@@ -1,0 +1,44 @@
+# Build directories
+build/
+bin/
+obj/
+out/
+dist/
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.suo
+*.db
+*.opendb
+Debug/
+Release/
+x64/
+x86/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vcpkg
+vcpkg_installed/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Project specific
+ftorrent.ico
+ftorrent.png
+*.torrent
+downloads/
