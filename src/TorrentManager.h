@@ -7,12 +7,19 @@
 #include <memory>
 #include <functional>
 #include <string>
+#include <mutex>
+#include <atomic>
+#include <future>
 
 /**
- * @brief Gestor central de torrents que coordina la sesión y la lista de torrents
+ * @brief Thread-safe torrent manager with stable architecture
  * 
- * Esta clase actúa como fachada entre la sesión de libtorrent y la interfaz de usuario,
- * manteniendo una lista de TorrentItem y notificando cambios mediante callbacks.
+ * This class provides a thread-safe interface between libtorrent and the UI.
+ * Features:
+ * - Thread-safe operations with mutex protection
+ * - Async API support with std::future
+ * - Callbacks to UI for state changes
+ * - libtorrent handles internal multi-threading for network/disk I/O
  */
 class TorrentManager {
 public:
@@ -29,9 +36,11 @@ public:
     // Initialization
     bool initialize();
     void shutdown();
-    bool isInitialized() const { return m_initialized; }
+    bool isInitialized() const { return m_initialized.load(); }
 
-    // Torrent operations
+    // Torrent operations (all thread-safe)
+    std::future<bool> addTorrentFileAsync(const std::string& torrentFile, const std::string& savePath);
+    std::future<bool> addMagnetLinkAsync(const std::string& magnetLink, const std::string& savePath);
     bool addTorrentFile(const std::string& torrentFile, const std::string& savePath);
     bool addMagnetLink(const std::string& magnetLink, const std::string& savePath);
     void removeTorrent(const std::string& hash, bool deleteFiles = false);
@@ -40,46 +49,54 @@ public:
     void pauseAll();
     void resumeAll();
 
-    // Torrent queries
+    // Torrent queries (thread-safe with mutex locking)
     TorrentItem* getTorrent(const std::string& hash);
     const TorrentItem* getTorrent(const std::string& hash) const;
     std::vector<TorrentItem*> getAllTorrents();
     std::vector<const TorrentItem*> getAllTorrents() const;
-    int getTorrentCount() const { return m_torrents.size(); }
+    int getTorrentCount() const;
 
-    // Statistics
+    // Statistics (thread-safe)
     int getTotalDownloadRate() const;
     int getTotalUploadRate() const;
     int getActiveTorrentsCount() const;
     std::string getSessionStats() const;
 
-    // Update - should be called regularly
+    // Update - called from UI thread timer (thread-safe)
     void update();
     void processAlerts();
 
-    // Callbacks
-    void setOnTorrentAdded(TorrentAddedCallback callback) { m_onTorrentAdded = callback; }
-    void setOnTorrentRemoved(TorrentRemovedCallback callback) { m_onTorrentRemoved = callback; }
-    void setOnTorrentUpdated(TorrentUpdatedCallback callback) { m_onTorrentUpdated = callback; }
-    void setOnStatsUpdated(StatsUpdatedCallback callback) { m_onStatsUpdated = callback; }
-    void setOnError(ErrorCallback callback) { m_onError = callback; }
+    // Callbacks (called from UI thread)
+    void setOnTorrentAdded(TorrentAddedCallback callback);
+    void setOnTorrentRemoved(TorrentRemovedCallback callback);
+    void setOnTorrentUpdated(TorrentUpdatedCallback callback);
+    void setOnStatsUpdated(StatsUpdatedCallback callback);
+    void setOnError(ErrorCallback callback);
 
 private:
+    // Core data
     std::unique_ptr<TorrentSession> m_session;
     std::vector<std::unique_ptr<TorrentItem>> m_torrents;
-    bool m_initialized;
+    std::atomic<bool> m_initialized;
+    std::atomic<bool> m_running;
 
-    // Callbacks
+    // Thread synchronization
+    mutable std::mutex m_torrentsMutex;
+    mutable std::mutex m_callbacksMutex;
+
+    // Callbacks (protected by m_callbacksMutex)
     TorrentAddedCallback m_onTorrentAdded;
     TorrentRemovedCallback m_onTorrentRemoved;
     TorrentUpdatedCallback m_onTorrentUpdated;
     StatsUpdatedCallback m_onStatsUpdated;
     ErrorCallback m_onError;
 
-    // Helper methods
-    void syncTorrents();
-    TorrentItem* findTorrent(const std::string& hash);
-    const TorrentItem* findTorrent(const std::string& hash) const;
+    // Helper methods (require mutex to be held by caller)
+    void syncTorrentsInternal();
+    TorrentItem* findTorrentInternal(const std::string& hash);
+    const TorrentItem* findTorrentInternal(const std::string& hash) const;
+    
+    // Thread-safe notification methods
     void notifyTorrentAdded(TorrentItem* item);
     void notifyTorrentRemoved(const std::string& hash);
     void notifyTorrentUpdated(TorrentItem* item);

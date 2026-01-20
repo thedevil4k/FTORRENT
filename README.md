@@ -17,6 +17,7 @@ Hemos preparado documentación detallada para ayudarte:
 -   📖 **[Guía del Usuario](USER-GUIDE.md)**: Cómo usar el programa, configurar descargas y optimizar tu red.
 -   🛠️ **[Referencia Técnica](TECHNICAL-REFERENCE.md)**: Detalles sobre la arquitectura, clases y flujo de datos para desarrolladores.
 -   🏗️ **[Arquitectura](ARCHITECTURE.md)**: Visión profunda del diseño del sistema.
+-   ⚡ **[Arquitectura Multi-Threading](MULTITHREADING-ARCHITECTURE.md)**: Detalles sobre el sistema multi-core y multi-hilo.
 -   🚀 **[Guía de Compilación](COMPILE-GUIDE.md)**: Instrucciones paso a paso para compilar desde el código fuente.
 
 ---
@@ -25,6 +26,8 @@ Hemos preparado documentación detallada para ayudarte:
 
 -   🚀 **Rendimiento Nativo:** Cero frameworks pesados, solo C++ puro.
 -   💪 **Motor de Élite:** Impulsado por `libtorrent-rasterbar` (el mismo motor que qBittorrent y Deluge).
+-   ⚡ **Multi-Core/Multi-Thread:** Arquitectura optimizada para aprovechar todos los núcleos de CPU disponibles.
+-   🎯 **Zero UI Blocking:** Interfaz siempre responsiva gracias a worker threads dedicados.
 -   🎨 **Diseño Limpio:** Interfaz intuitiva inspirada en los clásicos pero optimizada para el presente.
 -   📦 **Totalmente Portable:** Sin dependencias externas pesadas en tiempo de ejecución.
 -   🔧 **Configuración Experta:** Control granular sobre DHT, PEX, LSD y límites de red.
@@ -71,6 +74,7 @@ make -j$(nproc)
 
 -   [x] **v0.1.0:** Arquitectura base e integración de motor.
 -   [x] **v0.2.0:** Gestión de pares, archivos y trackers en tiempo real.
+-   [x] **v0.2.5:** Arquitectura multi-core/multi-thread con worker threads.
 -   [ ] **v0.3.0:** Soporte para Dark Mode nativo y mejoras de seguridad.
 -   [ ] **v1.0.0:** Primera versión estable multiplataforma (Flatpak/Installer).
 

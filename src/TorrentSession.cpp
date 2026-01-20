@@ -33,13 +33,19 @@ bool TorrentSession::initialize() {
             lt::alert_category::storage |
             lt::alert_category::tracker |
             lt::alert_category::connect |
-            lt::alert_category::peer);
+            lt::alert_category::peer |
+            lt::alert_category::dht |
+            lt::alert_category::port_mapping);
         
         // Connectivity and Discovery
         params.settings.set_bool(lt::settings_pack::enable_dht, sm.getDHTEnabled());
         params.settings.set_bool(lt::settings_pack::enable_lsd, sm.getLSDEnabled());
         params.settings.set_bool(lt::settings_pack::enable_upnp, sm.getUPnPEnabled());
         params.settings.set_bool(lt::settings_pack::enable_natpmp, true);
+        
+        // Default trackers for bootstrapping if needed
+        params.settings.set_str(lt::settings_pack::dht_bootstrap_nodes, 
+            "router.bittorrent.com:6881,router.utorrent.com:6881,dht.transmissionbt.com:6881,dht.libtorrent.org:25401");
         
         // Network settings
         std::string listen_if = "0.0.0.0:" + std::to_string(sm.getListenPort()) + ",[::]:" + std::to_string(sm.getListenPort());
@@ -198,16 +204,28 @@ int TorrentSession::getDownloadRate() const {
     if (!m_initialized || !m_session) {
         return 0;
     }
-    // TODO: Use metrics system for libtorrent 2.0
-    return 0;
+    int total = 0;
+    auto handles = m_session->get_torrents();
+    for (const auto& h : handles) {
+        if (h.is_valid()) {
+            total += h.status().download_rate;
+        }
+    }
+    return total;
 }
 
 int TorrentSession::getUploadRate() const {
     if (!m_initialized || !m_session) {
         return 0;
     }
-    // TODO: Use metrics system for libtorrent 2.0
-    return 0;
+    int total = 0;
+    auto handles = m_session->get_torrents();
+    for (const auto& h : handles) {
+        if (h.is_valid()) {
+            total += h.status().upload_rate;
+        }
+    }
+    return total;
 }
 
 void TorrentSession::processAlerts() {

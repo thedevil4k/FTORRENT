@@ -86,8 +86,8 @@ MainWindow::MainWindow(int w, int h, const char* title)
     // Restore window state
     restoreWindowState();
     
-    // Set up update timer (1 second)
-    Fl::add_timeout(1.0, updateTimerCallback, this);
+    // Set up update timer (100ms for faster alert processing)
+    Fl::add_timeout(0.1, updateTimerCallback, this);
 }
 
 MainWindow::~MainWindow() {
@@ -535,5 +535,5 @@ void MainWindow::updateTimerCallback(void* data) {
         win->updateToolbar(); // Keep toolbar updated as selection might change or items might disappear
     }
     
-    Fl::repeat_timeout(1.0, updateTimerCallback, data);
+    Fl::repeat_timeout(0.1, updateTimerCallback, data);
 }

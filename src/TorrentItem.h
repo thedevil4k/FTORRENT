@@ -5,6 +5,8 @@
 #include <libtorrent/torrent_status.hpp>
 #include <string>
 #include <cstdint>
+#include <mutex>
+#include <vector>
 
 namespace lt = libtorrent;
 
@@ -32,38 +34,38 @@ public:
     void update();
     
     // Getters - Basic Info
-    std::string getName() const { return m_name; }
-    std::string getSavePath() const { return m_savePath; }
-    std::string getHash() const { return m_hash; }
-    State getState() const { return m_state; }
-    std::string getStateString() const;
+    std::string getName() const { std::lock_guard<std::mutex> lock(m_mutex); return m_name; }
+    std::string getSavePath() const { std::lock_guard<std::mutex> lock(m_mutex); return m_savePath; }
+    std::string getHash() const { std::lock_guard<std::mutex> lock(m_mutex); return m_hash; }
+    State getState() const { std::lock_guard<std::mutex> lock(m_mutex); return m_state; }
+    std::string getStateString() const; // Implemented in cpp
     
     // Getters - Size Info
-    int64_t getTotalSize() const { return m_totalSize; }
-    int64_t getDownloaded() const { return m_downloaded; }
-    int64_t getUploaded() const { return m_uploaded; }
-    double getProgress() const { return m_progress; }
+    int64_t getTotalSize() const { std::lock_guard<std::mutex> lock(m_mutex); return m_totalSize; }
+    int64_t getDownloaded() const { std::lock_guard<std::mutex> lock(m_mutex); return m_downloaded; }
+    int64_t getUploaded() const { std::lock_guard<std::mutex> lock(m_mutex); return m_uploaded; }
+    double getProgress() const { std::lock_guard<std::mutex> lock(m_mutex); return m_progress; }
     
     // Getters - Speed Info
-    int getDownloadRate() const { return m_downloadRate; }
-    int getUploadRate() const { return m_uploadRate; }
+    int getDownloadRate() const { std::lock_guard<std::mutex> lock(m_mutex); return m_downloadRate; }
+    int getUploadRate() const { std::lock_guard<std::mutex> lock(m_mutex); return m_uploadRate; }
     
     // Getters - Peer Info
-    int getNumPeers() const { return m_numPeers; }
-    int getNumSeeds() const { return m_numSeeds; }
+    int getNumPeers() const { std::lock_guard<std::mutex> lock(m_mutex); return m_numPeers; }
+    int getNumSeeds() const { std::lock_guard<std::mutex> lock(m_mutex); return m_numSeeds; }
     
     // Getters - Time Info
-    int getETA() const; // in seconds
+    int getETA() const; // in seconds, impl in cpp needs lock? It accesses members, so yes.
     std::string getETAString() const;
-    int64_t getAddedTime() const { return m_addedTime; }
-    int64_t getCompletedTime() const { return m_completedTime; }
+    int64_t getAddedTime() const { std::lock_guard<std::mutex> lock(m_mutex); return m_addedTime; }
+    int64_t getCompletedTime() const { std::lock_guard<std::mutex> lock(m_mutex); return m_completedTime; }
     
     // Getters - Ratio
     double getRatio() const;
     
-    // Handle access
-    lt::torrent_handle& getHandle() { return m_handle; }
-    const lt::torrent_handle& getHandle() const { return m_handle; }
+    // Handle access - returns safe handle copy
+    lt::torrent_handle getHandle() { return m_handle; } 
+    const lt::torrent_handle getHandle() const { return m_handle; }
     bool isValid() const { return m_handle.is_valid(); }
     
     // Data structures for detailed info
@@ -101,6 +103,7 @@ public:
 
 private:
     lt::torrent_handle m_handle;
+    mutable std::mutex m_mutex;
     
     // Cached information
     std::string m_name;
