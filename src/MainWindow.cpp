@@ -1,14 +1,21 @@
 #include "MainWindow.h"
 #include "CreateTorrentDialog.h"
 #include "SettingsManager.h"
+#include "RemoveConfirmDialog.h"
 #include <FL/Fl.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Input.H>
 #include <FL/fl_ask.H>
 #include <FL/Fl_Shared_Image.H>
+#include <FL/Fl_PNG_Image.H>
 #include <sstream>
 #include <cstdint>
+#include <windows.h>
+#include <psapi.h>
+#include <iomanip>
+
+#pragma comment(lib, "psapi.lib")
 
 
 MainWindow::MainWindow(int w, int h, const char* title)
@@ -18,6 +25,10 @@ MainWindow::MainWindow(int w, int h, const char* title)
     , m_torrentList(nullptr)
     , m_statusBar(nullptr)
     , m_manager(nullptr)
+    , m_brightIcon(nullptr)
+    , m_darkIcon(nullptr)
+    , m_addIcon(nullptr)
+    , m_createIcon(nullptr)
 {
     // Initialize image support
     fl_register_images();
@@ -28,6 +39,41 @@ MainWindow::MainWindow(int w, int h, const char* title)
     }
     
     // Create UI components
+    // Load theme icons
+    Fl_PNG_Image* imgTemp;
+    
+    imgTemp = new Fl_PNG_Image("assets/bright.png");
+    if (imgTemp->d() == 0) { // Failed
+        delete imgTemp;
+    } else {
+        m_brightIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+    
+    imgTemp = new Fl_PNG_Image("assets/dark.png");
+    if (imgTemp->d() == 0) { // Failed
+        delete imgTemp;
+    } else {
+        m_darkIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+    
+    imgTemp = new Fl_PNG_Image("assets/addtorrent.png");
+    if (imgTemp->d() == 0) { // Failed
+        delete imgTemp;
+    } else {
+        m_addIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+
+    imgTemp = new Fl_PNG_Image("assets/createtorrent.png");
+    if (imgTemp->d() == 0) { // Failed
+        delete imgTemp;
+    } else {
+        m_createIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+
     createToolbar();
     createTorrentList();
     createStatusBar();
@@ -45,6 +91,8 @@ MainWindow::MainWindow(int w, int h, const char* title)
 }
 
 MainWindow::~MainWindow() {
+    delete m_brightIcon;
+    delete m_darkIcon;
     saveWindowState();
     Fl::remove_timeout(updateTimerCallback, this);
 }
@@ -60,17 +108,19 @@ void MainWindow::createToolbar() {
     
     // Add torrent button
     m_btnAdd = new Fl_Button(0, 0, 130, 30, "Add Torrent");
+    m_btnAdd->box(FL_FLAT_BOX);
     m_btnAdd->callback(onAddTorrent, this);
-    if (Resources::getAddIcon()) {
-        m_btnAdd->image(Resources::getAddIcon());
+    if (m_addIcon) {
+        m_btnAdd->image(m_addIcon);
         m_btnAdd->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
     }
     
     // Create torrent button
     m_btnCreate = new Fl_Button(0, 0, 130, 30, "Create Torrent");
+    m_btnCreate->box(FL_FLAT_BOX);
     m_btnCreate->callback(onCreateTorrent, this);
-    if (Resources::getAddIcon()) { // Using same icon for now
-        m_btnCreate->image(Resources::getAddIcon());
+    if (m_createIcon) { 
+        m_btnCreate->image(m_createIcon);
         m_btnCreate->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
     }
     
@@ -78,28 +128,22 @@ void MainWindow::createToolbar() {
     Fl_Box* spacer1 = new Fl_Box(0, 0, 20, 30);
     spacer1->box(FL_NO_BOX);
     
-    // Pause button
-    m_btnPause = new Fl_Button(0, 0, 80, 30, "Pause");
-    m_btnPause->callback(onPause, this);
+    // Toggle Pause/Resume button
+    m_btnTogglePause = new Fl_Button(0, 0, 40, 30);
+    m_btnTogglePause->box(FL_FLAT_BOX);
+    m_btnTogglePause->tooltip("Pause/Resume");
+    m_btnTogglePause->callback(onTogglePause, this);
     if (Resources::getPauseIcon()) {
-        m_btnPause->image(Resources::getPauseIcon());
-        m_btnPause->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
-    }
-    
-    // Resume button
-    m_btnResume = new Fl_Button(0, 0, 90, 30, "Resume");
-    m_btnResume->callback(onResume, this);
-    if (Resources::getPlayIcon()) {
-        m_btnResume->image(Resources::getPlayIcon());
-        m_btnResume->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
+        m_btnTogglePause->image(Resources::getPauseIcon());
     }
     
     // Remove button
-    m_btnRemove = new Fl_Button(0, 0, 90, 30, "Remove");
+    m_btnRemove = new Fl_Button(0, 0, 40, 30);
+    m_btnRemove->box(FL_FLAT_BOX);
+    m_btnRemove->tooltip("Remove Torrent");
     m_btnRemove->callback(onRemove, this);
     if (Resources::getRemoveIcon()) {
         m_btnRemove->image(Resources::getRemoveIcon());
-        m_btnRemove->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
     }
     
     // Spacer
@@ -108,6 +152,7 @@ void MainWindow::createToolbar() {
     
     // Preferences button
     Fl_Button* btnPrefs = new Fl_Button(0, 0, 120, 30, "Preferences");
+    btnPrefs->box(FL_FLAT_BOX);
     btnPrefs->callback(onPreferences, this);
     if (Resources::getSettingsIcon()) {
         btnPrefs->image(Resources::getSettingsIcon());
@@ -115,7 +160,9 @@ void MainWindow::createToolbar() {
     }
     
     // Theme button
-    m_darkModeBtn = new Fl_Button(0, 0, 110, 30, "Dark Mode");
+    m_darkModeBtn = new Fl_Button(0, 0, 30, 30);
+    m_darkModeBtn->box(FL_FLAT_BOX);
+    m_darkModeBtn->tooltip("Switch Theme");
     m_darkModeBtn->callback(onToggleTheme, this);
     
     m_toolbar->end();
@@ -203,8 +250,32 @@ void MainWindow::updateToolbar() {
     
     bool hasSelection = m_torrentList->hasSelection();
     
-    if (m_btnPause) hasSelection ? m_btnPause->activate() : m_btnPause->deactivate();
-    if (m_btnResume) hasSelection ? m_btnResume->activate() : m_btnResume->deactivate();
+    if (m_btnTogglePause) {
+        if (hasSelection) {
+            m_btnTogglePause->activate();
+            
+            // Check state of first selected item to determine button state
+            bool isPaused = false;
+            auto selected = m_torrentList->getSelectedTorrents();
+            if (!selected.empty()) {
+                isPaused = (selected[0]->getState() == TorrentItem::State::Paused);
+            }
+            
+            if (isPaused) {
+                m_btnTogglePause->tooltip("Resume");
+                if (Resources::getPlayIcon()) m_btnTogglePause->image(Resources::getPlayIcon());
+            } else {
+                m_btnTogglePause->tooltip("Pause");
+                if (Resources::getPauseIcon()) m_btnTogglePause->image(Resources::getPauseIcon());
+            }
+        } else {
+            m_btnTogglePause->deactivate();
+            m_btnTogglePause->tooltip("Pause");
+            if (Resources::getPauseIcon()) m_btnTogglePause->image(Resources::getPauseIcon());
+        }
+        m_btnTogglePause->redraw();
+    }
+    
     if (m_btnRemove) hasSelection ? m_btnRemove->activate() : m_btnRemove->deactivate();
 }
 
@@ -213,30 +284,37 @@ void MainWindow::applyTheme() {
     
     if (darkMode) {
         // Dark Mode Colors
-        Fl::background(0, 0, 0);       // Fondo negro absoluto para la ventana
-        Fl::background2(20, 20, 20);   // Casi negro para las listas
-        Fl::foreground(255, 255, 255); // Blanco puro para el texto
+        Fl::background(0, 0, 0);       // Absolute black background for window
+        Fl::background2(20, 20, 20);   // Near black for lists
+        Fl::foreground(255, 255, 255); // Pure white for text
         
-        // Colores de selección
+        // Selection colors
         Fl::set_color(FL_SELECTION_COLOR, 40, 80, 160);
         
-        // Colores para el efecto 3D de los botones (bordes)
-        // Redefinimos los grises que usa FLTK para el sombreado de cajas
-        Fl::set_color(FL_GRAY0, 70, 70, 70);   // Un gris medio-oscuro para los bordes
-        Fl::set_color(FL_DARK3, 40, 40, 40);   // Gris más oscuro para sombras profundas
-        Fl::set_color(FL_LIGHT3, 100, 100, 100); // Gris más claro para brillos
+        // 3D effect colors (redefining grays for borders)
+        Fl::set_color(FL_GRAY0, 70, 70, 70);   // Dark-mid gray for borders
+        Fl::set_color(FL_DARK3, 40, 40, 40);   // Darker gray for deep shadows
+        Fl::set_color(FL_LIGHT3, 100, 100, 100); // Lighter gray for highlights
         
-        if (m_darkModeBtn) m_darkModeBtn->label("Light Mode");
+        if (m_darkModeBtn) {
+            m_darkModeBtn->label(nullptr);
+            if (m_darkIcon) m_darkModeBtn->image(m_darkIcon);
+            else m_darkModeBtn->label("Light Mode");
+        }
     } else {
         // Light Mode Colors
-        Fl::background(225, 225, 225); // Gris claro estándar (tipo Windows clásico)
+        Fl::background(225, 225, 225); // Standard light gray
         Fl::background2(255, 255, 255);
         Fl::foreground(0, 0, 0);
         
         // Reset colors to defaults
-        Fl::set_color(FL_SELECTION_COLOR, 0, 81, 255); // Azul estándar
+        Fl::set_color(FL_SELECTION_COLOR, 0, 81, 255); // Standard Blue
         
-        if (m_darkModeBtn) m_darkModeBtn->label("Dark Mode");
+        if (m_darkModeBtn) {
+            m_darkModeBtn->label(nullptr);
+            if (m_brightIcon) m_darkModeBtn->image(m_brightIcon);
+            else m_darkModeBtn->label("Dark Mode");
+        }
     }
     
     // Aplicar a todos los widgets existentes
@@ -279,7 +357,21 @@ std::string MainWindow::formatStatusBar() const {
         oss << "Idle";
     }
     
+    // Add RAM usage
+    oss << "  |  RAM: " << getRamUsage();
+    
     return oss.str();
+}
+
+std::string MainWindow::getRamUsage() const {
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+        double memMB = pmc.WorkingSetSize / (1024.0 * 1024.0);
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(1) << memMB << " MB";
+        return oss.str();
+    }
+    return "0.0 MB";
 }
 
 void MainWindow::showAddTorrentDialog() {
@@ -333,22 +425,24 @@ void MainWindow::showAboutDialog() {
     );
 }
 
-void MainWindow::pauseSelectedTorrents() {
+void MainWindow::toggleSelectedTorrents() {
     if (!m_manager || !m_torrentList) return;
     
     auto selected = m_torrentList->getSelectedTorrents();
-    for (auto* torrent : selected) {
-        m_manager->pauseTorrent(torrent->getHash());
-    }
-}
+    if (selected.empty()) return;
 
-void MainWindow::resumeSelectedTorrents() {
-    if (!m_manager || !m_torrentList) return;
-    
-    auto selected = m_torrentList->getSelectedTorrents();
+    // Determine action based on the *first* selected item
+    bool shouldResume = (selected[0]->getState() == TorrentItem::State::Paused);
+
     for (auto* torrent : selected) {
-        m_manager->resumeTorrent(torrent->getHash());
+        if (shouldResume) {
+            m_manager->resumeTorrent(torrent->getHash());
+        } else {
+            m_manager->pauseTorrent(torrent->getHash());
+        }
     }
+    
+    updateUI();
 }
 
 void MainWindow::removeSelectedTorrents(bool deleteFiles) {
@@ -357,11 +451,12 @@ void MainWindow::removeSelectedTorrents(bool deleteFiles) {
     auto selected = m_torrentList->getSelectedTorrents();
     if (selected.empty()) return;
     
-    const char* msg = deleteFiles ? 
-        "Remove selected torrents and delete files?" :
-        "Remove selected torrents?";
+    RemoveConfirmDialog* dlg = new RemoveConfirmDialog(selected.size());
+    int result = dlg->show_modal();
+    bool shouldDeleteFiles = dlg->shouldDeleteFiles();
+    delete dlg;
     
-    if (fl_choice(msg, "Cancel", "Remove", nullptr) == 1) {
+    if (result == 1) { // Removed
         // Collect hashes first to avoid dangling pointers if removals trigger list updates
         std::vector<std::string> hashes;
         for (auto* torrent : selected) {
@@ -371,7 +466,7 @@ void MainWindow::removeSelectedTorrents(bool deleteFiles) {
         }
         
         for (const auto& hash : hashes) {
-            m_manager->removeTorrent(hash, deleteFiles);
+            m_manager->removeTorrent(hash, shouldDeleteFiles);
         }
     }
 }
@@ -416,12 +511,8 @@ void MainWindow::onCreateTorrent(Fl_Widget* w, void* data) {
     ((MainWindow*)data)->showCreateTorrentDialog();
 }
 
-void MainWindow::onPause(Fl_Widget* w, void* data) {
-    ((MainWindow*)data)->pauseSelectedTorrents();
-}
-
-void MainWindow::onResume(Fl_Widget* w, void* data) {
-    ((MainWindow*)data)->resumeSelectedTorrents();
+void MainWindow::onTogglePause(Fl_Widget* w, void* data) {
+    ((MainWindow*)data)->toggleSelectedTorrents();
 }
 
 void MainWindow::onRemove(Fl_Widget* w, void* data) {

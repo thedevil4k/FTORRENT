@@ -46,8 +46,7 @@ public:
     void showAboutDialog();
     
     // Torrent actions
-    void pauseSelectedTorrents();
-    void resumeSelectedTorrents();
+    void toggleSelectedTorrents();
     void removeSelectedTorrents(bool deleteFiles = false);
     
 private:
@@ -55,8 +54,7 @@ private:
     Fl_Pack* m_toolbar;
     Fl_Button* m_btnAdd;
     Fl_Button* m_btnCreate;
-    Fl_Button* m_btnPause;
-    Fl_Button* m_btnResume;
+    Fl_Button* m_btnTogglePause;
     Fl_Button* m_btnRemove;
     Fl_Button* m_darkModeBtn;
     TorrentListWidget* m_torrentList;
@@ -64,6 +62,13 @@ private:
     
     // Manager
     TorrentManager* m_manager;
+    
+    // Icons
+    // Icons
+    Fl_Image* m_brightIcon;
+    Fl_Image* m_darkIcon;
+    Fl_Image* m_addIcon;
+    Fl_Image* m_createIcon;
     
     // Layout constants
     static constexpr int MENU_HEIGHT = 0;
@@ -81,8 +86,7 @@ private:
     // Toolbar button callbacks
     static void onAddTorrent(Fl_Widget* w, void* data);
     static void onCreateTorrent(Fl_Widget* w, void* data);
-    static void onPause(Fl_Widget* w, void* data);
-    static void onResume(Fl_Widget* w, void* data);
+    static void onTogglePause(Fl_Widget* w, void* data);
     static void onRemove(Fl_Widget* w, void* data);
     static void onPreferences(Fl_Widget* w, void* data);
     static void onToggleTheme(Fl_Widget* w, void* data);
@@ -94,6 +98,7 @@ private:
     void saveWindowState();
     void restoreWindowState();
     std::string formatStatusBar() const;
+    std::string getRamUsage() const;
 };
 
 #endif // MAINWINDOW_H

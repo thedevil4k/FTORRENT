@@ -65,6 +65,8 @@ if not exist "%OUTPUT%" mkdir "%OUTPUT%"
 REM Copy files
 copy /Y Release\FLTorrent.exe "%OUTPUT%\"
 xcopy /Y /Q C:\vcpkg\installed\x64-windows\bin\*.dll "%OUTPUT%\" 2>nul
+if not exist "%OUTPUT%\assets" mkdir "%OUTPUT%\assets"
+xcopy /Y /E /Q "..\src\assets\*.*" "%OUTPUT%\assets\"
 
 echo.
 echo SUCCESS! FLTorrent compiled to: %OUTPUT%

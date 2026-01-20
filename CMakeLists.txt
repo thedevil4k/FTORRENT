@@ -39,6 +39,7 @@ set(SOURCES
     src/TorrentDetailsDialog.cpp
     src/Resources.cpp
     src/PathUtils.cpp
+    src/RemoveConfirmDialog.cpp
 )
 
 if(WIN32)
@@ -59,6 +60,7 @@ set(HEADERS
     src/Resources.h
     src/Icons.h
     src/PathUtils.h
+    src/RemoveConfirmDialog.h
 )
 
 # Add executable

@@ -5,6 +5,8 @@
 #include <FL/Fl_File_Chooser.H>
 #include <FL/fl_ask.H>
 #include "PathUtils.h"
+#include <iomanip>
+#include <filesystem>
 
 AddTorrentDialog::AddTorrentDialog()
     : Fl_Window(500, 520, "Add Torrent")
@@ -212,12 +214,25 @@ void AddTorrentDialog::updateFileList(const std::string& torrentPath) {
         lt::torrent_info info(torrentPath);
         std::ostringstream oss;
         
-        oss << std::left << std::setw(40) << "Filename" << " | " << "Size" << "\n";
-        oss << std::string(55, '-') << "\n";
+
+        oss << std::left << std::setw(35) << "Filename" << " | " 
+            << std::setw(8) << "Ext" << " | " 
+            << "Size" << "\n";
+        oss << std::string(60, '-') << "\n";
         
         auto const& fs = info.files();
         for (int i = 0; i < fs.num_files(); ++i) {
-            oss << std::left << std::setw(40) << fs.file_name(lt::file_index_t(i)).to_string().substr(0, 39) << " | "
+            std::string fname = fs.file_name(lt::file_index_t(i)).to_string();
+            std::filesystem::path p(fname);
+            std::string ext = p.extension().string();
+            // Remove leading dot if present
+            if (!ext.empty() && ext[0] == '.') ext = ext.substr(1);
+            
+            // Truncate filename if needed
+            if (fname.length() > 34) fname = fname.substr(0, 31) + "...";
+
+            oss << std::left << std::setw(35) << fname << " | "
+                << std::setw(8) << ext << " | "
                 << TorrentItem::formatSize(fs.file_size(lt::file_index_t(i))) << "\n";
         }
         
