@@ -49,6 +49,9 @@ public:
     void pauseAll();
     void resumeAll();
 
+    // Network limits
+    void setRateLimits(int downloadKBps, int uploadKBps);
+
     // Torrent queries (thread-safe with mutex locking)
     TorrentItem* getTorrent(const std::string& hash);
     const TorrentItem* getTorrent(const std::string& hash) const;

@@ -38,6 +38,7 @@ public:
     // Theme
     void applyTheme();
     void toggleDarkMode();
+    void toggleNetworkLimit();
     
     // Actions
     void showAddTorrentDialog();
@@ -59,6 +60,8 @@ private:
     Fl_Button* m_darkModeBtn;
     TorrentListWidget* m_torrentList;
     Fl_Box* m_statusBar;
+    Fl_Button* m_btnLimit;
+    bool m_limitModerate;
     
     // Manager
     TorrentManager* m_manager;
@@ -90,6 +93,7 @@ private:
     static void onRemove(Fl_Widget* w, void* data);
     static void onPreferences(Fl_Widget* w, void* data);
     static void onToggleTheme(Fl_Widget* w, void* data);
+    static void onToggleLimit(Fl_Widget* w, void* data);
     
     // Update timer
     static void updateTimerCallback(void* data);

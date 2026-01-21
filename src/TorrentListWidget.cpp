@@ -74,6 +74,11 @@ void TorrentListWidget::removeTorrent(const std::string& hash) {
         });
     
     if (it != m_torrents.end()) {
+        // Clear selection to avoid graphical glitches with indices
+        for (int i = 0; i < rows(); i++) {
+            select_row(i, 0);
+        }
+        
         m_torrents.erase(it, m_torrents.end());
         updateSortedIndices();
         rows(m_torrents.size());

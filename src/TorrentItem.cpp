@@ -58,6 +58,13 @@ void TorrentItem::update() {
         // State info
         updateState(status);
         
+        // If paused, force rates to 0 for UI clarity
+        if (m_state == State::Paused) {
+            m_downloadRate = 0;
+            m_uploadRate = 0;
+            m_numPeers = 0;
+        }
+        
         // Time info
         m_addedTime = status.added_time;
 

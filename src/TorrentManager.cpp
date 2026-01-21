@@ -4,6 +4,7 @@
 #include <libtorrent/hex.hpp>
 #include <chrono>
 #include <fstream>
+#include <filesystem>
 
 TorrentManager::TorrentManager()
     : m_initialized(false)
@@ -36,6 +37,9 @@ bool TorrentManager::initialize() {
     // Get number of hardware threads for info
     size_t numThreads = std::max(2u, std::min(8u, std::thread::hardware_concurrency()));
     std::cout << "TorrentManager initialized (using " << numThreads << " CPU cores available)" << std::endl;
+    
+    // Load resident torrents (persistence)
+    m_session->loadResidentTorrents();
     
     return true;
 }
@@ -135,12 +139,13 @@ void TorrentManager::removeTorrent(const std::string& hash, bool deleteFiles) {
     
     // Remove from session
     m_session->removeTorrent(handle, deleteFiles);
+    m_session->removeResumeData(hash);
     
+    // Notify before erasing while pointer is still valid
+    notifyTorrentRemoved(hash);
+
     // Remove from our list (this deletes the object)
     m_torrents.erase(it);
-    
-    // Notify after releasing - call outside lock would be better but keeping simple
-    // Note: callback should be quick
 }
 
 void TorrentManager::pauseTorrent(const std::string& hash) {
@@ -178,6 +183,12 @@ void TorrentManager::resumeAll() {
     for (auto& torrent : m_torrents) {
         m_session->resumeTorrent(torrent->getHandle());
         torrent->update();
+    }
+}
+
+void TorrentManager::setRateLimits(int downloadKBps, int uploadKBps) {
+    if (m_session) {
+        m_session->setRateLimits(downloadKBps, uploadKBps);
     }
 }
 
@@ -269,7 +280,15 @@ void TorrentManager::update() {
         // Update all torrent items
         for (auto& torrent : m_torrents) {
             torrent->update();
+            notifyTorrentUpdated(torrent.get());
         }
+    }
+
+    // Periodic resume data saving (every 30 seconds)
+    static auto lastSave = std::chrono::steady_clock::now();
+    if (std::chrono::steady_clock::now() - lastSave > std::chrono::seconds(30)) {
+        m_session->triggerSaveResumeData();
+        lastSave = std::chrono::steady_clock::now();
     }
 
     // Notify UI about updates (outside lock to prevent deadlock)
@@ -341,6 +360,7 @@ void TorrentManager::syncTorrentsInternal() {
     
     // 2. Remove identified torrents
     for (const auto& hash : toRemove) {
+        notifyTorrentRemoved(hash);
         m_torrents.erase(
             std::remove_if(m_torrents.begin(), m_torrents.end(),
                 [&hash](const std::unique_ptr<TorrentItem>& item) {
@@ -374,7 +394,9 @@ void TorrentManager::syncTorrentsInternal() {
             }
 
             auto newTorrent = std::make_unique<TorrentItem>(handle);
+            TorrentItem* ptr = newTorrent.get();
             m_torrents.push_back(std::move(newTorrent));
+            notifyTorrentAdded(ptr);
         }
     }
 }

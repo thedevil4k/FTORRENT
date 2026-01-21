@@ -4,7 +4,15 @@
 #include <libtorrent/alert_types.hpp>
 #include <libtorrent/torrent_info.hpp>
 #include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <libtorrent/write_resume_data.hpp>
+#include <libtorrent/bencode.hpp>
 #include "SettingsManager.h"
+#include "PathUtils.h"
+#include "TorrentItem.h"
+
+namespace fs = std::filesystem;
 
 TorrentSession::TorrentSession() 
     : m_initialized(false) {
@@ -172,12 +180,14 @@ void TorrentSession::removeTorrent(const lt::torrent_handle& handle, bool delete
 
 void TorrentSession::pauseTorrent(const lt::torrent_handle& handle) {
     if (handle.is_valid()) {
+        handle.unset_flags(lt::torrent_flags::auto_managed);
         handle.pause();
     }
 }
 
 void TorrentSession::resumeTorrent(const lt::torrent_handle& handle) {
     if (handle.is_valid()) {
+        handle.set_flags(lt::torrent_flags::auto_managed);
         handle.resume();
     }
 }
@@ -198,6 +208,17 @@ std::string TorrentSession::getSessionStats() const {
     std::string stats = "Session stats (libtorrent 2.0 system)\n";
     // TODO: Implement metrics gathering via alerts
     return stats;
+}
+
+void TorrentSession::setRateLimits(int downloadKBps, int uploadKBps) {
+    if (!m_initialized || !m_session) return;
+    
+    lt::settings_pack pack;
+    // libtorrent uses bytes per second
+    pack.set_int(lt::settings_pack::download_rate_limit, downloadKBps > 0 ? downloadKBps * 1024 : 0);
+    pack.set_int(lt::settings_pack::upload_rate_limit, uploadKBps > 0 ? uploadKBps * 1024 : 0);
+    
+    m_session->apply_settings(pack);
 }
 
 int TorrentSession::getDownloadRate() const {
@@ -228,6 +249,14 @@ int TorrentSession::getUploadRate() const {
     return total;
 }
 
+void TorrentSession::removeResumeData(const std::string& hash) {
+    std::string path = getResumeDataPath();
+    std::string fileName = path + "/" + hash + ".fastresume";
+    if (fs::exists(fileName)) {
+        fs::remove(fileName);
+    }
+}
+
 void TorrentSession::processAlerts() {
     if (!m_initialized || !m_session) {
         return;
@@ -254,15 +283,106 @@ void TorrentSession::processAlerts() {
                 std::cerr << msg << std::endl;
                 if (m_errorCallback) m_errorCallback(msg);
             } else {
+                add->handle.set_flags(lt::torrent_flags::auto_managed);
                 add->handle.resume(); // Ensure it starts
+                // Trigger an initial save
+                add->handle.save_resume_data();
             }
         }
         else if (auto* ma = lt::alert_cast<lt::metadata_received_alert>(alert)) {
             std::cout << "Metadata received for: " << ma->torrent_name() << std::endl;
+            ma->handle.save_resume_data();
+        }
+        else if (auto* rd = lt::alert_cast<lt::save_resume_data_alert>(alert)) {
+            writeResumeData(rd);
+        }
+        else if (auto* rdf = lt::alert_cast<lt::save_resume_data_failed_alert>(alert)) {
+            std::cerr << "Save resume data failed: " << rdf->message() << std::endl;
         }
         else if (auto* tea = lt::alert_cast<lt::tracker_error_alert>(alert)) {
             // Log tracker errors but don't alert user every time as they are common
             std::cerr << "Tracker error: " << tea->tracker_url() << " - " << tea->error_message() << std::endl;
         }
     }
+}
+
+void TorrentSession::triggerSaveResumeData() {
+    if (!m_initialized || !m_session) return;
+    
+    auto torrents = m_session->get_torrents();
+    for (auto& h : torrents) {
+        if (h.is_valid() && h.status().has_metadata) {
+            h.save_resume_data();
+        }
+    }
+}
+
+void TorrentSession::loadResidentTorrents() {
+    if (!m_initialized || !m_session) return;
+    
+    std::string path = getResumeDataPath();
+    if (!fs::exists(path)) return;
+    
+    int loaded = 0;
+    for (const auto& entry : fs::directory_iterator(path)) {
+        if (entry.path().extension() == ".fastresume") {
+            try {
+                std::ifstream is(entry.path(), std::ios::binary);
+                std::vector<char> resume_data((std::istreambuf_iterator<char>(is)), std::istreambuf_iterator<char>());
+                
+                if (resume_data.empty()) continue;
+                
+                lt::error_code ec;
+                lt::add_torrent_params params = lt::read_resume_data(resume_data, ec);
+                
+                if (ec) {
+                    std::cerr << "Error reading resume data: " << ec.message() << std::endl;
+                    continue;
+                }
+                
+                params.flags |= lt::torrent_flags::auto_managed;
+                m_session->async_add_torrent(params);
+                loaded++;
+            } catch (...) {
+                std::cerr << "Failed to load: " << entry.path().string() << std::endl;
+            }
+        }
+    }
+    std::cout << "Loaded " << loaded << " torrents from resume data." << std::endl;
+}
+
+void TorrentSession::writeResumeData(const lt::save_resume_data_alert* rd) {
+    if (!rd) return;
+    
+    std::string path = getResumeDataPath();
+    if (!fs::exists(path)) {
+        fs::create_directories(path);
+    }
+    
+    // Use info-hash as filename
+    std::string hash = TorrentItem::toHex(rd->handle.info_hashes().v1);
+    std::string fileName = path + "/" + hash + ".fastresume";
+    
+    std::ofstream os(fileName, std::ios::binary);
+    if (os.is_open()) {
+        std::vector<char> bencoded = lt::write_resume_data_buf(rd->params);
+        os.write(bencoded.data(), bencoded.size());
+        os.close();
+    }
+}
+
+std::string TorrentSession::getResumeDataPath() const {
+#ifdef _WIN32
+    char* appData = getenv("APPDATA");
+    if (appData) {
+        return std::string(appData) + "\\FTORRENT\\torrents";
+    }
+    return "torrents";
+#else
+    const char* home = getenv("HOME");
+    if (home) {
+        return std::string(home) + "/.config/ftorrent/torrents";
+    }
+    return "torrents";
+#endif
 }

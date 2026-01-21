@@ -33,6 +33,14 @@ public:
     void pauseTorrent(const lt::torrent_handle& handle);
     void resumeTorrent(const lt::torrent_handle& handle);
     
+    // Rate limiting
+    void setRateLimits(int downloadKBps, int uploadKBps);
+    
+    // Persistence
+    void triggerSaveResumeData();
+    void loadResidentTorrents();
+    void removeResumeData(const std::string& hash);
+    
     // Information getters
     std::vector<lt::torrent_handle> getTorrents() const;
     std::string getSessionStats() const;
@@ -51,6 +59,8 @@ private:
     ErrorCallback m_errorCallback;
     
     void setupSessionSettings();
+    void writeResumeData(const lt::save_resume_data_alert* rd);
+    std::string getResumeDataPath() const;
 };
 
 #endif // TORRENTSESSION_H

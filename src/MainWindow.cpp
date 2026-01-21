@@ -29,6 +29,7 @@ MainWindow::MainWindow(int w, int h, const char* title)
     , m_darkIcon(nullptr)
     , m_addIcon(nullptr)
     , m_createIcon(nullptr)
+    , m_limitModerate(false)
 {
     // Initialize image support
     fl_register_images();
@@ -107,7 +108,7 @@ void MainWindow::createToolbar() {
     m_toolbar->begin();
     
     // Add torrent button
-    m_btnAdd = new Fl_Button(0, 0, 130, 30, "Add Torrent");
+    m_btnAdd = new Fl_Button(0, 0, 130, 30, " Add Torrent");
     m_btnAdd->box(FL_FLAT_BOX);
     m_btnAdd->callback(onAddTorrent, this);
     if (m_addIcon) {
@@ -116,7 +117,7 @@ void MainWindow::createToolbar() {
     }
     
     // Create torrent button
-    m_btnCreate = new Fl_Button(0, 0, 130, 30, "Create Torrent");
+    m_btnCreate = new Fl_Button(0, 0, 130, 30, " Create Torrent");
     m_btnCreate->box(FL_FLAT_BOX);
     m_btnCreate->callback(onCreateTorrent, this);
     if (m_createIcon) { 
@@ -182,6 +183,13 @@ void MainWindow::createStatusBar() {
     m_statusBar->box(FL_DOWN_BOX);
     m_statusBar->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     m_statusBar->label("Ready");
+
+    // Add limit button to the right of status bar
+    m_btnLimit = new Fl_Button(w() - 100, y + 2, 90, STATUS_HEIGHT - 4, "Limit: OFF");
+    m_btnLimit->box(FL_FLAT_BOX);
+    m_btnLimit->labelsize(11);
+    m_btnLimit->callback(onToggleLimit, this);
+    m_btnLimit->tooltip("Toggle between Limit (50%) and Unlimited network usage");
 }
 
 void MainWindow::setTorrentManager(TorrentManager* manager) {
@@ -327,6 +335,16 @@ void MainWindow::applyTheme() {
     if (m_torrentList) {
         m_torrentList->redraw();
     }
+    
+    if (m_btnLimit) {
+        if (darkMode) {
+            m_btnLimit->color(fl_rgb_color(40, 40, 40));
+            m_btnLimit->labelcolor(FL_WHITE);
+        } else {
+            m_btnLimit->color(fl_rgb_color(210, 210, 210));
+            m_btnLimit->labelcolor(FL_BLACK);
+        }
+    }
 }
 
 void MainWindow::toggleDarkMode() {
@@ -334,6 +352,38 @@ void MainWindow::toggleDarkMode() {
     SettingsManager::instance().setDarkMode(!current);
     SettingsManager::instance().save();
     applyTheme();
+}
+
+void MainWindow::toggleNetworkLimit() {
+    m_limitModerate = !m_limitModerate;
+    
+    if (m_btnLimit) {
+        m_btnLimit->label(m_limitModerate ? "Limit: 50%" : "Limit: OFF");
+        m_btnLimit->redraw();
+    }
+    
+    if (m_manager) {
+        if (m_limitModerate) {
+            // Half the speed of what is in settings (or a default if 0)
+            int maxDown = SettingsManager::instance().getMaxDownloadRate();
+            int maxUp = SettingsManager::instance().getMaxUploadRate();
+            
+            // If settings say unlimited (0), we pick a reasonable high value to halve, 
+            // but usually limit means some fixed restriction.
+            // Let's assume moderate is halving the current settings, 
+            // and if they are 0, we set a specific moderate limit (e.g. 500 KB/s down, 100 KB/s up)
+            int limitDown = (maxDown > 0) ? maxDown / 2 : 1000; 
+            int limitUp = (maxUp > 0) ? maxUp / 2 : 200;
+            
+            m_manager->setRateLimits(limitDown, limitUp);
+        } else {
+            // Restore from settings
+            m_manager->setRateLimits(
+                SettingsManager::instance().getMaxDownloadRate(),
+                SettingsManager::instance().getMaxUploadRate()
+            );
+        }
+    }
 }
 
 std::string MainWindow::formatStatusBar() const {
@@ -525,6 +575,10 @@ void MainWindow::onPreferences(Fl_Widget* w, void* data) {
 
 void MainWindow::onToggleTheme(Fl_Widget* w, void* data) {
     ((MainWindow*)data)->toggleDarkMode();
+}
+
+void MainWindow::onToggleLimit(Fl_Widget* w, void* data) {
+    ((MainWindow*)data)->toggleNetworkLimit();
 }
 
 void MainWindow::updateTimerCallback(void* data) {
