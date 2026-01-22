@@ -67,17 +67,6 @@ mkdir build && cd build
 cmake ..
 make -j$(nproc)
 ```
-
----
-
-## 🗺️ Roadmap
-
--   [x] **v0.1.0:** Base architecture and engine integration.
--   [x] **v0.2.0:** Real-time peer, file and tracker management.
--   [x] **v0.2.5:** Multi-core/multi-threaded architecture with worker threads.
--   [ ] **v0.3.0:** Native Dark Mode support and security improvements.
--   [ ] **v1.0.0:** First stable cross-platform version (Flatpak/Installer).
-
 ---
 
 ## 🤝 Contributing
