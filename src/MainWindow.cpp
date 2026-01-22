@@ -2,6 +2,9 @@
 #include "CreateTorrentDialog.h"
 #include "SettingsManager.h"
 #include "RemoveConfirmDialog.h"
+#include "Resources.h"
+#include "SystemUtils.h"
+#include "PathUtils.h"
 #include <FL/Fl.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_File_Chooser.H>
@@ -9,13 +12,15 @@
 #include <FL/fl_ask.H>
 #include <FL/Fl_Shared_Image.H>
 #include <FL/Fl_PNG_Image.H>
+#include <FL/x.H>
 #include <sstream>
 #include <cstdint>
-#include <windows.h>
-#include <psapi.h>
 #include <iomanip>
 
-#pragma comment(lib, "psapi.lib")
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+#endif
 
 
 MainWindow::MainWindow(int w, int h, const char* title)
@@ -36,14 +41,19 @@ MainWindow::MainWindow(int w, int h, const char* title)
     
     // Set application icon
     if (Resources::getLogoImage()) {
-        icon(Resources::getLogoImage());
+        icon((const Fl_RGB_Image*)Resources::getLogoImage());
     }
     
     // Create UI components
     // Load theme icons
+    std::string appDir = PathUtils::getAppDirPath();
+    std::string assetsDir = appDir + "/assets/";
+    // Normalize slashes for FLTK image loader
+    std::replace(assetsDir.begin(), assetsDir.end(), '\\', '/');
+
     Fl_PNG_Image* imgTemp;
     
-    imgTemp = new Fl_PNG_Image("assets/bright.png");
+    imgTemp = new Fl_PNG_Image((assetsDir + "bright.png").c_str());
     if (imgTemp->d() == 0) { // Failed
         delete imgTemp;
     } else {
@@ -51,7 +61,7 @@ MainWindow::MainWindow(int w, int h, const char* title)
         delete imgTemp;
     }
     
-    imgTemp = new Fl_PNG_Image("assets/dark.png");
+    imgTemp = new Fl_PNG_Image((assetsDir + "dark.png").c_str());
     if (imgTemp->d() == 0) { // Failed
         delete imgTemp;
     } else {
@@ -59,7 +69,7 @@ MainWindow::MainWindow(int w, int h, const char* title)
         delete imgTemp;
     }
     
-    imgTemp = new Fl_PNG_Image("assets/addtorrent.png");
+    imgTemp = new Fl_PNG_Image((assetsDir + "addtorrent.png").c_str());
     if (imgTemp->d() == 0) { // Failed
         delete imgTemp;
     } else {
@@ -67,7 +77,7 @@ MainWindow::MainWindow(int w, int h, const char* title)
         delete imgTemp;
     }
 
-    imgTemp = new Fl_PNG_Image("assets/createtorrent.png");
+    imgTemp = new Fl_PNG_Image((assetsDir + "createtorrent.png").c_str());
     if (imgTemp->d() == 0) { // Failed
         delete imgTemp;
     } else {
@@ -89,9 +99,16 @@ MainWindow::MainWindow(int w, int h, const char* title)
     
     // Set up update timer (100ms for faster alert processing)
     Fl::add_timeout(0.1, updateTimerCallback, this);
+
+#ifdef _WIN32
+    Fl::add_handler(win_event_handler);
+#endif
 }
 
 MainWindow::~MainWindow() {
+#ifdef _WIN32
+    removeTrayIcon();
+#endif
     delete m_brightIcon;
     delete m_darkIcon;
     saveWindowState();
@@ -408,20 +425,9 @@ std::string MainWindow::formatStatusBar() const {
     }
     
     // Add RAM usage
-    oss << "  |  RAM: " << getRamUsage();
+    oss << "  |  RAM: " << SystemUtils::getRamUsage();
     
     return oss.str();
-}
-
-std::string MainWindow::getRamUsage() const {
-    PROCESS_MEMORY_COUNTERS_EX pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
-        double memMB = pmc.WorkingSetSize / (1024.0 * 1024.0);
-        std::ostringstream oss;
-        oss << std::fixed << std::setprecision(1) << memMB << " MB";
-        return oss.str();
-    }
-    return "0.0 MB";
 }
 
 void MainWindow::showAddTorrentDialog() {
@@ -468,7 +474,7 @@ void MainWindow::showPreferencesDialog() {
 
 void MainWindow::showAboutDialog() {
     fl_message(
-        "FLTorrent v0.1.0\n\n"
+        "FTorrent v0.1.0\n\n"
         "A lightweight BitTorrent client built with FLTK\n\n"
         "Powered by libtorrent-rasterbar\n\n"
         "© 2026"
@@ -545,12 +551,156 @@ void MainWindow::restoreWindowState() {
     }
 }
 
+void MainWindow::show() {
+    Fl_Double_Window::show();
+#ifdef _WIN32
+    setupTrayIcon();
+#endif
+}
+
 int MainWindow::handle(int event) {
     if (event == FL_CLOSE) {
         saveWindowState();
+#ifdef _WIN32
+        auto& settings = SettingsManager::instance();
+        if (settings.getMinimizeToTray()) {
+            hide();
+            return 1;
+        }
+#endif
     }
     return Fl_Double_Window::handle(event);
 }
+
+#ifdef _WIN32
+void MainWindow::setupTrayIcon() {
+    if (m_trayHasIcon) return;
+
+    HWND hwnd = fl_xid(this);
+    if (!hwnd) return;
+
+    // Try to get the window icon set by FLTK icon() call
+    HICON hIcon = (HICON)SendMessage(hwnd, WM_GETICON, ICON_BIG, 0);
+    if (!hIcon) hIcon = (HICON)SendMessage(hwnd, WM_GETICON, ICON_SMALL, 0);
+    if (!hIcon) hIcon = (HICON)GetClassLongPtr(hwnd, GCLP_HICON);
+    if (!hIcon) hIcon = (HICON)GetClassLongPtr(hwnd, GCLP_HICONSM);
+    
+    // Fallback to application icon
+    if (!hIcon) {
+        hIcon = LoadIcon(GetModuleHandle(NULL), IDI_APPLICATION);
+    }
+    if (!hIcon) {
+        hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    }
+
+    NOTIFYICONDATA nid = {};
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = hwnd;
+    nid.uID = 1;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = WM_TRAY_MESSAGE;
+    nid.hIcon = hIcon;
+    
+    // Set tooltip
+    strncpy(nid.szTip, "FTorrent", sizeof(nid.szTip) - 1);
+    nid.szTip[sizeof(nid.szTip) - 1] = '\0';
+
+    if (Shell_NotifyIcon(NIM_ADD, &nid)) {
+        m_trayHasIcon = true;
+    }
+}
+
+void MainWindow::removeTrayIcon() {
+    if (!m_trayHasIcon) return;
+
+    HWND hwnd = fl_xid(this);
+    if (!hwnd) return;
+
+    NOTIFYICONDATA nid = {};
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = hwnd;
+    nid.uID = 1;
+
+    Shell_NotifyIcon(NIM_DELETE, &nid);
+    m_trayHasIcon = false;
+}
+
+int MainWindow::win_event_handler(int event) {
+    // This is called by FLTK for every Windows message
+    // Note: We need to access the window instance. 
+    // Since we only have one main window, we can find it.
+    
+    // In FLTK, Windows messages are passed as the event argument in add_handler
+    // But we need the actual MSG or at least the hwnd/msg/wp/lp.
+    // FLTK's add_handler doesn't pass the MSG structure directly as an argument,
+    // but we can access it via fl_msg.
+    
+    extern MSG fl_msg;
+    if (fl_msg.message == WM_TRAY_MESSAGE) {
+        if (LOWORD(fl_msg.lParam) == WM_LBUTTONDBLCLK || LOWORD(fl_msg.lParam) == WM_LBUTTONUP) {
+            // Show/Restore window
+            MainWindow* win = (MainWindow*)Fl::first_window();
+            if (win) {
+                if (win->visible()) {
+                    win->hide();
+                } else {
+                    win->show();
+                    // Bring to front
+                    SetForegroundWindow(fl_xid(win));
+                }
+            }
+            return 1;
+        } else if (LOWORD(fl_msg.lParam) == WM_RBUTTONUP) {
+            // Show a simple context menu
+            HMENU hMenu = CreatePopupMenu();
+            AppendMenu(hMenu, MF_STRING, 1, "Open FTorrent");
+            AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenu(hMenu, MF_STRING, 3, "Pause All");
+            AppendMenu(hMenu, MF_STRING, 4, "Resume All");
+            AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenu(hMenu, MF_STRING, 2, "Exit");
+            
+            POINT pt;
+            GetCursorPos(&pt);
+            
+            // SetForegroundWindow is necessary for the menu to close when clicking away
+            SetForegroundWindow(fl_msg.hwnd);
+            
+            int id = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, fl_msg.hwnd, NULL);
+            DestroyMenu(hMenu);
+            
+            MainWindow* win = (MainWindow*)Fl::first_window();
+            if (!win) return 0;
+
+            if (id == 1) {
+                win->show();
+                SetForegroundWindow(fl_xid(win));
+            } else if (id == 2) {
+                // Actual exit from program
+                win->removeTrayIcon();
+                // Close the session and exit
+                exit(0); 
+            } else if (id == 3) {
+                // Pause all (Optional: could be implemented in manager)
+                if (win->m_manager) {
+                    for (auto* it : win->m_manager->getAllTorrents()) {
+                        win->m_manager->pauseTorrent(it->getHash());
+                    }
+                }
+            } else if (id == 4) {
+                // Resume all
+                if (win->m_manager) {
+                    for (auto* it : win->m_manager->getAllTorrents()) {
+                        win->m_manager->resumeTorrent(it->getHash());
+                    }
+                }
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
 
 // Static callbacks
 void MainWindow::onAddTorrent(Fl_Widget* w, void* data) {

@@ -1,62 +1,62 @@
-# 🌪️ FLTorrent
+# 🌪️ FTorrent
 
-Un cliente BitTorrent moderno, minimalista y ultra-ligero construido con **C++17**, **FLTK** y **libtorrent-rasterbar**.
+A modern, minimalist, and ultra-lightweight BitTorrent client built with **C++20**, **FLTK**, and **libtorrent-rasterbar**.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey?style=for-the-badge)
 
-FLTorrent está diseñado para usuarios que buscan eficiencia sin sacrificar potencia. Utiliza un kit de herramientas gráfico de bajo consumo para asegurar que el 100% de tus recursos se dediquen a lo que importa: tus descargas.
+FTorrent is designed for users seeking efficiency without sacrificing power. It uses a low-consumption graphical toolkit to ensure that 100% of your resources are dedicated to what matters: your downloads.
 
 ---
 
-## 📚 Documentación
+## 📚 Documentation
 
-Hemos preparado documentación detallada para ayudarte:
+We have prepared detailed documentation to help you:
 
--   📖 **[Guía del Usuario](USER-GUIDE.md)**: Cómo usar el programa, configurar descargas y optimizar tu red.
--   🛠️ **[Referencia Técnica](TECHNICAL-REFERENCE.md)**: Detalles sobre la arquitectura, clases y flujo de datos para desarrolladores.
--   🏗️ **[Arquitectura](ARCHITECTURE.md)**: Visión profunda del diseño del sistema.
--   ⚡ **[Arquitectura Multi-Threading](MULTITHREADING-ARCHITECTURE.md)**: Detalles sobre el sistema multi-core y multi-hilo.
--   🚀 **[Guía de Compilación](COMPILE-GUIDE.md)**: Instrucciones paso a paso para compilar desde el código fuente.
-
----
-
-## ✨ Características Principales
-
--   🚀 **Rendimiento Nativo:** Cero frameworks pesados, solo C++ puro.
--   💪 **Motor de Élite:** Impulsado por `libtorrent-rasterbar` (el mismo motor que qBittorrent y Deluge).
--   ⚡ **Multi-Core/Multi-Thread:** Arquitectura optimizada para aprovechar todos los núcleos de CPU disponibles.
--   🎯 **Zero UI Blocking:** Interfaz siempre responsiva gracias a worker threads dedicados.
--   🎨 **Diseño Limpio:** Interfaz intuitiva inspirada en los clásicos pero optimizada para el presente.
--   📦 **Totalmente Portable:** Sin dependencias externas pesadas en tiempo de ejecución.
--   🔧 **Configuración Experta:** Control granular sobre DHT, PEX, LSD y límites de red.
+-   📖 **[User Guide](USER-GUIDE.md)**: How to use the program, configure downloads, and optimize your network.
+-   🛠️ **[Technical Reference](TECHNICAL-REFERENCE.md)**: Details about the architecture, classes, and data flow for developers.
+-   🏗️ **[Architecture](ARCHITECTURE.md)**: In-depth vision of the system design.
+-   ⚡ **[Multi-Threading Architecture](MULTITHREADING-ARCHITECTURE.md)**: Details about the multi-core and multi-threaded system.
+-   🚀 **[Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions to compile from source code.
 
 ---
 
-## 🛠️ Requisitos Rápidos
+## ✨ Key Features
 
-### ¿Tienes todo lo necesario?
-Ejecuta nuestro script de comprobación:
+-   🚀 **Native Performance:** Zero heavy frameworks, just pure C++.
+-   💪 **Elite Engine:** Powered by `libtorrent-rasterbar` (the same engine as qBittorrent and Deluge).
+-   ⚡ **Multi-Core/Multi-Thread:** Optimized architecture to take advantage of all available CPU cores.
+-   🎯 **Zero UI Blocking:** Always responsive interface thanks to dedicated worker threads.
+-   🎨 **Clean Design:** Intuitive interface inspired by classics but optimized for the present.
+-   📦 **Fully Portable:** No heavy external runtime dependencies.
+-   🔧 **Expert Configuration:** Granular control over DHT, PEX, LSD and network limits.
+
+---
+
+## 🛠️ Quick Requirements
+
+### Do you have everything you need?
+Run our check script:
 ```powershell
 .\check-requirements.ps1
 ```
 
-### Requisitos de Sistema
--   **Windows:** 10 o superior + Visual Studio 2019/2022.
--   **Linux:** GCC 7+ / Clang 6+ y CMake 3.15+.
--   **Dependencias:** FLTK 1.3.x y libtorrent 2.0.x (gestionadas vía vcpkg).
+### System Requirements
+-   **Windows:** 10 or higher + Visual Studio 2019/2022.
+-   **Linux:** GCC 7+ / Clang 6+ and CMake 3.15+.
+-   **Dependencies:** FLTK 1.3.x and libtorrent 2.0.x (managed via vcpkg).
 
 ---
 
-## 🚀 Instalación y Compilación
+## 🚀 Installation and Compilation
 
-### Windows (vía vcpkg)
+### Windows (via vcpkg)
 ```powershell
-# 1. Instalar dependencias
+# 1. Install dependencies
 .\install-vcpkg-deps.ps1
 
-# 2. Compilar proyecto
+# 2. Compile project
 .\build.ps1
 ```
 
@@ -70,25 +70,25 @@ make -j$(nproc)
 
 ---
 
-## 🗺️ Hoja de Ruta (Roadmap)
+## 🗺️ Roadmap
 
--   [x] **v0.1.0:** Arquitectura base e integración de motor.
--   [x] **v0.2.0:** Gestión de pares, archivos y trackers en tiempo real.
--   [x] **v0.2.5:** Arquitectura multi-core/multi-thread con worker threads.
--   [ ] **v0.3.0:** Soporte para Dark Mode nativo y mejoras de seguridad.
--   [ ] **v1.0.0:** Primera versión estable multiplataforma (Flatpak/Installer).
-
----
-
-## 🤝 Contribuir
-
-¿Quieres mejorar FLTorrent? ¡Eres bienvenido! Revisa nuestra [Referencia Técnica](TECHNICAL-REFERENCE.md) para entender cómo encajan las piezas antes de enviar un Pull Request.
+-   [x] **v0.1.0:** Base architecture and engine integration.
+-   [x] **v0.2.0:** Real-time peer, file and tracker management.
+-   [x] **v0.2.5:** Multi-core/multi-threaded architecture with worker threads.
+-   [ ] **v0.3.0:** Native Dark Mode support and security improvements.
+-   [ ] **v1.0.0:** First stable cross-platform version (Flatpak/Installer).
 
 ---
 
-## 📝 Licencia
+## 🤝 Contributing
 
-Este proyecto se distribuye bajo la licencia **MIT**. Siéntete libre de usarlo, modificarlo y compartirlo.
+Want to improve FTorrent? You're welcome! Check our [Technical Reference](TECHNICAL-REFERENCE.md) to understand how the pieces fit together before sending a Pull Request.
 
 ---
-*Hecho con ❤️ para la comunidad BitTorrent.*
+
+## 📝 License
+
+This project is distributed under the **MIT** license. Feel free to use, modify and share it.
+
+---
+*Made with ❤️ for the BitTorrent community.*

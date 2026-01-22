@@ -1,222 +1,222 @@
-# 🔨 Guía de Compilación de FLTorrent
+# 🔨 FTorrent Compilation Guide
 
-## 📋 Scripts de Compilación Disponibles
+## 📋 Available Compilation Scripts
 
-FLTorrent incluye varios scripts para facilitar la compilación:
+FTorrent includes several scripts to facilitate compilation:
 
-### 1. **compile.bat** (Recomendado) ⭐
-Script completo con validación, copia de DLLs y creación de distribución portable.
+### 1. **compile.bat** (Recommended) ⭐
+Complete script with validation, DLL copying, and portable distribution creation.
 
-**Uso:**
+**Usage:**
 ```batch
-# Compilar a la ruta por defecto (D:\fltorrent-compilation)
+# Compile to default path (D:\FTorrent-compilation)
 compile.bat
 
-# Compilar a una ruta personalizada
-compile.bat C:\MisAplicaciones\FLTorrent
+# Compile to a custom path
+compile.bat C:\MyApps\FTorrent
 ```
 
-**Características:**
-- ✅ Validación de vcpkg
-- ✅ Configuración automática con CMake
-- ✅ Compilación en modo Release
-- ✅ Copia automática del .exe
-- ✅ Copia de todas las DLLs necesarias
-- ✅ Creación de README.txt
-- ✅ Detección y reporte de errores
-- ✅ Opción de abrir carpeta al finalizar
+**Features:**
+- ✅ vcpkg validation
+- ✅ Automatic configuration with CMake
+- ✅ Compilation in Release mode
+- ✅ Automatic .exe copying
+- ✅ Automatic copying of all necessary DLLs
+- ✅ README.txt creation
+- ✅ Error detection and reporting
+- ✅ Option to open folder upon completion
 
 ---
 
-### 2. **quick-compile.bat** (Rápido)
-Script simplificado para compilaciones rápidas.
+### 2. **quick-compile.bat** (Fast)
+Simplified script for quick compilations.
 
-**Uso:**
+**Usage:**
 ```batch
-# Compilar a la ruta por defecto
+# Compile to default path
 quick-compile.bat
 
-# Compilar a ruta personalizada
-quick-compile.bat D:\MiBuild
+# Compile to custom path
+quick-compile.bat D:\MyBuild
 ```
 
-**Características:**
-- ✅ Compilación rápida
-- ✅ Menos validaciones
-- ✅ Abre la carpeta automáticamente
-- ⚠️ Menos mensajes informativos
+**Features:**
+- ✅ Fast compilation
+- ✅ Fewer validations
+- ✅ Automatically opens the folder
+- ⚠️ Fewer informational messages
 
 ---
 
 ### 3. **build.ps1** (PowerShell)
-Script PowerShell avanzado (requiere PowerShell 5.0+).
+Advanced PowerShell script (requires PowerShell 5.0+).
 
-**Uso:**
+**Usage:**
 ```powershell
-# Compilar en modo Release
+# Compile in Release mode
 .\build.ps1
 
-# Compilar en modo Debug
+# Compile in Debug mode
 .\build.ps1 -BuildType Debug
 
-# Especificar ruta de vcpkg
-.\build.ps1 -VcpkgRoot "C:\mi-vcpkg"
+# Specify vcpkg path
+.\build.ps1 -VcpkgRoot "C:\my-vcpkg"
 ```
 
 ---
 
-## 🚀 Proceso de Compilación Paso a Paso
+## 🚀 Step-by-Step Compilation Process
 
-### Opción A: Usando Scripts (Recomendado)
+### Option A: Using Scripts (Recommended)
 
-1. **Asegúrate que las dependencias estén instaladas:**
+1. **Ensure dependencies are installed:**
    ```powershell
-   # Si aún no lo has hecho:
+   # If you haven't done so yet:
    .\install-vcpkg-deps.ps1
    ```
 
-2. **Ejecuta el script de compilación:**
+2. **Run the compilation script:**
    ```batch
-   compile.bat D:\fltorrent-compilation
+   compile.bat D:\FTorrent-compilation
    ```
 
-3. **Espera a que termine** (1-5 minutos la primera vez)
+3. **Wait for it to finish** (1-5 minutes the first time)
 
-4. **¡Listo!** Tu ejecutable estará en `D:\fltorrent-compilation\FLTorrent.exe`
+4. **Done!** Your executable will be in `D:\FTorrent-compilation\FTorrent.exe`
 
 ---
 
-### Opción B: Manual
+### Option B: Manual
 
-1. **Crear directorio de build:**
+1. **Create build directory:**
    ```batch
    mkdir build
    cd build
    ```
 
-2. **Configurar con CMake:**
+2. **Configure with CMake:**
    ```batch
    cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
    ```
 
-3. **Compilar:**
+3. **Compile:**
    ```batch
    cmake --build . --config Release
    ```
 
-4. **El ejecutable estará en:**
+4. **The executable will be in:**
    ```
-   build\Release\FLTorrent.exe
+   build\Release\FTorrent.exe
    ```
 
-5. **Copiar DLLs necesarias:**
+5. **Copy necessary DLLs:**
    ```batch
    xcopy /Y C:\vcpkg\installed\x64-windows\bin\*.dll Release\
    ```
 
 ---
 
-## 📦 Estructura de la Carpeta de Compilación
+## 📦 Compilation Folder Structure
 
-Después de ejecutar `compile.bat`, tendrás:
+After running `compile.bat`, you will have:
 
 ```
-D:\fltorrent-compilation\
-├── FLTorrent.exe              # Ejecutable principal
-├── README.txt                 # Instrucciones
-├── fltk.dll                   # FLTK library
-├── libtorrent.dll             # LibTorrent library
-├── boost_*.dll                # Boost libraries
-├── zlib1.dll                  # Compression
-├── libssl-*.dll               # SSL/TLS
-├── libcrypto-*.dll            # Crypto
-└── [otras DLLs necesarias]    # Dependencias adicionales
+D:\FTorrent-compilation\
+├── FTorrent.exe              # Main executable
+├── README.txt                # Instructions
+├── fltk.dll                  # FLTK library
+├── libtorrent.dll            # LibTorrent library
+├── boost_*.dll               # Boost libraries
+├── zlib1.dll                 # Compression
+├── libssl-*.dll              # SSL/TLS
+├── libcrypto-*.dll           # Crypto
+└── [other necessary DLLs]    # Additional dependencies
 ```
 
 ---
 
-## ⚙️ Configuración de Rutas
+## ⚙️ Path Configuration
 
-### Cambiar la Ruta de vcpkg
+### Changing the vcpkg Path
 
-Si vcpkg no está en `C:\vcpkg`, edita el script `compile.bat`:
+If vcpkg is not in `C:\vcpkg`, edit the `compile.bat` script:
 
 ```batch
-REM Cambiar esta línea:
+REM Change this line:
 set "VCPKG_ROOT=C:\vcpkg"
 
-REM Por tu ruta:
-set "VCPKG_ROOT=D:\MiVcpkg"
+REM To your path:
+set "VCPKG_ROOT=D:\MyVcpkg"
 ```
 
-### Cambiar la Ruta de Salida por Defecto
+### Changing the Default Output Path
 
-En `compile.bat`, línea 18:
+In `compile.bat`, line 18:
 
 ```batch
-REM Cambiar:
-set "OUTPUT_DIR=D:\fltorrent-compilation"
+REM Change:
+set "OUTPUT_DIR=D:\FTorrent-compilation"
 
-REM Por ejemplo:
-set "OUTPUT_DIR=C:\Programas\FLTorrent"
+REM For example:
+set "OUTPUT_DIR=C:\Programs\FTorrent"
 ```
 
 ---
 
-## 🐛 Solución de Problemas
+## 🐛 Troubleshooting
 
 ### Error: "vcpkg not found"
 
-**Problema:** Script no encuentra vcpkg
+**Issue:** Script cannot find vcpkg
 
-**Solución:**
-1. Verifica que vcpkg esté instalado en `C:\vcpkg`
-2. O edita `VCPKG_ROOT` en el script
-3. O pasa la ruta correcta al ejecutar
+**Solution:**
+1. Verify that vcpkg is installed in `C:\vcpkg`
+2. Or edit `VCPKG_ROOT` in the script
+3. Or pass the correct path when running
 
 ### Error: "CMake configuration failed"
 
-**Problema:** Dependencias no instaladas
+**Issue:** Dependencies not installed
 
-**Solución:**
+**Solution:**
 ```powershell
-# Reinstalar dependencias
+# Reinstall dependencies
 cd C:\vcpkg
 .\vcpkg install fltk:x64-windows libtorrent:x64-windows
 ```
 
 ### Error: "Build failed"
 
-**Problema:** Error de compilación
+**Issue:** Compilation error
 
-**Solución:**
-1. Revisa los mensajes de error
-2. Verifica que Visual Studio esté instalado
-3. Ejecuta:
+**Solution:**
+1. Check the error messages
+2. Verify that Visual Studio is installed
+3. Run:
    ```batch
-   # Limpia y recompila
+   # Clean and recompile
    cd build
    cmake --build . --config Release --clean-first
    ```
 
-### Error: "No se puede ejecutar el .exe"
+### Error: "Cannot run the .exe"
 
-**Problema:** Faltan DLLs
+**Issue:** Missing DLLs
 
-**Solución:**
-1. Asegúrate de ejecutar desde la carpeta de compilación
-2. O copia todas las DLLs de `C:\vcpkg\installed\x64-windows\bin\`
-3. El script `compile.bat` hace esto automáticamente
+**Solution:**
+1. Ensure you run from the compilation folder
+2. Or copy all DLLs from `C:\vcpkg\installed\x64-windows\bin\`
+3. The `compile.bat` script does this automatically
 
 ---
 
-## 🐧 Compilación en Linux
+## 🐧 Compilation on Linux
 
-FLTorrent es totalmente compatible con Linux. Sigue estos pasos para compilar en distribuciones basadas en Ubuntu/Debian:
+FTorrent is fully compatible with Linux. Follow these steps to compile on Ubuntu/Debian-based distributions:
 
-### 1. Instalar Dependencias de Sistema
+### 1. Install System Dependencies
 
-Ejecuta el siguiente comando para instalar las herramientas de compilación y las librerías necesarias:
+Run the following command to install the necessary build tools and libraries:
 
 ```bash
 sudo apt-get update
@@ -236,158 +236,158 @@ sudo apt-get install -y \
     libxfixes-dev
 ```
 
-### 2. Proceso de Compilación
+### 2. Compilation Process
 
-1. **Crear directorio de build:**
+1. **Create build directory:**
    ```bash
    mkdir build && cd build
    ```
 
-2. **Configurar con CMake:**
+2. **Configure with CMake:**
    ```bash
    cmake .. -DCMAKE_BUILD_TYPE=Release
    ```
 
-3. **Compilar:**
+3. **Compile:**
    ```bash
    make -j$(nproc)
    ```
 
-4. **Instalar (opcional):**
+4. **Install (optional):**
    ```bash
    sudo make install
    ```
 
-### 3. Ejecución
+### 3. Execution
 
-Una vez compilado, el ejecutable estará en la carpeta `build`:
+Once compiled, the executable will be in the `build` folder:
 ```bash
-./FLTorrent
+./FTorrent
 ```
 
-## 📊 Tiempos de Compilación
+## 📊 Compilation Times
 
-| Configuración | Primera Vez | Subsecuentes |
+| Configuration | First Time | Subsequent |
 |---------------|-------------|--------------|
 | **Clean Build** | 2-5 min | 1-2 min |
-| **Incremental** | - | 10-30 seg |
+| **Incremental** | - | 10-30 sec |
 | **Debug** | 3-6 min | 1-3 min |
 | **Release** | 2-5 min | 1-2 min |
 
-*Tiempos pueden variar según el hardware*
+*Times may vary based on hardware*
 
 ---
 
-## 🎯 Modos de Compilación
+## 🎯 Compilation Modes
 
-### Release (Recomendado para uso)
+### Release (Recommended for usage)
 ```batch
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ```
-- ✅ Optimizado para velocidad
-- ✅ Ejecutable más pequeño
-- ✅ Sin símbolos de depuración
+- ✅ Optimized for speed
+- ✅ Smaller executable
+- ✅ No debugging symbols
 
-### Debug (Para desarrollo)
+### Debug (For development)
 ```batch
 cmake .. -DCMAKE_BUILD_TYPE=Debug
 cmake --build . --config Debug
 ```
-- ✅ Símbolos de depuración
-- ✅ Más fácil de depurar
-- ⚠️ Ejecutable más grande y lento
+- ✅ Debugging symbols
+- ✅ Easier to debug
+- ⚠️ Larger and slower executable
 
 ---
 
-## 📝 Checklist Previo a la Compilación
+## 📝 Pre-Compilation Checklist
 
-- [ ] vcpkg instalado en `C:\vcpkg`
-- [ ] Visual Studio 2019+ instalado
-- [ ] CMake 3.15+ instalado
-- [ ] Dependencias instaladas (`.\install-vcpkg-deps.ps1`)
-- [ ] vcpkg integrado (`vcpkg integrate install`)
-- [ ] Git instalado (opcional pero recomendado)
+- [ ] vcpkg installed in `C:\vcpkg`
+- [ ] Visual Studio 2019+ installed
+- [ ] CMake 3.15+ installed
+- [ ] Dependencies installed (`.\install-vcpkg-deps.ps1`)
+- [ ] vcpkg integrated (`vcpkg integrate install`)
+- [ ] Git installed (optional but recommended)
 
 ---
 
-## 🔄 Compilación Limpia
+## 🔄 Clean Compilation
 
-Si algo falla, intenta una compilación limpia:
+If something fails, try a clean compilation:
 
 ```batch
-# Eliminar build anterior
+# Remove previous build
 rd /s /q build
 
-# Crear nuevo build
+# Create new build
 mkdir build
 cd build
 
-# Configurar y compilar de nuevo
+# Configure and compile again
 cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build . --config Release
 ```
 
 ---
 
-## 🌐 Compilación para Distribución
+## 🌐 Compilation for Distribution
 
-### Versión Portable
+### Portable Version
 
-1. Ejecuta `compile.bat` con tu ruta deseada
-2. La carpeta generada es completamente portable
-3. Puedes comprimirla en .zip
-4. Distribúyela como quieras
+1. Run `compile.bat` with your desired path
+2. The generated folder is fully portable
+3. You can compress it into a .zip file
+4. Distribute it however you like
 
-### Crear Instalador (Futuro)
+### Create Installer (Future)
 
-Para crear un instalador profesional:
-- Usar NSIS o InnoSetup
-- Incluir registro de asociaciones .torrent
-- Agregar al menú inicio
+To create a professional installer:
+- Use NSIS or InnoSetup
+- Include .torrent extension associations
+- Add to the Start menu
 - Auto-updater
 
 ---
 
-## ✅ Verificación de Compilación Exitosa
+## ✅ Successful Compilation Verification
 
-Después de compilar, verifica:
+After compiling, verify:
 
-1. **Archivo .exe existe:**
+1. **.exe file exists:**
    ```batch
-   dir D:\fltorrent-compilation\FLTorrent.exe
+   dir D:\FTorrent-compilation\FTorrent.exe
    ```
 
-2. **DLLs copiadas:**
+2. **DLLs copied:**
    ```batch
-   dir D:\fltorrent-compilation\*.dll
+   dir D:\FTorrent-compilation\*.dll
    ```
 
-3. **Ejecutable funciona:**
+3. **Executable works:**
    ```batch
-   cd D:\fltorrent-compilation
-   FLTorrent.exe
+   cd D:\FTorrent-compilation
+   FTorrent.exe
    ```
 
-4. **Interfaz se abre correctamente**
+4. **Interface opens correctly**
 
 ---
 
-## 📞 Soporte
+## 📞 Support
 
-Si tienes problemas:
+If you have problems:
 
-1. Revisa esta guía
-2. Verifica los requisitos
-3. Revisa los logs de compilación
-4. Busca el error específico en Google
-5. Abre un issue en GitHub
+1. Review this guide
+2. Verify requirements
+3. Check compilation logs
+4. Search for the specific error on Google
+5. Open an issue on GitHub
 
 ---
 
-**¡Compilación exitosa!** 🎉
+**Successful compilation!** 🎉
 
-Ahora puedes ejecutar FLTorrent desde:
+Now you can run FTorrent from:
 ```
-D:\fltorrent-compilation\FLTorrent.exe
+D:\FTorrent-compilation\FTorrent.exe
 ```

@@ -7,7 +7,7 @@
 #include "LogoIcon.h"
 
 /**
- * @brief Resource manager for FLTorrent
+ * @brief Resource manager for FTorrent
  * 
  * Provides easy access to application icons and resources.
  * Uses XPM format for embedded icons.

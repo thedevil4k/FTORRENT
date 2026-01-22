@@ -1,15 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
 REM ====================================================================
-REM FLTorrent - Quick Compile Script
+REM FTorrent - Quick Compile Script
 REM Usage: quick-compile.bat [output_directory]
 REM Example: quick-compile.bat D:\MyBuild
 REM ====================================================================
 
 set "OUTPUT=%~1"
-if "%OUTPUT%"=="" set "OUTPUT=D:\FLTorrent Compilation"
+if "%OUTPUT%"=="" set "OUTPUT=D:\FTorrent Compilation"
 
-echo Compiling FLTorrent to: %OUTPUT%
+echo Compiling FTorrent to: %OUTPUT%
 echo.
 
 REM Check for compiler and CMake
@@ -63,13 +63,13 @@ REM Create output directory
 if not exist "%OUTPUT%" mkdir "%OUTPUT%"
 
 REM Copy files
-copy /Y Release\FLTorrent.exe "%OUTPUT%\"
+copy /Y Release\FTorrent.exe "%OUTPUT%\"
 xcopy /Y /Q C:\vcpkg\installed\x64-windows\bin\*.dll "%OUTPUT%\" 2>nul
 if not exist "%OUTPUT%\assets" mkdir "%OUTPUT%\assets"
 xcopy /Y /E /Q "..\src\assets\*.*" "%OUTPUT%\assets\"
 
 echo.
-echo SUCCESS! FLTorrent compiled to: %OUTPUT%
+echo SUCCESS! FTorrent compiled to: %OUTPUT%
 echo.
 explorer "%OUTPUT%"
 goto :end

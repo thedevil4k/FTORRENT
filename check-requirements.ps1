@@ -1,6 +1,6 @@
-# Script para verificar requisitos de FLTorrent
+# Script para verificar requisitos de FTorrent
 
-Write-Host "=== Verificación de Requisitos FLTorrent ===" -ForegroundColor Cyan
+Write-Host "=== Verificación de Requisitos FTorrent ===" -ForegroundColor Cyan
 Write-Host ""
 
 $AllOk = $true

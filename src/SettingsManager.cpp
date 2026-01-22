@@ -1,16 +1,9 @@
 #include "SettingsManager.h"
+#include "SystemUtils.h"
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
 #include <algorithm>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <shlobj.h>
-#else
-#include <unistd.h>
-#include <pwd.h>
-#endif
 
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;
@@ -48,7 +41,7 @@ bool SettingsManager::save() {
         return false;
     }
 
-    file << "# FLTorrent Settings\n\n";
+    file << "# FTorrent Settings\n\n";
     
     for (const auto& pair : m_settings) {
         file << pair.first << "=" << pair.second << "\n";
@@ -60,17 +53,7 @@ bool SettingsManager::save() {
 
 void SettingsManager::setDefaults() {
     // General
-#ifdef _WIN32
-    char path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, 0, path))) {
-        std::string downloadPath = std::string(path) + "\\Downloads";
-        setDefaultSavePath(downloadPath);
-    } else {
-        setDefaultSavePath("C:\\Downloads");
-    }
-#else
-    setDefaultSavePath(std::string(getenv("HOME")) + "/Downloads");
-#endif
+    setDefaultSavePath(SystemUtils::getDefaultDownloadsDir());
     setStartWithSystem(false);
     setMinimizeToTray(false);
     
@@ -95,23 +78,13 @@ void SettingsManager::setDefaults() {
     setDarkMode(false);
     
     // Advanced
-    setUserAgent("FLTorrent/0.1.0");
+    setUserAgent("FTorrent/0.1.0");
 }
 
 std::string SettingsManager::getConfigPath() const {
-#ifdef _WIN32
-    char path[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, path))) {
-        return std::string(path) + "\\FLTorrent\\settings.ini";
-    }
-    return "settings.ini";
-#else
-    const char* home = getenv("HOME");
-    if (home) {
-        return std::string(home) + "/.config/fltorrent/settings.ini";
-    }
-    return "settings.ini";
-#endif
+    std::string dir = SystemUtils::getConfigDir();
+    std::string filename = SystemUtils::isWindows() ? "\\settings.ini" : "/settings.ini";
+    return dir + filename;
 }
 
 void SettingsManager::parseLine(const std::string& line) {

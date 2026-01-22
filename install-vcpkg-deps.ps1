@@ -1,10 +1,10 @@
-# Script para instalar dependencias de FLTorrent usando vcpkg
+# Script para instalar dependencias de FTorrent usando vcpkg
 
 param(
     [string]$VcpkgRoot = "C:\vcpkg"
 )
 
-Write-Host "=== Instalador de Dependencias FLTorrent ===" -ForegroundColor Cyan
+Write-Host "=== Instalador de Dependencias FTorrent ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Verificar si vcpkg existe

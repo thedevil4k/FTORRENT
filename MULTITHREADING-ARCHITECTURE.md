@@ -1,8 +1,8 @@
-# FLTorrent Multithreading Architecture
+# FTorrent Multithreading Architecture
 
 ## Overview
 
-FLTorrent implements a **multi-core, multi-threaded architecture** designed for stability, speed, and non-blocking performance. The design separates concerns between UI rendering, torrent management, and I/O operations across multiple threads.
+FTorrent implements a **multi-core, multi-threaded architecture** designed for stability, speed, and non-blocking performance. The design separates concerns between UI rendering, torrent management, and I/O operations across multiple threads.
 
 ## Architecture Diagram
 
@@ -281,7 +281,7 @@ manager->setOnTorrentAdded([](TorrentItem* item) {
 
 ## Conclusion
 
-FLTorrent's multithreading architecture provides:
+FTorrent's multithreading architecture provides:
 - ✅ **Non-blocking UI**: All heavy operations run in background
 - ✅ **Thread-safe**: Mutexes protect all shared data
 - ✅ **Scalable**: Multi-core utilization for I/O-bound tasks

@@ -1,9 +1,9 @@
 {
-    "app-id": "io.github.thedevil4k.FLTorrent",
+    "app-id": "io.github.thedevil4k.FTorrent",
     "runtime": "org.freedesktop.Platform",
     "runtime-version": "23.08",
     "sdk": "org.freedesktop.Sdk",
-    "command": "FLTorrent",
+    "command": "FTorrent",
     "finish-args": [
         "--share=network",
         "--share=ipc",
@@ -38,7 +38,7 @@
             ]
         },
         {
-            "name": "fltorrent",
+            "name": "ftorrent",
             "buildsystem": "cmake-ninja",
             "sources": [
                 {

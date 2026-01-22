@@ -23,9 +23,10 @@ CreateTorrentDialog::CreateTorrentDialog()
     , m_okClicked(false)
 {
     // Ensure trackers file exists with some defaults if not present
-    std::ifstream check("trackersadd.txt");
+    std::string trackerFile = PathUtils::getAppDirPath() + "/trackersadd.txt";
+    std::ifstream check(trackerFile);
     if (!check.good()) {
-        std::ofstream create("trackersadd.txt");
+        std::ofstream create(trackerFile);
         if (create.is_open()) {
             create << "udp://tracker.opentrackr.org:1337/announce\n"
                       "udp://open.stealth.si:80/announce\n"
@@ -236,7 +237,8 @@ void CreateTorrentDialog::onAddGenericTrackers(Fl_Widget* w, void* data) {
     }
     
     std::string toAdd;
-    std::ifstream file("trackersadd.txt");
+    std::string trackerFile = PathUtils::getAppDirPath() + "/trackersadd.txt";
+    std::ifstream file(trackerFile);
     if (file.is_open()) {
         while (std::getline(file, line)) {
             size_t first = line.find_first_not_of(" \t\r\n");

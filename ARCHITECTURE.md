@@ -1,46 +1,46 @@
-# FLTorrent - Arquitectura del Proyecto
+# FTorrent - Project Architecture
 
-## 📐 Visión General
+## 📐 Overview
 
-FLTorrent está diseñado con una arquitectura modular y orientada a objetos que separa claramente las responsabilidades:
+FTorrent is designed with a modular, object-oriented architecture that clearly separates responsibilities:
 
 ```
 ┌─────────────────────────────────────────┐
-│           Interfaz FLTK (UI)            │
+│           FLTK UI Layer (UI)            │
 │          (main.cpp, widgets)            │
 └──────────────┬──────────────────────────┘
                │
                ▼
 ┌─────────────────────────────────────────┐
 │         TorrentManager (Facade)         │
-│      - Coordina operaciones             │
-│      - Sistema de callbacks             │
+│      - Coordinates operations           │
+│      - Callback system                  │
 └──────┬──────────────────────────────────┘
        │
        ├──────▶ TorrentSession
-       │        (Wrapper de libtorrent)
+       │        (libtorrent Wrapper)
        │
        ├──────▶ TorrentItem
-       │        (Modelo de torrent individual)
+       │        (Individual Torrent Model)
        │
        └──────▶ SettingsManager
-                (Configuración global)
+                (Global Configuration)
 ```
 
-## 📦 Componentes Principales
+## 📦 Main Components
 
 ### 1. TorrentSession
-**Archivo:** `TorrentSession.h/cpp`
+**File:** `TorrentSession.h/cpp`
 
-**Responsabilidad:** Wrapper de bajo nivel sobre libtorrent-rasterbar
+**Responsibility:** Low-level wrapper over libtorrent-rasterbar
 
-**Características:**
-- Inicialización y configuración de la sesión de libtorrent
-- Operaciones básicas: añadir/eliminar torrents
-- Procesamiento de alertas de libtorrent
-- Obtención de estadísticas globales
+**Features:**
+- libtorrent session initialization and configuration
+- Basic operations: add/remove torrents
+- libtorrent alert processing
+- Retrieval of global statistics
 
-**API Principal:**
+**Main API:**
 ```cpp
 bool initialize();
 bool addTorrentFile(const std::string& file, const std::string& path);
@@ -52,27 +52,27 @@ void processAlerts();
 ---
 
 ### 2. TorrentItem
-**Archivo:** `TorrentItem.h/cpp`
+**File:** `TorrentItem.h/cpp`
 
-**Responsabilidad:** Modelo de datos para un torrent individual
+**Responsibility:** Data model for an individual torrent
 
-**Características:**
-- Encapsula toda la información de un torrent
-- Cachea datos para rendimiento
-- Proporciona métodos de formateo (tamaño, velocidad, tiempo)
-- Estados predefinidos: Queued, Checking, Downloading, Seeding, Paused, Error
+**Features:**
+- Encapsulates all information of a torrent
+- Caches data for performance
+- Provides formatting methods (size, speed, time)
+- Predefined states: Queued, Checking, Downloading, Seeding, Paused, Error, Complete
 
-**Datos que maneja:**
-- Información básica: nombre, hash, ruta
-- Progreso: tamaño total, descargado, progreso %
-- Velocidades: download/upload rate
-- Peers: número de peers y seeds
-- Tiempos: ETA, tiempo añadido, tiempo completado
-- Ratio de subida
+**Data managed:**
+- Basic info: name, hash, path
+- Progress: total size, downloaded, progress %
+- Speeds: download/upload rate
+- Peers: number of peers and seeds
+- Times: ETA, added time, completed time
+- Upload ratio
 
-**API Principal:**
+**Main API:**
 ```cpp
-void update(); // Actualiza desde libtorrent
+void update(); // Update from libtorrent
 std::string getName();
 double getProgress();
 int getDownloadRate();
@@ -83,18 +83,18 @@ std::string formatSize(int64_t bytes);
 ---
 
 ### 3. TorrentManager
-**Archivo:** `TorrentManager.h/cpp`
+**File:** `TorrentManager.h/cpp`
 
-**Responsabilidad:** Gestor central que coordina todo
+**Responsibility:** Central manager that coordinates everything
 
-**Características:**
-- Fachada principal para la UI
-- Mantiene lista de TorrentItems
-- Sistema de callbacks para notificar cambios
-- Sincronización automática con libtorrent
-- Operaciones de alto nivel sobre torrents
+**Features:**
+- Main facade for the UI
+- Maintains a list of TorrentItems
+- Callback system to notify changes
+- Automatic synchronization with libtorrent
+- High-level operations on torrents
 
-**Sistema de Callbacks:**
+**Callback System:**
 ```cpp
 using TorrentAddedCallback = std::function<void(TorrentItem*)>;
 using TorrentRemovedCallback = std::function<void(const std::string& hash)>;
@@ -103,7 +103,7 @@ using StatsUpdatedCallback = std::function<void()>;
 using ErrorCallback = std::function<void(const std::string& error)>;
 ```
 
-**API Principal:**
+**Main API:**
 ```cpp
 bool initialize();
 bool addTorrentFile(const std::string& file, const std::string& path);
@@ -111,30 +111,30 @@ void removeTorrent(const std::string& hash, bool deleteFiles);
 void pauseTorrent(const std::string& hash);
 void resumeTorrent(const std::string& hash);
 std::vector<TorrentItem*> getAllTorrents();
-void update(); // Llamar regularmente desde UI
+void update(); // Regular call from UI timer
 ```
 
 ---
 
 ### 4. SettingsManager
-**Archivo:** `SettingsManager.h/cpp`
+**File:** `SettingsManager.h/cpp`
 
-**Responsabilidad:** Gestión de configuración persistente
+**Responsibility:** Persistent configuration management
 
-**Características:**
-- Patrón Singleton
-- Carga/guarda configuración en archivo INI
-- Valores por defecto razonables
-- Configuración multiplataforma (Windows/Linux)
+**Features:**
+- Singleton pattern
+- Load/save configuration in INI file
+- Reasonable default values
+- Cross-platform configuration (Windows/Linux)
 
-**Categorías de Configuración:**
-- **General:** ruta de descarga, inicio con sistema
-- **Red:** límites de velocidad, puerto, conexiones
+**Settings Categories:**
+- **General:** download path, start with system
+- **Network:** rate limits, port, connections
 - **BitTorrent:** DHT, PEX, LSD, UPnP
-- **UI:** posición y tamaño de ventana
-- **Avanzado:** user agent, configuraciones personalizadas
+- **UI:** window position and size
+- **Advanced:** user agent, custom configurations
 
-**API Principal:**
+**Main API:**
 ```cpp
 static SettingsManager& instance(); // Singleton
 bool load();
@@ -142,76 +142,76 @@ bool save();
 std::string getDefaultSavePath();
 int getMaxDownloadRate();
 bool getDHTEnabled();
-// ... muchos más getters/setters
+// ... many more getters/setters
 ```
 
 ---
 
-## 🔄 Flujo de Datos
+## 🔄 Data Flow
 
-### Añadir un Torrent:
+### Adding a Torrent:
 ```
 UI → TorrentManager::addTorrentFile()
    → TorrentSession::addTorrentFile()
-   → libtorrent añade el torrent
+   → libtorrent adds the torrent
    → TorrentManager::syncTorrents()
-   → Crea nuevo TorrentItem
+   → Creates new TorrentItem
    → Callback: onTorrentAdded(item)
-   → UI actualiza la lista
+   → UI updates the list
 ```
 
-### Actualización Periódica:
+### Periodic Update:
 ```
 Timer → TorrentManager::update()
       → TorrentSession::processAlerts()
       → TorrentManager::syncTorrents()
-      → Para cada TorrentItem::update()
+      → For each TorrentItem::update()
       → Callback: onTorrentUpdated(item)
-      → UI actualiza velocidades/progreso
+      → UI updates speeds/progress
 ```
 
-### Configuración:
+### Configuration:
 ```
 UI Settings Dialog → SettingsManager::setMaxDownloadRate(500)
-                   → SettingsManager::save()
-                   → Archivo INI actualizado
+                    → SettingsManager::save()
+                    → INI file updated
 ```
 
 ---
 
-## 🎯 Ventajas de esta Arquitectura
+## 🎯 Advantages of this Architecture
 
-1. **Separación de Responsabilidades:** Cada clase tiene un propósito claro
-2. **Testeable:** Cada componente puede ser testeado independientemente
-3. **Extensible:** Fácil añadir nuevas funcionalidades
-4. **Callbacks:** La UI reacciona a cambios sin polling constante
-5. **Configuración Persistente:** Los settings sobreviven reinicios
-6. **Abstracción:** La UI no necesita conocer detalles de libtorrent
-
----
-
-## 🚀 Próximos Pasos
-
-### Componentes UI (Fase 3):
-- `MainWindow` - Ventana principal
-- `TorrentList` - Widget tabla de torrents
-- `TorrentDetailsPanel` - Panel de detalles
-- `AddTorrentDialog` - Diálogo para añadir torrents
-- `SettingsDialog` - Diálogo de configuración
-
-### Funcionalidades Adicionales (Fase 4):
-- Sistema de categorías/etiquetas
-- Filtros de torrents
-- Búsqueda integrada
-- Sistema de RSS feeds
-- Planificador de velocidad
-- Soporte para trackers privados
+1. **Separation of Concerns:** Each class has a clear purpose.
+2. **Testable:** Each component can be tested independently.
+3. **Extensible:** Easy to add new features.
+4. **Callbacks:** UI reacts to changes without constant polling.
+5. **Persistent Configuration:** Settings survive restarts.
+6. **Abstraction:** UI doesn't need to know libtorrent details.
 
 ---
 
-## 📝 Notas de Implementación
+## 🚀 Next Steps
 
-- **Thread Safety:** TorrentManager debe ser thread-safe para callbacks desde libtorrent
-- **Actualización UI:** Los callbacks se ejecutan desde el thread de libtorrent, la UI debe sincronizarse
-- **Rendimiento:** TorrentItem cachea datos para evitar llamadas constantes a libtorrent
-- **Memoria:** Uso de unique_ptr para gestión automática de memoria
+### UI Components (Phase 3):
+- `MainWindow` - Main window
+- `TorrentListWidget` - Torrent table widget
+- `TorrentDetailsDialog` - Details dialog
+- `AddTorrentDialog` - Add torrent dialog
+- `PreferencesDialog` - Settings dialog
+
+### Additional Features (Phase 4):
+- Category/label system
+- Torrent filters
+- Integrated search
+- RSS feeds system
+- Bandwidth scheduler
+- Private trackers support
+
+---
+
+## 📝 Implementation Notes
+
+- **Thread Safety:** TorrentManager must be thread-safe for callbacks from libtorrent.
+- **UI Update:** Callbacks are executed from the worker/alert thread, UI needs synchronization.
+- **Performance:** TorrentItem caches data to avoid constant libtorrent calls.
+- **Memory:** Use of unique_ptr for automatic memory management.

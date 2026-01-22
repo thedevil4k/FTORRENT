@@ -1,47 +1,47 @@
-# 📖 Guía del Usuario - FLTorrent
+# 📖 User Guide - FTorrent
 
-¡Bienvenido a FLTorrent! Esta guía te ayudará a dar tus primeros pasos con el cliente de torrents más ligero y potente.
+Welcome to FTorrent! This guide will help you take your first steps with the lightest and most powerful torrent client.
 
-## 🚀 Inicio Rápido
+## 🚀 Quick Start
 
-1.  **Ejecutar la aplicación:** Abre el ejecutable `FLTorrent.exe`.
-2.  **Inicializar Sesión:** Al abrir por primera vez, verás la interfaz principal. El motor de descarga se inicia automáticamente.
-3.  **Configurar Descargas:** Ve a `Herramientas` -> `Preferencias` y elige tu carpeta de descargas por defecto.
+1.  **Run the application:** Open the `FTorrent.exe` executable.
+2.  **Initialize Session:** When you open it for the first time, you will see the main interface. The download engine starts automatically.
+3.  **Configure Downloads:** Go to `Preferences` (gear icon) and choose your default download folder.
 
-## 📥 Cómo añadir Torrents
+## 📥 How to Add Torrents
 
-Tienes dos formas de empezar a descargar:
+You have two ways to start downloading:
 
-### 1. Archivos .torrent
-Haz clic en el icono **"+"** o ve a `Archivo` -> `Añadir Archivo Torrent`. Selecciona el archivo de tu ordenador y acepta.
+### 1. .torrent Files
+Click the **"+"** icon or the `Add Torrent` button. Select the file from your computer and accept.
 
-### 2. Enlaces Magnet (Próximamente)
-Haz clic en el icono del imán y pega el enlace magnet.
+### 2. Magnet Links
+Click the `Add Torrent` button, paste the magnet link in the corresponding field, and accept.
 
-## ⚙️ Ajustes de Red
+## ⚙️ Network Settings
 
-Para obtener el mejor rendimiento, puedes ajustar:
+To get the best performance, you can adjust:
 
--   **Límite de Bajada:** Útil si quieres navegar mientras descargas.
--   **Límite de Subida:** Recomendado dejar un margen para no saturar tu conexión.
--   **Puertos:** FLTorrent usa UPnP para abrir puertos automáticamente, pero puedes configurarlo manualmente en las Preferencias.
+-   **Download Limit:** Useful if you want to browse while downloading.
+-   **Upload Limit:** Recommended to leave some room to not saturate your connection.
+-   **Ports:** FTorrent uses UPnP to open ports automatically, but you can configure it manually in the Preferences.
 
-## 📊 Entendiendo la Interfaz
+## 📊 Understanding the Interface
 
--   **Lista de Torrents:** Muestra el nombre, tamaño, progreso, velocidad y estado de cada descarga.
--   **Barra de Estado:** Abajo verás la velocidad total de tu conexión y si el motor está activo.
--   **Iconos de Control:**
-    -   ▶️ **Reanudar:** Inicia la descarga seleccionada.
-    -   ⏸️ **Pausar:** Detiene temporalmente la descarga.
-    -   🗑️ **Eliminar:** Quita el torrent (puedes elegir borrar también los archivos descargados).
+-   **Torrent List:** Shows the name, size, progress, speed, and status of each download.
+-   **Status Bar:** At the bottom, you will see the total speed of your connection and the session status.
+-   **Control Icons:**
+    -   ▶️ **Resume:** Starts the selected download.
+    -   ⏸️ **Pause:** Temporarily stops the download.
+    -   🗑️ **Remove:** Removes the torrent (you can choose to also delete the downloaded files).
 
-## ❓ Preguntas Frecuentes
+## ❓ Frequently Asked Questions
 
-**¿Dónde se guardan mis archivos?**
-Por defecto en tu carpeta de descargas del sistema, pero puedes cambiarlo en las Preferencias.
+**Where are my files saved?**
+By default in your system's download folder, but you can change it in the Preferences.
 
-**¿Por qué mi descarga no avanza?**
-Asegúrate de que el torrent tenga "Seeds" (Semillas). Sin semillas, no hay nadie compartiendo el archivo completo.
+**Why is my download not progressing?**
+Make sure the torrent has "Seeds". Without seeds, there is no one sharing the complete file.
 
 ---
-*FLTorrent - Simple, Rápido, Mitico.*
+*FTorrent - Simple, Fast, Mythical.*

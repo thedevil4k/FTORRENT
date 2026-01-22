@@ -6,10 +6,10 @@
 #include <memory>
 
 /**
- * @brief Gestor de configuración de la aplicación
+ * @brief Application settings manager
  * 
- * Maneja la carga, guardado y acceso a la configuración de FLTorrent.
- * Usa un archivo INI simple para almacenar las preferencias del usuario.
+ * Handles loading, saving and access to FTorrent settings.
+ * Uses a simple INI file to store user preferences.
  */
 class SettingsManager {
 public:

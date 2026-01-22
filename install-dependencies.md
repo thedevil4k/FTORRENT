@@ -1,88 +1,88 @@
-# Instalación de Dependencias para FLTorrent
+# Installing Dependencies for FTorrent
 
-## Requisitos Previos
-- Git instalado
-- Visual Studio 2019 o posterior (con herramientas de C++)
-- CMake 3.15 o superior
+## Prerequisites
+- Git installed
+- Visual Studio 2019 or later (with C++ tools)
+- CMake 3.15 or higher
 
-## Método 1: Usando vcpkg (Recomendado)
+## Method 1: Using vcpkg (Recommended)
 
-### Paso 1: Instalar vcpkg
+### Step 1: Install vcpkg
 
-Si aún no tienes vcpkg instalado:
+If you don't have vcpkg installed yet:
 
 ```powershell
-# Navegar a una ubicación donde instalar vcpkg (ej: C:\)
+# Navigate to a location to install vcpkg (e.g., C:\)
 cd C:\
 git clone https://github.com/microsoft/vcpkg.git
 cd vcpkg
 .\bootstrap-vcpkg.bat
 ```
 
-### Paso 2: Integrar vcpkg con CMake
+### Step 2: Integrate vcpkg with CMake
 
 ```powershell
 .\vcpkg integrate install
 ```
 
-### Paso 3: Instalar las dependencias
+### Step 3: Install dependencies
 
 ```powershell
-# Instalar FLTK
+# Install FLTK
 .\vcpkg install fltk:x64-windows
 
-# Instalar libtorrent-rasterbar
+# Install libtorrent-rasterbar
 .\vcpkg install libtorrent:x64-windows
 ```
 
-**Nota:** El proceso de instalación puede tardar varios minutos, especialmente para libtorrent.
+**Note:** The installation process may take several minutes, especially for libtorrent.
 
-### Paso 4: Configurar CMake para usar vcpkg
+### Step 4: Configure CMake to use vcpkg
 
-Al ejecutar cmake, necesitas especificar la toolchain de vcpkg:
+When running cmake, you need to specify the vcpkg toolchain:
 
 ```powershell
-cd d:\FLTORRENT
+cd d:\FTorrent
 mkdir build
 cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build . --config Release
 ```
 
-## Método 2: Configuración Manual (Alternativa)
+## Method 2: Manual Configuration (Alternative)
 
-Si ya tienes las bibliotecas instaladas manualmente:
+If you already have the libraries installed manually:
 
-1. Configura las variables de entorno:
-   - `FLTK_DIR`: Ruta a la instalación de FLTK
-   - `LibtorrentRasterbar_DIR`: Ruta a la instalación de libtorrent
+1. Configure environment variables:
+   - `FLTK_DIR`: Path to FLTK installation
+   - `LibtorrentRasterbar_DIR`: Path to libtorrent installation
 
-2. Ejecuta CMake normalmente:
+2. Run CMake normally:
 ```powershell
-cd d:\FLTORRENT
+cd d:\FTorrent
 mkdir build
 cd build
 cmake ..
 cmake --build . --config Release
 ```
 
-## Verificación
+## Verification
 
-Después de compilar, deberías tener:
-- `build/Release/FLTorrent.exe` (o `build/Debug/FLTorrent.exe`)
+After compiling, you should have:
+- `build/Release/FTorrent.exe` (or `build/Debug/FTorrent.exe`)
 
-Ejecuta el programa para verificar que funciona correctamente.
+Run the program to verify it works correctly.
 
-## Resolución de Problemas
+## Troubleshooting
 
 ### Error: "Could not find FLTK"
-- Verifica que vcpkg haya instalado correctamente FLTK
-- Asegúrate de usar la toolchain de vcpkg en cmake
+- Verify that vcpkg has correctly installed FLTK.
+- Ensure you are using the vcpkg toolchain in cmake.
 
 ### Error: "Could not find LibtorrentRasterbar"
-- Verifica la instalación con: `vcpkg list | findstr libtorrent`
-- Reinstala si es necesario: `vcpkg remove libtorrent:x64-windows` y luego `vcpkg install libtorrent:x64-windows`
+- Verify the installation with: `vcpkg list | findstr libtorrent`
+- Reinstall if necessary: `vcpkg remove libtorrent:x64-windows` and then `vcpkg install libtorrent:x64-windows`
 
-### Error de compilación con Boost
-- libtorrent depende de Boost, que vcpkg instalará automáticamente
-- Si hay problemas, reinstala: `vcpkg install boost:x64-windows`
+### Compilation Error with Boost
+- libtorrent depends on Boost, which vcpkg will install automatically.
+- If there are problems, reinstall: `vcpkg install boost:x64-windows`

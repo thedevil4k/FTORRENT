@@ -2,15 +2,15 @@
 setlocal enabledelayedexpansion
 
 REM ====================================================================
-REM FLTorrent Compilation Script for Windows
+REM FTorrent Compilation Script for Windows
 REM ====================================================================
-REM This script compiles FLTorrent and copies the executable to a
+REM This script compiles FTorrent and copies the executable to a
 REM specified directory with all necessary DLLs.
 REM ====================================================================
 
 echo.
 echo ====================================================================
-echo                 FLTorrent Compilation Script
+echo                 FTorrent Compilation Script
 echo ====================================================================
 echo.
 
@@ -20,7 +20,7 @@ set "VCPKG_ROOT=C:\vcpkg"
 set "VCPKG_TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 
 REM Default output directory (can be changed by user)
-set "OUTPUT_DIR=D:\fltorrent-compilation"
+set "OUTPUT_DIR=D:\FTorrent-compilation"
 
 REM Parse command line arguments
 if not "%~1"=="" (
@@ -108,7 +108,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/5] Building FLTorrent (Release)...
+echo [3/5] Building FTorrent (Release)...
 cmake --build . --config Release
 
 if errorlevel 1 (
@@ -129,11 +129,11 @@ echo.
 echo [5/5] Copying executable and dependencies...
 
 REM Copy executable
-if exist "Release\FLTorrent.exe" (
-    copy /Y "Release\FLTorrent.exe" "%OUTPUT_DIR%\"
-    echo   [OK] FLTorrent.exe
+if exist "Release\FTorrent.exe" (
+    copy /Y "Release\FTorrent.exe" "%OUTPUT_DIR%\"
+    echo   [OK] FTorrent.exe
 ) else (
-    echo   [ERROR] FLTorrent.exe not found!
+    echo   [ERROR] FTorrent.exe not found!
     pause
     exit /b 1
 )
@@ -156,21 +156,21 @@ if exist "%VCPKG_BIN%" (
 REM Create a basic README
 echo Creating README.txt...
 (
-    echo FLTorrent - Portable Installation
+    echo FTorrent - Portable Installation
     echo ==================================
     echo.
-    echo This is a portable version of FLTorrent.
+    echo This is a portable version of FTorrent.
     echo.
     echo To run:
-    echo   - Double-click FLTorrent.exe
+    echo   - Double-click FTorrent.exe
     echo.
     echo Settings will be stored in:
-    echo   %%APPDATA%%\FLTorrent\settings.ini
+    echo   %%APPDATA%%\FTorrent\settings.ini
     echo.
     echo Downloaded torrents will be saved to:
     echo   The path configured in Preferences ^(default: Downloads folder^)
     echo.
-    echo For more information, visit: https://github.com/yourusername/FLTorrent
+    echo For more information, visit: https://github.com/yourusername/FTorrent
     echo.
     echo Version: 0.1.0
     echo Compiled: %date% %time%
@@ -183,13 +183,13 @@ echo ====================================================================
 echo                    COMPILATION SUCCESSFUL!
 echo ====================================================================
 echo.
-echo FLTorrent has been compiled and is ready to use.^
+echo FTorrent has been compiled and is ready to use.^
 
 echo.
 echo Output directory: %OUTPUT_DIR%
 echo.
 echo Files created:
-dir /B "%OUTPUT_DIR%\FLTorrent.exe" 2>nul
+dir /B "%OUTPUT_DIR%\FTorrent.exe" 2>nul
 echo + DLL dependencies
 echo + README.txt
 echo.
@@ -201,6 +201,6 @@ if /i "%OPEN_FOLDER%"=="Y" (
 )
 
 echo.
-echo You can now run FLTorrent from: %OUTPUT_DIR%\FLTorrent.exe
+echo You can now run FTorrent from: %OUTPUT_DIR%\FTorrent.exe
 echo.
 pause

@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
-project(FLTorrent VERSION 0.1.0 LANGUAGES CXX)
+project(FTorrent VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(WIN32)
     add_compile_definitions(NOMINMAX)
+    # Automatically copy dependency DLLs to the install folder for CPack
+    set(X_VCPKG_APPLOCAL_DEPS_INSTALL ON)
 endif()
 
 # Find FLTK
@@ -40,6 +42,7 @@ set(SOURCES
     src/Resources.cpp
     src/PathUtils.cpp
     src/RemoveConfirmDialog.cpp
+    src/SystemUtils.cpp
 )
 
 if(WIN32)
@@ -61,19 +64,20 @@ set(HEADERS
     src/Icons.h
     src/PathUtils.h
     src/RemoveConfirmDialog.h
+    src/SystemUtils.h
 )
 
 # Add executable
-add_executable(FLTorrent ${SOURCES} ${HEADERS})
+add_executable(FTorrent ${SOURCES} ${HEADERS})
 
 # Include directories
-target_include_directories(FLTorrent PRIVATE 
+target_include_directories(FTorrent PRIVATE 
     ${FLTK_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # Link libraries
-target_link_libraries(FLTorrent PRIVATE 
+target_link_libraries(FTorrent PRIVATE 
     ${FLTK_LIBRARIES}
     PNG::PNG
     JPEG::JPEG
@@ -83,19 +87,90 @@ target_link_libraries(FLTorrent PRIVATE
 
 # Platform-specific settings
 if(WIN32)
-    target_link_libraries(FLTorrent PRIVATE ws2_32 wsock32 comctl32)
+    target_link_libraries(FTorrent PRIVATE ws2_32 wsock32 comctl32)
     # Use standard windowed app (no console)
-    set_target_properties(FLTorrent PROPERTIES WIN32_EXECUTABLE ON)
+    set_target_properties(FTorrent PROPERTIES WIN32_EXECUTABLE ON)
     # Define Windows version
-    target_compile_definitions(FLTorrent PRIVATE _WIN32_WINNT=0x0A00)
+    target_compile_definitions(FTorrent PRIVATE _WIN32_WINNT=0x0A00)
 else()
     # On Linux, we might need pthread
     find_package(Threads REQUIRED)
-    target_link_libraries(FLTorrent PRIVATE Threads::Threads)
+    target_link_libraries(FTorrent PRIVATE Threads::Threads)
 endif()
-
 # Installation Rules
 include(GNUInstallDirs)
-install(TARGETS FLTorrent
+install(TARGETS FTorrent
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
+
+if(WIN32)
+    # Force inclusion of critical DLLs in the installer package
+    # This works as a fallback if the automatic vcpkg bundling misses them
+    set(DLL_LIST 
+        "torrent-rasterbar.dll"
+        "libcrypto-3-x64.dll"
+        "libssl-3-x64.dll"
+        "libpng16.dll"
+        "jpeg62.dll"
+        "zlib1.dll"
+    )
+    
+    foreach(dll ${DLL_LIST})
+        install(FILES "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/${dll}"
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            OPTIONAL
+        )
+    endforeach()
+
+    # Install UI icons directory next to the executable
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}/assets"
+    )
+
+    # Install trackers list template
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/trackersadd.txt"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+endif()
+
+# --- CPACK CONFIGURATION ---
+set(CPACK_PACKAGE_NAME "FTorrent")
+set(CPACK_PACKAGE_VENDOR "FTorrent Team")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A lightweight and fast BitTorrent client")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "FTorrent")
+
+# Windows NSIS Installer
+if(WIN32)
+    set(CPACK_GENERATOR "NSIS;ZIP")
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ftorrent.ico") 
+
+    set(CPACK_NSIS_HELP_LINK "https://github.com/FTorrent/FTorrent")
+    set(CPACK_NSIS_URL_INFO_ABOUT "https://ftorrent.org")
+    set(CPACK_NSIS_CONTACT "contact@ftorrent.org")
+    set(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\FTorrent.lnk' '$INSTDIR\\\\bin\\\\FTorrent.exe'")
+    
+    # This sets the icon in 'Add/Remove Programs' (Installed Apps)
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\FTorrent.exe")
+endif()
+
+# Linux Packages
+if(UNIX AND NOT APPLE)
+    set(CPACK_GENERATOR "DEB;RPM;TGZ")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "FTorrent Maintainers <dev@ftorrent.org>")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "net")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libfltk1.3, libtorrent-rasterbar2.0")
+    
+    set(CPACK_RPM_PACKAGE_LICENSE "MIT")
+    set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
+endif()
+
+# macOS Disk Image
+if(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+endif()
+
+include(CPack)
+

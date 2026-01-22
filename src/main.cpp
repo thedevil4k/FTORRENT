@@ -21,13 +21,13 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    std::cout << "FLTorrent initialized successfully" << std::endl;
+    std::cout << "FTorrent initialized successfully" << std::endl;
     
     // Create main window
     MainWindow* window = new MainWindow(
         settings.getWindowWidth(),
         settings.getWindowHeight(),
-        "FLTorrent"
+        "FTorrent"
     );
     
     // Connect manager to window
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     settings.save();
     Resources::cleanup();
     
-    std::cout << "FLTorrent shutdown complete" << std::endl;
+    std::cout << "FTorrent shutdown complete" << std::endl;
     
     return result;
 }

@@ -13,7 +13,7 @@ Fl_Pixmap* Resources::s_iconUpload = nullptr;
 
 void Resources::initialize() {
     // Create logo from PNG memory buffer
-    s_logo = new Fl_PNG_Image("logo.png", fltorrent_logo_png, fltorrent_logo_png_size);
+    s_logo = new Fl_PNG_Image("logo.png", ftorrent_logo_png, ftorrent_logo_png_size);
     s_iconAdd = new Fl_Pixmap(icon_add_xpm);
     s_iconPause = new Fl_Pixmap(icon_pause_xpm);
     s_iconPlay = new Fl_Pixmap(icon_play_xpm);

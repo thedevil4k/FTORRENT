@@ -1,4 +1,4 @@
-# FLTorrent Build Script
+# FTorrent Build Script
 # Este script automatiza la compilación del proyecto
 
 param(
@@ -6,7 +6,7 @@ param(
     [string]$BuildType = "Release"
 )
 
-Write-Host "=== FLTorrent Build Script ===" -ForegroundColor Cyan
+Write-Host "=== FTorrent Build Script ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Verificar que cl.exe y cmake están disponibles
@@ -68,7 +68,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Compilar
 Write-Host ""
-Write-Host "Compilando FLTorrent..." -ForegroundColor Yellow
+Write-Host "Compilando FTorrent..." -ForegroundColor Yellow
 cmake --build . --config $BuildType
 
 if ($LASTEXITCODE -ne 0) {
@@ -83,7 +83,7 @@ Pop-Location
 Write-Host ""
 Write-Host "=== Compilación exitosa ===" -ForegroundColor Green
 Write-Host ""
-Write-Host "Ejecutable generado en: build\$BuildType\FLTorrent.exe" -ForegroundColor Cyan
+Write-Host "Ejecutable generado en: build\$BuildType\FTorrent.exe" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Para ejecutar:" -ForegroundColor Yellow
-Write-Host "  .\build\$BuildType\FLTorrent.exe" -ForegroundColor Gray
+Write-Host "  .\build\$BuildType\FTorrent.exe" -ForegroundColor Gray

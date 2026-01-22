@@ -11,13 +11,16 @@
 #include "PreferencesDialog.h"
 #include "AddTorrentDialog.h"
 #include "TorrentDetailsDialog.h"
-#include "Resources.h"
+#ifdef _WIN32
+#include <shellapi.h>
+#define WM_TRAY_MESSAGE (WM_USER + 1)
+#endif
 
 /**
- * @brief Ventana principal de FLTorrent
+ * @brief FTorrent main window
  * 
- * Contiene el menú, toolbar, lista de torrents y barra de estado.
- * Inspirada en qBittorrent/Transmission.
+ * Contains the menu, toolbar, torrent list and status bar.
+ * Inspired by qBittorrent/Transmission.
  */
 class MainWindow : public Fl_Double_Window {
 public:
@@ -25,6 +28,7 @@ public:
     ~MainWindow();
 
     // Window management
+    void show();
     int handle(int event) override;
     
     // TorrentManager integration
@@ -103,6 +107,13 @@ private:
     void restoreWindowState();
     std::string formatStatusBar() const;
     std::string getRamUsage() const;
+
+#ifdef _WIN32
+    void setupTrayIcon();
+    void removeTrayIcon();
+    bool m_trayHasIcon = false;
+    static int win_event_handler(int event);
+#endif
 };
 
 #endif // MAINWINDOW_H

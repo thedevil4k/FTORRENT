@@ -11,6 +11,7 @@
 #include <pwd.h>
 #endif
 #include <FL/Fl.H>
+#include <filesystem>
 
 std::string PathUtils::getHomePath() {
 #ifdef _WIN32
@@ -129,4 +130,27 @@ const char* PathUtils::showDirChooser(const char* message, const char* path) {
 
 void PathUtils::initFileChooserFavorites() {
     // This is now handled inside showFileChooser and showDirChooser
+}
+
+std::string PathUtils::getAppDirPath() {
+    try {
+#ifdef _WIN32
+        wchar_t path[MAX_PATH];
+        GetModuleFileNameW(NULL, path, MAX_PATH);
+        std::filesystem::path p(path);
+        std::filesystem::path parent = p.parent_path();
+        std::u8string u8 = parent.u8string();
+        return std::string((const char*)u8.data(), u8.size());
+#elif defined(__APPLE__)
+        // macOS path handling could be here, but for now fallback to standard nix
+        return ".";
+#else
+        std::filesystem::path p = std::filesystem::canonical("/proc/self/exe");
+        std::filesystem::path parent = p.parent_path();
+        std::u8string u8 = parent.u8string();
+        return std::string((const char*)u8.data(), u8.size());
+#endif
+    } catch (...) {
+        return ".";
+    }
 }

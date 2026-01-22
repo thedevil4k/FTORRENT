@@ -1,71 +1,71 @@
-# 📄 Referencia Técnica de FLTorrent
+# 📄 FTorrent Technical Reference
 
-Este documento proporciona una descripción detallada de la arquitectura de software de FLTorrent, sus clases principales y cómo interactúan entre sí.
+This document provides a detailed description of FTorrent's software architecture, its main classes, and how they interact with each other.
 
-## 🏗️ Arquitectura General
+## 🏗️ General Architecture
 
-FLTorrent sigue un patrón de diseño modular donde la lógica de red (libtorrent) está desacoplada de la interfaz de usuario (FLTK).
+FTorrent follows a modular design pattern where the network logic (libtorrent) is decoupled from the user interface (FLTK).
 
-### Componentes Principales
+### Main Components
 
-1.  **Capa de Aplicación (`main.cpp`)**: Punto de entrada que inicializa los recursos, carga la configuración y lanza la ventana principal.
-2.  **Capa de Gestión (`TorrentManager`)**: El "cerebro" de la aplicación. Gestiona la lista de torrents y actúa como mediador entre la UI y la sesión de red.
-3.  **Capa de Red (`TorrentSession`)**: Un wrapper técnico sobre `libtorrent-rasterbar`. Maneja la sesión real, las alertas y las operaciones de red de bajo nivel.
-4.  **Capa de Datos (`TorrentItem`)**: Representa el estado y la información de un único torrent.
-5.  **Capa de UI (`MainWindow`, `TorrentListWidget`, etc.)**: Gestiona la presentación visual y la interacción con el usuario.
+1.  **Application Layer (`main.cpp`)**: Point of entry that initializes resources, loads configuration, and launches the main window.
+2.  **Management Layer (`TorrentManager`)**: The "brain" of the application. It manages the torrent list and acts as a mediator between the UI and the network session.
+3.  **Network Layer (`TorrentSession`)**: A technical wrapper over `libtorrent-rasterbar`. It handles the actual session, alerts, and low-level network operations.
+4.  **Data Layer (`TorrentItem`)**: Represents the status and information of a single torrent.
+5.  **UI Layer (`MainWindow`, `TorrentListWidget`, etc.)**: Manages the visual presentation and user interaction.
 
 ---
 
-## 🛠️ Detalle de Clases
+## 🛠️ Class Details
 
 ### 1. `TorrentManager`
-Es el núcleo funcional del programa.
-- **Responsabilidades:**
-    - Inicializar y detener la sesión de torrents.
-    - Sincronizar el estado de libtorrent con los objetos `TorrentItem`.
-    - Notificar a la UI mediante callbacks cuando ocurren eventos (torrent añadido, actualizado, error).
-    - Proporcionar estadísticas globales (velocidad total de subida/bajada).
+It is the functional core of the program.
+- **Responsibilities:**
+    - Initializing and stopping the torrent session.
+    - Synchronizing the libtorrent state with `TorrentItem` objects.
+    - Notifying the UI via callbacks when events occur (torrent added, updated, error).
+    - Providing global statistics (total upload/download speed).
 
 ### 2. `TorrentSession`
-Maneja la complejidad de `libtorrent`.
-- **Características:**
-    - Configura ajustes de red (DHT, PeX, LSD, UPnP).
-    - Procesa las alertas del sistema de libtorrent.
-    - Maneja la persistencia de los handles de los torrents.
+Handles the complexity of `libtorrent`.
+- **Features:**
+    - Configures network settings (DHT, PeX, LSD, UPnP).
+    - Processes libtorrent system alerts.
+    - Handles the persistence of torrent handles.
 
 ### 3. `SettingsManager`
-Singleton encargado de la persistencia.
-- **Funcionalidad:**
-    - Guarda y carga archivos `.ini`.
-    - Almacena rutas de descarga, límites de velocidad y estado de la ventana.
+Singleton in charge of persistence.
+- **Functionality:**
+    - Saves and loads `.ini` files.
+    - Stores download paths, speed limits, and window state.
 
 ### 4. `Resources`
-Gestor de activos estáticos.
-- **Función:** Centraliza la carga de iconos en formato XPM embebidos en el código para asegurar la portabilidad sin depender de archivos de imagen externos.
+Static asset manager.
+- **Function:** Centralizes the loading of XPM icons embedded in the code to ensure portability without depending on external image files.
 
 ---
 
-## 🔄 Flujo de Datos
+## 🔄 Data Flow
 
-1.  **Añadir Torrent:**
-    - `MainWindow` captura la ruta del archivo.
-    - `TorrentManager::addTorrentFile()` es invocado.
-    - `TorrentSession` ordena a `libtorrent` iniciar la descarga.
-    - `TorrentManager` recibe una alerta de éxito y crea un `TorrentItem`.
-    - La UI se actualiza mediante el callback `onTorrentAdded`.
+1.  **Adding a Torrent:**
+    - `MainWindow` captures the file path.
+    - `TorrentManager::addTorrentFile()` is invoked.
+    - `TorrentSession` orders `libtorrent` to start the download.
+    - `TorrentManager` receives a success alert and creates a `TorrentItem`.
+    - The UI is updated via the `onTorrentAdded` callback.
 
-2.  **Ciclo de Actualización:**
-    - El bucle de eventos de FLTK llama periódicamente (mediante timers) a `TorrentManager::update()`.
-    - `TorrentManager` consulta el estado a `libtorrent`.
-    - Los `TorrentItem` se actualizan con nuevas velocidades y progresos.
-    - La UI refleja estos cambios en el `TorrentListWidget`.
+2.  **Update Cycle:**
+    - The FLTK event loop periodically calls `TorrentManager::update()` via timers.
+    - `TorrentManager` queries `libtorrent` for status.
+    - `TorrentItem` objects are updated with new speeds and progress.
+    - The UI reflects these changes in the `TorrentListWidget`.
 
 ---
 
-## 🛠️ Tecnologías Utilizadas
+## 🛠️ Technologies Used
 
-- **Lenguaje:** C++17
+- **Language:** C++20
 - **GUI Toolkit:** FLTK 1.3.x (Fast Light Toolkit)
-- **Motor Torrent:** libtorrent-rasterbar 2.0.x
+- **Torrent Engine:** libtorrent-rasterbar 2.0.x
 - **Build System:** CMake 3.15+
-- **Dependencias:** Boost (vía libtorrent), vcpkg (gestor de paquetes)
+- **Dependencies:** Boost (via libtorrent), vcpkg (package manager)
