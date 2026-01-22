@@ -161,10 +161,12 @@ if(UNIX AND NOT APPLE)
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "FTorrent Maintainers <dev@ftorrent.org>")
     set(CPACK_DEBIAN_PACKAGE_SECTION "net")
+    # Auto-detect dependencies if possible, or list them manually
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libfltk1.3, libtorrent-rasterbar2.0")
     
     set(CPACK_RPM_PACKAGE_LICENSE "MIT")
     set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
+    set(CPACK_RPM_PACKAGE_REQUIRES "fltk, libtorrent-rasterbar")
 endif()
 
 # macOS Disk Image

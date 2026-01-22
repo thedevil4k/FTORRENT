@@ -18,7 +18,8 @@ We have prepared detailed documentation to help you:
 -   🛠️ **[Technical Reference](TECHNICAL-REFERENCE.md)**: Details about the architecture, classes, and data flow for developers.
 -   🏗️ **[Architecture](ARCHITECTURE.md)**: In-depth vision of the system design.
 -   ⚡ **[Multi-Threading Architecture](MULTITHREADING-ARCHITECTURE.md)**: Details about the multi-core and multi-threaded system.
--   🚀 **[Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions to compile from source code.
+-   🚀 **[Compilation and Packaging Guide](scripts-for-building/BUILDING.md)**: Detailed instructions to compile or create your own installable packages.
+-   🚀 **[Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions to compile from source code (Legacy).
 
 ---
 
@@ -49,24 +50,15 @@ Run our check script:
 
 ---
 
-## 🚀 Installation and Compilation
+## 🚀 Compilation and Packaging
 
-### Windows (via vcpkg)
-```powershell
-# 1. Install dependencies
-.\install-vcpkg-deps.ps1
+Building FTorrent is simple. We provide specialized scripts for each platform:
 
-# 2. Compile project
-.\build.ps1
-```
+- **Windows**: Use `scripts-for-building/build-win.ps1` and `create-win-installer.ps1`.
+- **Linux**: Use `scripts-for-building/build-linux.sh`, `create-linux-deb.sh`, or `create-linux-rpm.sh`.
 
-### Linux
-```bash
-sudo apt-get install libfltk1.3-dev libtorrent-rasterbar-dev
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-```
+For a complete step-by-step manual, please see the **[Building Guide](scripts-for-building/BUILDING.md)**.
+
 ---
 
 ## 🤝 Contributing
