@@ -76,6 +76,7 @@ void SettingsManager::setDefaults() {
     setWindowY(100);
     setWindowMaximized(false);
     setDarkMode(false);
+    setRamMode(0); // ECO (Default)
     
     // Advanced
     setUserAgent("FTorrent/0.1.0");
@@ -286,6 +287,14 @@ bool SettingsManager::getDarkMode() const {
 
 void SettingsManager::setDarkMode(bool enabled) {
     setBool("DarkMode", enabled);
+}
+
+int SettingsManager::getRamMode() const {
+    return getInt("RamMode", 1); // Default to Normal (1)
+}
+
+void SettingsManager::setRamMode(int mode) {
+    setInt("RamMode", mode);
 }
 
 std::string SettingsManager::getUserAgent() const {

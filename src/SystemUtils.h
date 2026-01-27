@@ -54,6 +54,11 @@ public:
      * @brief Get system architecture (x86, x64, arm, etc.)
      */
     static std::string getArchitecture();
+
+    /**
+     * @brief Forces the OS to release unused memory and trim the working set
+     */
+    static void releaseMemory();
 };
 
 #endif // SYSTEM_UTILS_H

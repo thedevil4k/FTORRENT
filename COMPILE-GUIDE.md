@@ -4,66 +4,32 @@
 
 FTorrent includes several scripts to facilitate compilation:
 
-### 1. **compile.bat** (Recommended) ⭐
-Complete script with validation, DLL copying, and portable distribution creation.
+### 1. **compile.ps1** (Recommended) ⭐
+Complete PowerShell script with validation, DLL copying, assets bundling, and portable distribution creation.
 
 **Usage:**
-```batch
+```powershell
 # Compile to default path (D:\FTorrent-compilation)
-compile.bat
+.\scripts\windows\compilation\compile.ps1
 
 # Compile to a custom path
-compile.bat C:\MyApps\FTorrent
+.\scripts\windows\compilation\compile.ps1 -OutputDir "C:\MyApps\FTorrent"
 ```
 
 **Features:**
 - ✅ vcpkg validation
+- ✅ Automatic environment activation (Visual Studio)
 - ✅ Automatic configuration with CMake
 - ✅ Compilation in Release mode
-- ✅ Automatic .exe copying
-- ✅ Automatic copying of all necessary DLLs
-- ✅ README.txt creation
-- ✅ Error detection and reporting
+- ✅ Automatic .exe and DLL copying
+- ✅ Assets bundling (src/assets)
+- ✅ README.txt creation with build info
+- ✅ Colored output and error detection
 - ✅ Option to open folder upon completion
 
----
-
-### 2. **quick-compile.bat** (Fast)
-Simplified script for quick compilations.
-
-**Usage:**
-```batch
-# Compile to default path
-quick-compile.bat
-
-# Compile to custom path
-quick-compile.bat D:\MyBuild
-```
-
-**Features:**
-- ✅ Fast compilation
-- ✅ Fewer validations
-- ✅ Automatically opens the folder
-- ⚠️ Fewer informational messages
 
 ---
 
-### 3. **build.ps1** (PowerShell)
-Advanced PowerShell script (requires PowerShell 5.0+).
-
-**Usage:**
-```powershell
-# Compile in Release mode
-.\build.ps1
-
-# Compile in Debug mode
-.\build.ps1 -BuildType Debug
-
-# Specify vcpkg path
-.\build.ps1 -VcpkgRoot "C:\my-vcpkg"
-```
-
----
 
 ## 🚀 Step-by-Step Compilation Process
 
@@ -72,12 +38,12 @@ Advanced PowerShell script (requires PowerShell 5.0+).
 1. **Ensure dependencies are installed:**
    ```powershell
    # If you haven't done so yet:
-   .\install-vcpkg-deps.ps1
+   .\scripts\windows\setup\install-vcpkg-deps.ps1
    ```
 
 2. **Run the compilation script:**
-   ```batch
-   compile.bat D:\FTorrent-compilation
+   ```powershell
+   .\scripts\windows\compilation\compile.ps1 -OutputDir "D:\FTorrent-compilation"
    ```
 
 3. **Wait for it to finish** (1-5 minutes the first time)
@@ -118,7 +84,7 @@ Advanced PowerShell script (requires PowerShell 5.0+).
 
 ## 📦 Compilation Folder Structure
 
-After running `compile.bat`, you will have:
+After running `compile.ps1`, you will have:
 
 ```
 D:\FTorrent-compilation\
@@ -139,7 +105,13 @@ D:\FTorrent-compilation\
 
 ### Changing the vcpkg Path
 
-If vcpkg is not in `C:\vcpkg`, edit the `compile.bat` script:
+If vcpkg is not in `C:\vcpkg`, you can pass it as a parameter:
+
+```powershell
+.\scripts\windows\compilation\compile.ps1 -VcpkgRoot "D:\MyVcpkg"
+```
+
+Or edit the `compile.ps1` script:
 
 ```batch
 REM Change this line:
@@ -151,14 +123,10 @@ set "VCPKG_ROOT=D:\MyVcpkg"
 
 ### Changing the Default Output Path
 
-In `compile.bat`, line 18:
+In `compile.ps1`, you can use the `-OutputDir` parameter:
 
-```batch
-REM Change:
-set "OUTPUT_DIR=D:\FTorrent-compilation"
-
-REM For example:
-set "OUTPUT_DIR=C:\Programs\FTorrent"
+```powershell
+.\scripts\windows\compilation\compile.ps1 -OutputDir "C:\Programs\FTorrent"
 ```
 
 ---
@@ -206,7 +174,7 @@ cd C:\vcpkg
 **Solution:**
 1. Ensure you run from the compilation folder
 2. Or copy all DLLs from `C:\vcpkg\installed\x64-windows\bin\`
-3. The `compile.bat` script does this automatically
+3. The `compile.ps1` script does this automatically
 
 ---
 
@@ -305,7 +273,7 @@ cmake --build . --config Debug
 - [ ] vcpkg installed in `C:\vcpkg`
 - [ ] Visual Studio 2019+ installed
 - [ ] CMake 3.15+ installed
-- [ ] Dependencies installed (`.\install-vcpkg-deps.ps1`)
+- [ ] Dependencies installed (`.\scripts\windows\setup\install-vcpkg-deps.ps1`)
 - [ ] vcpkg integrated (`vcpkg integrate install`)
 - [ ] Git installed (optional but recommended)
 
@@ -334,18 +302,25 @@ cmake --build . --config Release
 
 ### Portable Version
 
-1. Run `compile.bat` with your desired path
+1. Run `compile.ps1` with your desired path
 2. The generated folder is fully portable
 3. You can compress it into a .zip file
 4. Distribute it however you like
 
-### Create Installer (Future)
+### Create Installer (Recommended for release)
 
-To create a professional installer:
-- Use NSIS or InnoSetup
-- Include .torrent extension associations
-- Add to the Start menu
-- Auto-updater
+To create a professional NSIS installer and a ZIP package:
+
+1. **Run the installer script:**
+   ```powershell
+   .\scripts\windows\installers\create-win-installer.ps1
+   ```
+
+**Features:**
+- ✅ **Self-Compiling:** Automatically recompiles the project before packaging to ensure the latest version.
+- ✅ **NSIS Installer:** Creates a standard `.exe` installer with desktop and start menu shortcuts.
+- ✅ **Portable ZIP:** Also generates a `.zip` file for manual distribution.
+- ✅ **Asset Bundling:** Automatically includes all icons and necessary files.
 
 ---
 

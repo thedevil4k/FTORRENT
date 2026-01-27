@@ -51,6 +51,7 @@ public:
 
     // Network limits
     void setRateLimits(int downloadKBps, int uploadKBps);
+    void setRamMode(int mode);
 
     // Torrent queries (thread-safe with mutex locking)
     TorrentItem* getTorrent(const std::string& hash);

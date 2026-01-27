@@ -93,12 +93,17 @@ FTorrent/
 │   ├── install-dependencies.md             ✅ 2.3 KB
 │   └── (generated logo/icon images)
 │
-├── build/                                  [3 files]
-│   ├── CMakeLists.txt                      ✅ 1.5 KB
-│   ├── build.ps1                           ✅ 2.8 KB
-│   └── install-vcpkg-deps.ps1              ✅ 3.7 KB
+├── scripts/                                [12 files]
+│   ├── windows/
+│   │   ├── compilation/                    ✅ build-win.ps1, compile.bat...
+│   │   ├── setup/                          ✅ check-requirements.ps1...
+│   │   └── installers/                     ✅ create-win-installer.ps1
+│   └── linux/
+│       ├── compilation/                    ✅ build-linux.sh
+│       ├── setup/                          ✅ setup-linux.sh
+│       └── installers/                     ✅ create-linux-deb.sh...
 │
-└── TOTAL: 32 files                         ~175 KB
+└── TOTAL: 40+ files                        ~200 KB
 ```
 
 ---
@@ -285,7 +290,7 @@ FTorrent/
 
 ```powershell
 # When installation finishes (very soon):
-.\build.ps1
+.\scripts\windows\compilation\build-win.ps1
 
 # Or manually:
 mkdir build
@@ -294,7 +299,7 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build . --config Release
 
 # Run:
-.\Release\FTorrent.exe
+.\build\Release\FTorrent.exe
 ```
 
 ---

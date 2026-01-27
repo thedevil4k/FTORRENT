@@ -77,6 +77,9 @@ bool TorrentSession::initialize() {
         // Create session
         m_session = std::make_unique<lt::session>(params);
         
+        // Apply RAM mode settings
+        setRamMode(sm.getRamMode());
+        
         m_initialized = true;
         std::cout << "TorrentSession initialized with port " << sm.getListenPort() << std::endl;
         return true;
@@ -213,10 +216,77 @@ std::string TorrentSession::getSessionStats() const {
 void TorrentSession::setRateLimits(int downloadKBps, int uploadKBps) {
     if (!m_initialized || !m_session) return;
     
+    int finalDown = downloadKBps;
+    int finalUp = uploadKBps;
+    
+    // Si estamos en ECO, forzamos máximos de 2MB/s y 512KB/s 
+    // a menos que el límite solicitado sea aún menor
+    if (SettingsManager::instance().getRamMode() == 0) {
+        if (finalDown == 0 || finalDown > 2048) finalDown = 2048;
+        if (finalUp == 0 || finalUp > 512) finalUp = 512;
+    }
+    
     lt::settings_pack pack;
-    // libtorrent uses bytes per second
-    pack.set_int(lt::settings_pack::download_rate_limit, downloadKBps > 0 ? downloadKBps * 1024 : 0);
-    pack.set_int(lt::settings_pack::upload_rate_limit, uploadKBps > 0 ? uploadKBps * 1024 : 0);
+    pack.set_int(lt::settings_pack::download_rate_limit, finalDown > 0 ? finalDown * 1024 : 0);
+    pack.set_int(lt::settings_pack::upload_rate_limit, finalUp > 0 ? finalUp * 1024 : 0);
+    
+    m_session->apply_settings(pack);
+}
+
+void TorrentSession::setRamMode(int mode) {
+    if (!m_initialized || !m_session) return;
+    
+    lt::settings_pack pack;
+    auto& sm = SettingsManager::instance();
+    
+    if (mode == 0) { // MODO ECO: Escritura inmediata "al corte", CERO retención
+        // Cola de disco al mínimo técnico (64KB es el bloque mínimo de libtorrent)
+        pack.set_int(lt::settings_pack::max_queued_disk_bytes, 64 * 1024); 
+        
+        // NO usar el caché del Sistema Operativo
+        pack.set_int(lt::settings_pack::disk_io_write_mode, lt::settings_pack::disable_os_cache);
+        pack.set_int(lt::settings_pack::disk_io_read_mode, lt::settings_pack::disable_os_cache);
+        
+        // Minimizar buffers de red para no retener paquetes
+        pack.set_int(lt::settings_pack::send_buffer_watermark, 16 * 1024);
+        pack.set_int(lt::settings_pack::send_buffer_low_watermark, 8 * 1024);
+
+        // Restringir conexiones y slots de subida drásticamente
+        pack.set_int(lt::settings_pack::connections_limit, 20);
+        pack.set_int(lt::settings_pack::unchoke_slots_limit, 2);
+        pack.set_int(lt::settings_pack::active_downloads, 1);
+        pack.set_int(lt::settings_pack::active_limit, 2);
+    } 
+    else if (mode == 1) { // MODO NORMAL: Balanceado
+        pack.set_int(lt::settings_pack::max_queued_disk_bytes, 256 * 1024 * 1024);
+        pack.set_int(lt::settings_pack::disk_io_write_mode, lt::settings_pack::enable_os_cache);
+        pack.set_int(lt::settings_pack::disk_io_read_mode, lt::settings_pack::enable_os_cache);
+        pack.set_int(lt::settings_pack::connections_limit, 200);
+        pack.set_int(lt::settings_pack::active_limit, 20);
+    }
+    else { // MODO TURBO: Descarga máxima, RAM como buffer masivo
+        // Buffer de disco masivo (2GB) para descargar a tope sin esperar al disco
+        pack.set_int(lt::settings_pack::max_queued_disk_bytes, 2000 * 1024 * 1024); 
+        
+        // Habilitar caché del OS para máxima suavidad y velocidad
+        pack.set_int(lt::settings_pack::disk_io_write_mode, lt::settings_pack::enable_os_cache);
+        pack.set_int(lt::settings_pack::disk_io_read_mode, lt::settings_pack::enable_os_cache);
+        
+        // Conexiones masivas para encontrar todos los peers posibles
+        pack.set_int(lt::settings_pack::connections_limit, 2000);
+        pack.set_int(lt::settings_pack::active_downloads, 100);
+        pack.set_int(lt::settings_pack::active_limit, 200);
+        
+        // Buffers de red optimizados para alta velocidad
+        pack.set_int(lt::settings_pack::send_buffer_watermark, 5 * 1024 * 1024);
+        pack.set_int(lt::settings_pack::send_buffer_low_watermark, 1 * 1024 * 1024);
+    }
+    
+    // Aplicar los límites de velocidad globales definidos en settings (si existen)
+    int userDown = sm.getMaxDownloadRate();
+    int userUp = sm.getMaxUploadRate();
+    pack.set_int(lt::settings_pack::download_rate_limit, userDown > 0 ? userDown * 1024 : 0);
+    pack.set_int(lt::settings_pack::upload_rate_limit, userUp > 0 ? userUp * 1024 : 0);
     
     m_session->apply_settings(pack);
 }

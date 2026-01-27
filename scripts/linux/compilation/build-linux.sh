@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-BASE_DIR="$SCRIPT_DIR/.."
+BASE_DIR="$SCRIPT_DIR/../../.."
 BUILD_DIR="$BASE_DIR/build_linux"
 
 echo "--- FTorrent Linux Build ---"

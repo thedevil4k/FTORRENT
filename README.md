@@ -18,8 +18,8 @@ We have prepared detailed documentation to help you:
 -   🛠️ **[Technical Reference](TECHNICAL-REFERENCE.md)**: Details about the architecture, classes, and data flow for developers.
 -   🏗️ **[Architecture](ARCHITECTURE.md)**: In-depth vision of the system design.
 -   ⚡ **[Multi-Threading Architecture](MULTITHREADING-ARCHITECTURE.md)**: Details about the multi-core and multi-threaded system.
--   🚀 **[Compilation and Packaging Guide](scripts-for-building/BUILDING.md)**: Detailed instructions to compile or create your own installable packages.
--   🚀 **[Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions to compile from source code (Legacy).
+-   🚀 **[Compilation and Packaging Guide](scripts/BUILDING.md)**: Detailed instructions to compile or create your own installable packages.
+-   🚀 **[Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions to compile from source code.
 
 ---
 
@@ -40,7 +40,7 @@ We have prepared detailed documentation to help you:
 ### Do you have everything you need?
 Run our check script:
 ```powershell
-.\check-requirements.ps1
+.\scripts\windows\setup\check-requirements.ps1
 ```
 
 ### System Requirements
@@ -54,10 +54,10 @@ Run our check script:
 
 Building FTorrent is simple. We provide specialized scripts for each platform:
 
-- **Windows**: Use `scripts-for-building/build-win.ps1` and `create-win-installer.ps1`.
-- **Linux**: Use `scripts-for-building/build-linux.sh`, `create-linux-deb.sh`, or `create-linux-rpm.sh`.
+- **Windows**: Use `scripts/windows/compilation/` and `scripts/windows/installers/`.
+- **Linux**: Use `scripts/linux/compilation/` and `scripts/linux/installers/`.
 
-For a complete step-by-step manual, please see the **[Building Guide](scripts-for-building/BUILDING.md)**.
+For a complete step-by-step manual, please see the **[Building Guide](scripts/BUILDING.md)**.
 
 ---
 

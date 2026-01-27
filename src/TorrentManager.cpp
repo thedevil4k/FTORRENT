@@ -192,6 +192,12 @@ void TorrentManager::setRateLimits(int downloadKBps, int uploadKBps) {
     }
 }
 
+void TorrentManager::setRamMode(int mode) {
+    if (m_session) {
+        m_session->setRamMode(mode);
+    }
+}
+
 TorrentItem* TorrentManager::getTorrent(const std::string& hash) {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
     return findTorrentInternal(hash);

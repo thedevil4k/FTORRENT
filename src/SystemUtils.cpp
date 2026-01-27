@@ -25,7 +25,9 @@ std::string SystemUtils::getRamUsage() {
 #ifdef _WIN32
     PROCESS_MEMORY_COUNTERS_EX pmc;
     if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
-        double memMB = pmc.WorkingSetSize / (1024.0 * 1024.0);
+        // En Windows, WorkingSetSize incluye el caché de archivos mapeados por el SO.
+        // PrivateUsage representa lo que el programa tiene asignado de forma real y privada (Commit Size).
+        double memMB = pmc.PrivateUsage / (1024.0 * 1024.0);
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(1) << memMB << " MB";
         return oss.str();
@@ -56,6 +58,14 @@ std::string SystemUtils::getRamUsage() {
     }
 #endif
     return "0.0 MB";
+}
+
+void SystemUtils::releaseMemory() {
+#ifdef _WIN32
+    // Vaciar el "Working Set" del proceso. Esto obliga a Windows a liberar
+    // toda la RAM posible de los archivos mapeados que no se estén usando activamente.
+    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+#endif
 }
 
 std::string SystemUtils::getConfigDir() {

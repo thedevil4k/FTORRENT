@@ -75,6 +75,9 @@ public:
     bool getDarkMode() const;
     void setDarkMode(bool enabled);
     
+    int getRamMode() const; // 0=Low, 1=Normal, 2=Turbo
+    void setRamMode(int mode);
+    
     // Advanced settings
     std::string getUserAgent() const;
     void setUserAgent(const std::string& agent);

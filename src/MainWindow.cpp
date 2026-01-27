@@ -12,6 +12,7 @@
 #include <FL/fl_ask.H>
 #include <FL/Fl_Shared_Image.H>
 #include <FL/Fl_PNG_Image.H>
+#include <FL/Fl_Choice.H>
 #include <FL/x.H>
 #include <sstream>
 #include <cstdint>
@@ -182,6 +183,26 @@ void MainWindow::createToolbar() {
     m_darkModeBtn->box(FL_FLAT_BOX);
     m_darkModeBtn->tooltip("Switch Theme");
     m_darkModeBtn->callback(onToggleTheme, this);
+
+    // Spacer
+    Fl_Box* spacer3 = new Fl_Box(0, 0, 40, 30);
+    spacer3->box(FL_NO_BOX);
+
+    // Dynamic RAM Mode Selector
+    m_choiceRamMode = new Fl_Choice(0, 0, 150, 30);
+    m_choiceRamMode->add("Mode: ECO");
+    m_choiceRamMode->add("Mode: NORMAL");
+    m_choiceRamMode->add("Mode: TURBO");
+    m_choiceRamMode->box(FL_FLAT_BOX);
+    m_choiceRamMode->tooltip("RAM Usage Mode: ECO (Zero Buffer), Normal (Balanced), TURBO (Max Buffer)");
+    m_choiceRamMode->callback(onRamModeChanged, this);
+    m_choiceRamMode->value(SettingsManager::instance().getRamMode());
+
+    // Toggle Network Limit button
+    m_btnLimit = new Fl_Button(0, 0, 150, 30, "LIMIT NET SPEED: OFF");
+    m_btnLimit->box(FL_FLAT_BOX);
+    m_btnLimit->tooltip("Limit network speed");
+    m_btnLimit->callback(onToggleLimit, this);
     
     m_toolbar->end();
 }
@@ -200,13 +221,6 @@ void MainWindow::createStatusBar() {
     m_statusBar->box(FL_DOWN_BOX);
     m_statusBar->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     m_statusBar->label("Ready");
-
-    // Add limit button to the right of status bar
-    m_btnLimit = new Fl_Button(w() - 100, y + 2, 90, STATUS_HEIGHT - 4, "Limit: OFF");
-    m_btnLimit->box(FL_FLAT_BOX);
-    m_btnLimit->labelsize(11);
-    m_btnLimit->callback(onToggleLimit, this);
-    m_btnLimit->tooltip("Toggle between Limit (50%) and Unlimited network usage");
 }
 
 void MainWindow::setTorrentManager(TorrentManager* manager) {
@@ -355,11 +369,23 @@ void MainWindow::applyTheme() {
     
     if (m_btnLimit) {
         if (darkMode) {
-            m_btnLimit->color(fl_rgb_color(40, 40, 40));
+            m_btnLimit->color(fl_rgb_color(30, 30, 30));
             m_btnLimit->labelcolor(FL_WHITE);
         } else {
-            m_btnLimit->color(fl_rgb_color(210, 210, 210));
+            m_btnLimit->color(fl_rgb_color(220, 220, 220));
             m_btnLimit->labelcolor(FL_BLACK);
+        }
+    }
+
+    if (m_choiceRamMode) {
+        if (darkMode) {
+            m_choiceRamMode->color(fl_rgb_color(30, 30, 30));
+            m_choiceRamMode->labelcolor(FL_WHITE);
+            m_choiceRamMode->textcolor(FL_WHITE);
+        } else {
+            m_choiceRamMode->color(fl_rgb_color(220, 220, 220));
+            m_choiceRamMode->labelcolor(FL_BLACK);
+            m_choiceRamMode->textcolor(FL_BLACK);
         }
     }
 }
@@ -375,7 +401,7 @@ void MainWindow::toggleNetworkLimit() {
     m_limitModerate = !m_limitModerate;
     
     if (m_btnLimit) {
-        m_btnLimit->label(m_limitModerate ? "Limit: 50%" : "Limit: OFF");
+        m_btnLimit->label(m_limitModerate ? "LIMIT NET SPEED: 50%" : "LIMIT NET SPEED: OFF");
         m_btnLimit->redraw();
     }
     
@@ -572,6 +598,13 @@ int MainWindow::handle(int event) {
     return Fl_Double_Window::handle(event);
 }
 
+void MainWindow::resize(int x, int y, int w, int h) {
+    Fl_Double_Window::resize(x, y, w, h);
+    
+    // Status bar is handled by FLTK if resizable is set.
+    // Dashboard widgets in toolbar are positioned by Fl_Pack.
+}
+
 #ifdef _WIN32
 void MainWindow::setupTrayIcon() {
     if (m_trayHasIcon) return;
@@ -731,12 +764,27 @@ void MainWindow::onToggleLimit(Fl_Widget* w, void* data) {
     ((MainWindow*)data)->toggleNetworkLimit();
 }
 
+void MainWindow::onRamModeChanged(Fl_Widget* w, void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (win && win->m_choiceRamMode && win->m_manager) {
+        int mode = win->m_choiceRamMode->value();
+        SettingsManager::instance().setRamMode(mode);
+        SettingsManager::instance().save();
+        win->m_manager->setRamMode(mode);
+    }
+}
+
 void MainWindow::updateTimerCallback(void* data) {
     MainWindow* win = (MainWindow*)data;
     
     if (win && win->m_manager) {
         win->m_manager->update();
         win->updateToolbar(); // Keep toolbar updated as selection might change or items might disappear
+
+        // En Modo ECO, forzamos la liberación de memoria de forma agresiva cada 100ms
+        if (SettingsManager::instance().getRamMode() == 0) {
+            SystemUtils::releaseMemory();
+        }
     }
     
     Fl::repeat_timeout(0.1, updateTimerCallback, data);

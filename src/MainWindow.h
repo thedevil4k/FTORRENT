@@ -30,6 +30,7 @@ public:
     // Window management
     void show();
     int handle(int event) override;
+    void resize(int x, int y, int w, int h) override;
     
     // TorrentManager integration
     void setTorrentManager(TorrentManager* manager);
@@ -65,6 +66,7 @@ private:
     TorrentListWidget* m_torrentList;
     Fl_Box* m_statusBar;
     Fl_Button* m_btnLimit;
+    Fl_Choice* m_choiceRamMode;
     bool m_limitModerate;
     
     // Manager
@@ -98,6 +100,7 @@ private:
     static void onPreferences(Fl_Widget* w, void* data);
     static void onToggleTheme(Fl_Widget* w, void* data);
     static void onToggleLimit(Fl_Widget* w, void* data);
+    static void onRamModeChanged(Fl_Widget* w, void* data);
     
     // Update timer
     static void updateTimerCallback(void* data);

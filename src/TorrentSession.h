@@ -35,6 +35,7 @@ public:
     
     // Rate limiting
     void setRateLimits(int downloadKBps, int uploadKBps);
+    void setRamMode(int mode);
     
     // Persistence
     void triggerSaveResumeData();
