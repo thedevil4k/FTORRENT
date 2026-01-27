@@ -62,6 +62,23 @@ Static asset manager.
 
 ---
 
+## 💎 Resource Management (XPM)
+
+To maintain a zero-dependency portable executable, FTorrent uses **embedded XPM resources**:
+- **Icons:** All UI icons (Add, Magnet, Pause, Resume, Remove, Settings) are stored as static `char*` arrays in `Icons.h`.
+- **Packaging:** The `Resources` class handles the conversion of these XPM arrays into `Fl_RGB_Image` objects at runtime.
+- **Advantage:** Eliminates the need for an `assets/` folder and prevents "missing icon" errors during distribution.
+
+---
+
+## ⚡ Multi-threading Architecture
+
+FTorrent is designed to be completely non-blocking:
+1.  **Main Thread (UI):** exclusively handles FLTK events and window rendering.
+2.  **Worker Thread (Alerts):** A dedicated thread polls `libtorrent` for alerts every 100ms.
+3.  **I/O Threads:** Internal `libtorrent` threads handle disk and network operations.
+4.  **Synchronization:** Uses `std::mutex` and `std::atomic` to safely share data between the alert processor and the UI controllers.
+
 ## 🛠️ Technologies Used
 
 - **Language:** C++20

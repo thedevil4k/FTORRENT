@@ -26,10 +26,20 @@ To get the best performance, you can adjust:
 -   **Upload Limit:** Recommended to leave some room to not saturate your connection.
 -   **Ports:** FTorrent uses UPnP to open ports automatically, but you can configure it manually in the Preferences.
 
+## 💎 System Tray Integration
+
+FTorrent can run in the background:
+-   **Minimize to Tray:** Closing the window or clicking minimize (if configured) will move FTorrent to the system tray.
+-   **Context Menu:** Right-click the tray icon to quickly Pause/Resume all torrents or Exit the application.
+-   **Quick Restore:** Double-click the tray icon to bring the window back to front.
+
 ## 📊 Understanding the Interface
 
 -   **Torrent List:** Shows the name, size, progress, speed, and status of each download.
--   **Status Bar:** At the bottom, you will see the total speed of your connection and the session status.
+-   **Status Bar:** At the bottom, you will see:
+    -   **Total Speed:** Combined download and upload rates.
+    -   **Resource Monitor:** Real-time RAM consumption of the application.
+    -   **Session Status:** Indicates if the engine is running or paused.
 -   **Control Icons:**
     -   ▶️ **Resume:** Starts the selected download.
     -   ⏸️ **Pause:** Temporarily stops the download.

@@ -2,7 +2,7 @@
 
 A modern, minimalist, and ultra-lightweight BitTorrent client built with **C++20**, **FLTK**, and **libtorrent-rasterbar**.
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey?style=for-the-badge)
 
@@ -32,6 +32,9 @@ We have prepared detailed documentation to help you:
 -   🎨 **Clean Design:** Intuitive interface inspired by classics but optimized for the present.
 -   📦 **Fully Portable:** No heavy external runtime dependencies.
 -   🔧 **Expert Configuration:** Granular control over DHT, PEX, LSD and network limits.
+-   💎 **System Tray:** Minimize to tray and manage downloads from the background.
+-   📉 **Real-time Limits:** Apply bandwidth limits instantly without restarting.
+-   📊 **Resource Monitor:** Integrated RAM and CPU usage display.
 
 ---
 

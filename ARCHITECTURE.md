@@ -187,31 +187,30 @@ UI Settings Dialog → SettingsManager::setMaxDownloadRate(500)
 4. **Callbacks:** UI reacts to changes without constant polling.
 5. **Persistent Configuration:** Settings survive restarts.
 6. **Abstraction:** UI doesn't need to know libtorrent details.
+7. **Thread Safety:** Dedicated worker thread ensures smooth UI performance.
 
 ---
 
-## 🚀 Next Steps
+## 🚀 Advanced Features Implemented
 
-### UI Components (Phase 3):
-- `MainWindow` - Main window
-- `TorrentListWidget` - Torrent table widget
-- `TorrentDetailsDialog` - Details dialog
-- `AddTorrentDialog` - Add torrent dialog
-- `PreferencesDialog` - Settings dialog
+### UI Components:
+- ✅ `MainWindow` - Main window with toolbar and status bar
+- ✅ `TorrentListWidget` - Multi-column sortable table
+- ✅ `TorrentDetailsDialog` - Detailed stats, peers, and file lists
+- ✅ `AddTorrentDialog` - File/Magnet support with preview
+- ✅ `PreferencesDialog` - Comprehensive settings management
 
-### Additional Features (Phase 4):
-- Category/label system
-- Torrent filters
-- Integrated search
-- RSS feeds system
-- Bandwidth scheduler
-- Private trackers support
+### Performance & Integration:
+- ✅ **System Tray:** Full integration with Windows tray icons.
+- ✅ **Real-time Engine:** Immediate application of bandwidth limits.
+- ✅ **Resource Tracking:** Real-time RAM and throughput monitoring.
+- ✅ **Zero Blocking:** Decoupled alert processing for high responsiveness.
 
 ---
 
 ## 📝 Implementation Notes
 
-- **Thread Safety:** TorrentManager must be thread-safe for callbacks from libtorrent.
-- **UI Update:** Callbacks are executed from the worker/alert thread, UI needs synchronization.
-- **Performance:** TorrentItem caches data to avoid constant libtorrent calls.
-- **Memory:** Use of unique_ptr for automatic memory management.
+- **Thread Safety:** TorrentManager uses a dedicated thread for libtorrent alerts, with results posted back to the UI thread safely.
+- **UI Update:** FLTK timers (100ms) ensure the UI stays synchronized with the backend.
+- **Performance:** XPM icons are embedded to minimize disk I/O and bundle size.
+- **Memory:** Strict RAII with smart pointers throughout the codebase.

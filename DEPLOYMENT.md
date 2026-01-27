@@ -53,11 +53,25 @@ This will generate:
 FTorrent supports `.deb` (Debian/Ubuntu) and `.rpm` (Fedora/RedHat) packages.
 
 ### 1. Install Dependencies
+You can use the helper script:
 ```bash
-sudo apt-get install build-essential cmake pkg-config libfltk1.3-dev libtorrent-rasterbar-dev
+./scripts/linux/setup/setup-linux.sh
 ```
 
 ### 2. Build and Package
+You can use the automated scripts:
+
+**Debian/Ubuntu:**
+```bash
+./scripts/linux/installers/create-linux-deb.sh
+```
+
+**Fedora/RedHat:**
+```bash
+./scripts/linux/installers/create-linux-rpm.sh
+```
+
+Or manually:
 ```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release

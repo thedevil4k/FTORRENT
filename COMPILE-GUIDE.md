@@ -180,12 +180,18 @@ cd C:\vcpkg
 
 ## 🐧 Compilation on Linux
 
-FTorrent is fully compatible with Linux. Follow these steps to compile on Ubuntu/Debian-based distributions:
+FTorrent is fully compatible with Linux. You can use the provided helper scripts or compile manually.
 
 ### 1. Install System Dependencies
 
-Run the following command to install the necessary build tools and libraries:
+You can use the setup script to install all necessary dependencies for your distribution (Debian, Ubuntu, Fedora, Arch, etc.):
 
+```bash
+chmod +x scripts/linux/setup/setup-linux.sh
+./scripts/linux/setup/setup-linux.sh
+```
+
+Or install manually (Ubuntu/Debian example):
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
@@ -196,19 +202,45 @@ sudo apt-get install -y \
     libpng-dev \
     libjpeg-dev \
     zlib1g-dev \
-    libx11-dev \
-    libxext-dev \
-    libxft-dev \
-    libxinerama-dev \
-    libxcursor-dev \
-    libxfixes-dev
+    rpm # Required for packaging
 ```
 
-### 2. Compilation Process
+### 2. Compilation using Scripts (Recommended)
+
+To compile the project easily:
+
+```bash
+chmod +x scripts/linux/compilation/build-linux.sh
+./scripts/linux/compilation/build-linux.sh
+```
+
+The executable will be located in `build_linux/bin/FTorrent`.
+
+### 3. Creating Installers (.deb / .rpm)
+
+You can generate installable packages for Linux distributions.
+
+**For Debian/Ubuntu (.deb):**
+```bash
+chmod +x scripts/linux/installers/create-linux-deb.sh
+./scripts/linux/installers/create-linux-deb.sh
+```
+
+**For Fedora/RHEL/CentOS (.rpm):**
+```bash
+chmod +x scripts/linux/installers/create-linux-rpm.sh
+./scripts/linux/installers/create-linux-rpm.sh
+```
+
+The packages will be generated in `build_linux`.
+
+### 4. Manual Compilation
+
+If you prefer to compile manually:
 
 1. **Create build directory:**
    ```bash
-   mkdir build && cd build
+   mkdir build_linux && cd build_linux
    ```
 
 2. **Configure with CMake:**
@@ -221,17 +253,10 @@ sudo apt-get install -y \
    make -j$(nproc)
    ```
 
-4. **Install (optional):**
+4. **Run:**
    ```bash
-   sudo make install
+   ./bin/FTorrent
    ```
-
-### 3. Execution
-
-Once compiled, the executable will be in the `build` folder:
-```bash
-./FTorrent
-```
 
 ## 📊 Compilation Times
 
