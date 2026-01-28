@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://thedevil4k.github.io/FTORRENT/sitemap.xml
