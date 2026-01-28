@@ -1,7 +1,7 @@
 :root {
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --secondary: #0ea5e9;
+    --primary: #22c55e;
+    --primary-hover: #16a34a;
+    --secondary: #10b981;
     --bg-dark: #020617;
     --bg-card: rgba(15, 23, 42, 0.5);
     --text-main: #f8fafc;
@@ -9,7 +9,7 @@
     --accent: #f43f5e;
     --glass: rgba(15, 23, 42, 0.4);
     --border: rgba(255, 255, 255, 0.05);
-    --selection: rgba(99, 102, 241, 0.2);
+    --selection: rgba(34, 197, 94, 0.2);
 }
 
 ::selection {
@@ -40,14 +40,14 @@ body {
     width: 100%;
     height: 100%;
     z-index: -1;
-    background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #0f172a 100%);
+    background: radial-gradient(circle at 50% 50%, #064e3b 0%, #020617 100%);
 }
 
 .bg-blob {
     position: fixed;
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
     border-radius: 50%;
     z-index: -1;
     filter: blur(80px);
@@ -80,20 +80,26 @@ header {
     text-align: center;
 }
 
-.logo-main {
-    width: 120px;
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
     margin-bottom: 2rem;
-    filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.5));
+}
+
+.logo-main {
+    width: 100px; /* Reduced to fit better with text */
+    filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.5));
 }
 
 h1 {
-    font-size: 5rem;
+    font-size: 6rem;
     font-weight: 800;
     background: linear-gradient(to right, #fff, var(--primary));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 1rem;
+    letter-spacing: -2px;
 }
 
 .subtitle {
@@ -120,13 +126,13 @@ h1 {
 
 .btn-primary {
     background: var(--primary);
-    color: white;
-    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+    color: #020617; /* Darker text for better contrast on green */
+    box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.4);
 }
 
 .btn-primary:hover {
     transform: translateY(-3px);
-    box-shadow: 0 20px 35px -10px rgba(99, 102, 241, 0.6);
+    box-shadow: 0 20px 35px -10px rgba(34, 197, 94, 0.6);
     background: var(--primary-hover);
 }
 
@@ -168,7 +174,7 @@ section {
 
 .card:hover {
     transform: translateY(-10px);
-    border-color: rgba(99, 102, 241, 0.5);
+    border-color: rgba(34, 197, 94, 0.5);
     background: rgba(30, 41, 59, 0.9);
 }
 
@@ -213,7 +219,7 @@ section {
 .release-row:hover {
     background: rgba(30, 41, 59, 0.4);
     transform: scale(1.02);
-    border-color: rgba(99, 102, 241, 0.3);
+    border-color: rgba(34, 197, 94, 0.3);
     box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
 }
 
@@ -229,12 +235,12 @@ section {
 }
 
 .download-pill {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(14, 165, 233, 0.1));
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.1));
     color: #fff;
     padding: 0.6rem 1.2rem;
     border-radius: 50px;
     font-weight: 700;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(34, 197, 94, 0.2);
     display: flex;
     align-items: center;
     gap: 0.5rem;
