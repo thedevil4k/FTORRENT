@@ -32,15 +32,15 @@
                 <img src="img/logo.png" alt="FT Logo" class="logo-main">
                 <h1>ORRENT</h1>
             </div>
-            <p class="subtitle">A modern, minimalist, and ultra-lightweight BitTorrent client built for speed and
-                efficiency.</p>
+            <p class="subtitle">Experience the power of native C++20 performance. A professional-grade, lightweight
+                BitTorrent client engineered for efficiency, speed, and absolute control.</p>
 
             <div class="cta-group">
                 <a href="https://github.com/thedevil4k/FTORRENT/releases/latest" class="btn btn-primary">
                     <i class="fas fa-download"></i> Download Latest
                 </a>
                 <a href="https://github.com/thedevil4k/FTORRENT" class="btn btn-outline" target="_blank">
-                    <i class="fab fa-github"></i> View on GitHub
+                    <i class="fab fa-github"></i> Source Code
                 </a>
             </div>
 
@@ -51,39 +51,82 @@
 
         <!-- Features Section -->
         <section id="features">
-            <h2 class="section-title">Why FTORRENT?</h2>
+            <h2 class="section-title">Professional Performance</h2>
             <div class="grid">
                 <div class="card">
-                    <i class="fas fa-bolt"></i>
-                    <h3>Native Performance</h3>
-                    <p>Built with pure C++20 and FLTK. Zero heavy frameworks like Electron, ensuring maximum efficiency.
-                    </p>
-                </div>
-                <div class="card">
                     <i class="fas fa-microchip"></i>
-                    <h3>Elite Engine</h3>
-                    <p>Powered by <strong>libtorrent-rasterbar</strong>, the same engine used by qBittorrent and Deluge.
-                    </p>
+                    <h3>FLTK Native Architecture</h3>
+                    <p>Built with <strong>FLTK (Fast Light Toolkit)</strong> for a lightning-fast, zero-bloat UI. No
+                        Electron, no web-tech, just pure native execution.</p>
                 </div>
                 <div class="card">
-                    <i class="fas fa-layer-group"></i>
-                    <h3>Multi-Threaded</h3>
-                    <p>Optimized architecture that takes advantage of all CPU cores without blocking the UI.</p>
+                    <i class="fas fa-bolt"></i>
+                    <h3>C++20 Power</h3>
+                    <p>Leveraging modern C++20 features to deliver a high-performance binary with minimal resource
+                        overhead and maximum stability.</p>
                 </div>
                 <div class="card">
-                    <i class="fas fa-leaf"></i>
-                    <h3>Ultra-Light</h3>
-                    <p>Extremely low RAM and CPU footprint. Dedicated to what matters: your downloads.</p>
+                    <i class="fas fa-gears"></i>
+                    <h3>Libtorrent Engine</h3>
+                    <p>Powered by <strong>libtorrent-rasterbar</strong>, the industry-standard BitTorrent engine used by
+                        the world's most popular clients.</p>
                 </div>
                 <div class="card">
                     <i class="fas fa-gauge-high"></i>
-                    <h3>Real-time Limits</h3>
-                    <p>Apply bandwidth and resource limits instantly without needing to restart the application.</p>
+                    <h3>Instant Responsiveness</h3>
+                    <p>High-frequency update cycles and real-time bandwidth management. Change limits and settings
+                        without interrupting your workflow.</p>
                 </div>
                 <div class="card">
                     <i class="fas fa-shield-halved"></i>
-                    <h3>Expert Control</h3>
-                    <p>Granular control over DHT, PEX, LSD and advanced network settings for power users.</p>
+                    <h3>Advanced Protocol Support</h3>
+                    <p>Full implementation of DHT, PEX, LSD, and UPnP. Fine-grained control over network encryption and
+                        peer discovery.</p>
+                </div>
+                <div class="card">
+                    <i class="fas fa-leaf"></i>
+                    <h3>Low Footprint</h3>
+                    <p>Optimized for long-running sessions. Minimal RAM consumption allows it to run in the background
+                        without impacting system performance.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Section -->
+        <section id="tech-stack" class="tech-box">
+            <div class="tech-grid">
+                <div class="tech-content">
+                    <h2 class="tech-title">Technical Excellence</h2>
+                    <p class="tech-desc">
+                        FTORRENT is architected on the <strong>Fast Light Toolkit (FLTK)</strong> framework. While many
+                        modern clients rely on heavy web-wrappers like Electron, we prioritize <strong>low-level
+                            execution</strong> to ensure the smallest possible binary and memory footprint.
+                    </p>
+                    <ul class="tech-list">
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <span>Zero-latency user interface responses</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <span>Deterministic memory management via C++20</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <span>Optimized for 24/7 high-uptime seeding</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="tech-code">
+                    <pre><code><span class="code-comment">// Native Performance Architecture</span>
+#include &lt;libtorrent/session.hpp&gt;
+#include &lt;FL/Fl.H&gt;
+
+<span class="code-keyword">void</span> FT_Engine::process() {
+  <span class="code-comment">// Optimized for efficiency</span>
+  this-&gt;release_memory();
+  this-&gt;handle_peers_native();
+}</code></pre>
                 </div>
             </div>
         </section>

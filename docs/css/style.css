@@ -17,6 +17,107 @@
     color: var(--primary);
 }
 
+/* Tech Box Section */
+.tech-box {
+    background: var(--bg-card);
+    border-radius: 32px;
+    padding: 4rem;
+    border: 1px solid var(--border);
+    margin-bottom: 6rem;
+    backdrop-filter: blur(10px);
+}
+
+.tech-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4rem;
+    align-items: center;
+}
+
+.tech-content {
+    flex: 1.2;
+    min-width: 300px;
+}
+
+.tech-title {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary);
+    text-align: left;
+}
+
+.tech-desc {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.tech-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.tech-list li {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    font-size: 1.05rem;
+}
+
+.tech-list i {
+    color: var(--primary);
+    font-size: 1.2rem;
+}
+
+.tech-code {
+    flex: 1;
+    min-width: 300px;
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+    position: relative;
+    overflow: hidden;
+}
+
+.tech-code::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary);
+}
+
+.tech-code pre {
+    margin: 0;
+}
+
+.tech-code code {
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #e2e8f0;
+}
+
+.code-comment {
+    color: #64748b;
+    font-style: italic;
+}
+
+.code-keyword {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -72,7 +173,8 @@ body {
 
 /* Header */
 header {
-    height: 100vh;
+    padding: 6rem 0 0 0;
+    /* Changed from 100vh to padding */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -88,12 +190,14 @@ header {
 }
 
 .logo-main {
-    width: 100px; /* Reduced to fit better with text */
+    width: 80px;
+    /* Reduced from 100px */
     filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.5));
 }
 
 h1 {
-    font-size: 6rem;
+    font-size: 4.5rem;
+    /* Reduced from 6rem */
     font-weight: 800;
     background: linear-gradient(to right, #fff, var(--primary));
     -webkit-background-clip: text;
@@ -103,10 +207,12 @@ h1 {
 }
 
 .subtitle {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
+    /* Reduced from 1.5rem */
     color: var(--text-muted);
-    max-width: 700px;
-    margin-bottom: 3rem;
+    max-width: 600px;
+    margin-bottom: 2.5rem;
+    /* Reduced from 3rem */
 }
 
 .cta-group {
@@ -126,7 +232,8 @@ h1 {
 
 .btn-primary {
     background: var(--primary);
-    color: #020617; /* Darker text for better contrast on green */
+    color: #020617;
+    /* Darker text for better contrast on green */
     box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.4);
 }
 
@@ -148,7 +255,8 @@ h1 {
 
 /* Features */
 section {
-    padding: 8rem 0;
+    padding: 6rem 0;
+    /* Reduced from 8rem */
 }
 
 .section-title {
@@ -270,9 +378,11 @@ section {
 
 /* Preview */
 .app-preview {
-    margin-top: 5rem;
+    margin-top: 3.5rem;
+    /* Reduced from 5rem */
     width: 100%;
-    max-width: 1000px;
+    max-width: 900px;
+    /* Slightly reduced from 1000px */
     border-radius: 20px;
     box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5);
     border: 1px solid var(--border);
@@ -295,5 +405,13 @@ section {
 
     .btn {
         text-align: center;
+    }
+
+    .tech-box {
+        padding: 2rem;
+    }
+
+    .tech-title {
+        font-size: 2rem;
     }
 }
