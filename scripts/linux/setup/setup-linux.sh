@@ -29,7 +29,7 @@ run_as_root() {
     fi
 }
 
-case $OS in
+        ;;
     ubuntu|debian|raspbian|linuxmint|pop)
         echo "Installing dependencies for Debian-based system..."
         export DEBIAN_FRONTEND=noninteractive
@@ -45,6 +45,17 @@ case $OS in
             pkg-config \
             rpm \
             git
+
+        # Version check for libtorrent if on Ubuntu
+        if [ "$OS" == "ubuntu" ]; then
+            LT_VERSION=$(dpkg -s libtorrent-rasterbar-dev | grep Version | awk '{print $2}')
+            echo "Installed libtorrent-rasterbar-dev version: $LT_VERSION"
+            if [[ "$LT_VERSION" < "2.0" ]]; then
+                echo "WARNING: libtorrent version $LT_VERSION detected. This project requires version 2.0+."
+                echo "On Ubuntu 22.04 or older, you may need to compile libtorrent from source or use a PPA."
+                echo "Ubuntu 24.04+ is recommended for building FTorrent."
+            fi
+        fi
         ;;
     fedora|rhel|centos|almalinux|rocky)
         echo "Installing dependencies for RedHat-based system..."
