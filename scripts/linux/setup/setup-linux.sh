@@ -29,7 +29,7 @@ run_as_root() {
     fi
 }
 
-        ;;
+case $OS in
     ubuntu|debian|raspbian|linuxmint|pop)
         echo "Installing dependencies for Debian-based system..."
         export DEBIAN_FRONTEND=noninteractive
