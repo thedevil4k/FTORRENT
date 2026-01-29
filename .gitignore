@@ -38,7 +38,5 @@ Thumbs.db
 *.bak
 
 # Project specific
-ftorrent.ico
-ftorrent.png
 *.torrent
 downloads/
