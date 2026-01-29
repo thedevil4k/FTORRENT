@@ -10,7 +10,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Setup MSVC
       uses: microsoft/setup-msbuild@v1.1
@@ -30,7 +30,7 @@ jobs:
         cmake --build build --config Release
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: fltorrent-windows
         path: build/Release/FLTorrent.exe
@@ -38,10 +38,15 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Install Dependencies
       run: bash scripts/linux/setup/setup-linux.sh
+
+    - name: Build Project
+      run: bash scripts/linux/compilation/build-linux.sh
+      env:
+        BUILD_DIR: build_linux
 
     - name: Create Debian Package
       run: bash scripts/linux/installers/create-linux-deb.sh
@@ -54,13 +59,13 @@ jobs:
         BUILD_DIR: build_linux
 
     - name: Upload DEB Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: FTorrent-deb
         path: build_linux/*.deb
 
     - name: Upload RPM Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: FTorrent-rpm
         path: build_linux/*.rpm
