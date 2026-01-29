@@ -41,20 +41,26 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Install Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake libfltk1.3-dev libtorrent-rasterbar-dev libpng-dev libjpeg-dev zlib1g-dev
+      run: bash scripts/linux/setup/setup-linux.sh
 
-    - name: Configure CMake
-      run: |
-        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    - name: Create Debian Package
+      run: bash scripts/linux/installers/create-linux-deb.sh
+      env:
+        BUILD_DIR: build_linux
 
-    - name: Build
-      run: |
-        cmake --build build --config Release
+    - name: Create RPM Package
+      run: bash scripts/linux/installers/create-linux-rpm.sh
+      env:
+        BUILD_DIR: build_linux
 
-    - name: Upload Artifact
+    - name: Upload DEB Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: fltorrent-linux
-        path: build/FLTorrent
+        name: FTorrent-deb
+        path: build_linux/*.deb
+
+    - name: Upload RPM Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: FTorrent-rpm
+        path: build_linux/*.rpm

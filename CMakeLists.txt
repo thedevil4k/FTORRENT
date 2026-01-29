@@ -159,14 +159,32 @@ endif()
 
 # Linux Packages
 if(UNIX AND NOT APPLE)
+    # Desktop integration
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/io.github.thedevil4k.FTorrent.desktop"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+        RENAME "io.github.thedevil4k.FTorrent.desktop"
+    )
+    
+    # Icons (various sizes if available, but for now we use the one we have)
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ftorrent.png"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps"
+        RENAME "ftorrent.png"
+    )
+
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
+    
+    # Debian specific
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "FTorrent Maintainers <dev@ftorrent.org>")
     set(CPACK_DEBIAN_PACKAGE_SECTION "net")
-    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON) # Auto-detect dependencies
-    
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libfltk1.3, libtorrent-rasterbar-dev") # Fallback dependencies
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+
+    # RPM specific
     set(CPACK_RPM_PACKAGE_LICENSE "MIT")
     set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
-    set(CPACK_RPM_PACKAGE_AUTOREQPROV ON) # Auto-detect dependencies
+    set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
+    set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 endif()
 
 # macOS Disk Image

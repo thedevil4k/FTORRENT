@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=FTorrent
+Comment=Lightweight and fast BitTorrent client
+Exec=FTorrent
+Icon=ftorrent
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;P2P;Qt;
+Keywords=torrent;bittorrent;p2p;
