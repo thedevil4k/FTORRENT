@@ -321,7 +321,7 @@ void CreateTorrentDialog::processCreate() {
         // On Windows, libtorrent's set_piece_hashes needs the parent directory 
         // because add_files adds files with the source directory name as a prefix.
         // We use std::filesystem to get the parent path safely.
-#if defined(_WIN32) && defined(__cpp_lib_char8_t)
+#if defined(__cpp_lib_char8_t)
         std::filesystem::path sourcePath(std::u8string_view((const char8_t*)source.c_str(), source.length()));
 #else
         std::filesystem::path sourcePath = std::filesystem::u8path(source);
@@ -329,7 +329,7 @@ void CreateTorrentDialog::processCreate() {
         std::filesystem::path parent = sourcePath.parent_path();
         
         std::string parentPathStr;
-#if defined(_WIN32) && defined(__cpp_lib_char8_t)
+#if defined(__cpp_lib_char8_t)
         std::u8string u8Parent = parent.u8string();
         parentPathStr.assign((const char*)u8Parent.data(), u8Parent.size());
 #else
@@ -354,7 +354,7 @@ void CreateTorrentDialog::processCreate() {
 
         // Use std::filesystem::path to handle UTF-8 paths on Windows correctly
         std::filesystem::path pSave;
-#if defined(_WIN32) && defined(__cpp_lib_char8_t)
+#if defined(__cpp_lib_char8_t)
         pSave = std::filesystem::path(std::u8string_view((const char8_t*)savePath.c_str(), savePath.length()));
 #else
         pSave = std::filesystem::u8path(savePath);
