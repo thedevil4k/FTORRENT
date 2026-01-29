@@ -5,67 +5,55 @@ Write-Host ""
 
 $AllOk = $true
 
-# 1. Verificar vcpkg
-Write-Host "[1/4] Verificando vcpkg..." -NoNewline
+# 1. Verificar Git
+Write-Host "[1/5] Verificando Git..." -NoNewline
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    $gitVer = git --version
+    Write-Host " OK ($gitVer)" -ForegroundColor Green
+}
+else {
+    Write-Host " NO ENCONTRADO" -ForegroundColor Red
+    $AllOk = $false
+}
+
+# 2. Verificar vcpkg
+Write-Host "[2/5] Verificando vcpkg..." -NoNewline
 if (Test-Path "C:\vcpkg\vcpkg.exe") {
     Write-Host " OK (Encontrado en C:\vcpkg)" -ForegroundColor Green
 }
 else {
     Write-Host " NO ENCONTRADO" -ForegroundColor Red
-    Write-Host "      Por favor, asegúrate de que vcpkg está instalado en C:\vcpkg" -ForegroundColor Gray
     $AllOk = $false
 }
 
-# Intentar encontrar Visual Studio Build Tools
-$vsInstallPath = ""
-if (Test-Path "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe") {
-    $vsInstallPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
-}
-
-# 2. Verificar CMake
-Write-Host "[2/4] Verificando CMake..." -NoNewline
+# 3. Verificar CMake
+Write-Host "[3/5] Verificando CMake..." -NoNewline
 $cmake = where.exe cmake 2>$null
 if ($cmake) {
     $version = cmake --version | Select-Object -First 1
     Write-Host " OK ($version)" -ForegroundColor Green
 }
 else {
-    # Buscar en rutas de Visual Studio
-    $vsCmake = Join-Path $vsInstallPath "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-    if ($vsInstallPath -and (Test-Path $vsCmake)) {
-        Write-Host " OK (Encontrado en VS: $vsInstallPath)" -ForegroundColor Green
-        # Sugerir añadir al PATH
-        Write-Host "      Nota: CMake se encontró en la carpeta de VS pero no está en tu PATH global." -ForegroundColor Gray
-    }
-    else {
-        Write-Host " NO ENCONTRADO" -ForegroundColor Yellow
-        Write-Host "      CMake no está en el PATH ni en la ruta estándar de VS." -ForegroundColor Gray
-        $AllOk = $false
-    }
+    Write-Host " NO ENCONTRADO" -ForegroundColor Yellow
+    $AllOk = $false
 }
 
-# 3. Verificar Compilador (cl.exe)
-Write-Host "[3/4] Verificando compilador (cl.exe)..." -NoNewline
-$cl = where.exe cl 2>$null
-if ($cl) {
+# 4. Verificar NSIS
+Write-Host "[4/5] Verificando NSIS (makensis.exe)..." -NoNewline
+if (Get-Command makensis -ErrorAction SilentlyContinue) {
     Write-Host " OK" -ForegroundColor Green
 }
+elseif (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe") {
+    Write-Host " OK (Encontrado en ruta estándar)" -ForegroundColor Green
+}
 else {
-    if ($vsInstallPath) {
-        Write-Host " INSTALADO PERO NO EN EL PATH" -ForegroundColor Yellow
-        Write-Host "      Se detectó Visual Studio en: $vsInstallPath" -ForegroundColor Gray
-        Write-Host "      Para que funcione, debes abrir 'Developer PowerShell for VS 2022' desde el menú Inicio." -ForegroundColor Cyan
-    }
-    else {
-        Write-Host " NO ENCONTRADO" -ForegroundColor Red
-        Write-Host "      No se detectó Visual Studio Build Tools o Community." -ForegroundColor Gray
-        $AllOk = $false
-    }
+    Write-Host " NO ENCONTRADO" -ForegroundColor Yellow
+    $AllOk = $false
 }
 
-# 4. Verificar Librerías en vcpkg
+# 5. Verificar Librerías en vcpkg
 if (Test-Path "C:\vcpkg\vcpkg.exe") {
-    Write-Host "[4/4] Verificando dependencias en vcpkg..." -ForegroundColor Cyan
+    Write-Host "[5/5] Verificando dependencias en vcpkg..." -ForegroundColor Cyan
     $packages = & C:\vcpkg\vcpkg.exe list
     
     $deps = @("fltk", "libtorrent")
@@ -79,9 +67,6 @@ if (Test-Path "C:\vcpkg\vcpkg.exe") {
             $AllOk = $false
         }
     }
-}
-else {
-    Write-Host "[4/4] No se puede verificar dependencias sin vcpkg." -ForegroundColor Red
 }
 
 Write-Host ""

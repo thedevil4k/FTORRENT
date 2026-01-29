@@ -33,15 +33,19 @@ Complete PowerShell script with validation, DLL copying, assets bundling, and po
 
 ## 🚀 Step-by-Step Compilation Process
 
-### Option A: Using Scripts (Recommended)
+### Option A: Using Scripts (Recommended) ⭐
 
-1. **Ensure dependencies are installed:**
+1. **Environment Setup (Windows):**
+   Run the "magic" setup script. This will automatically install vcpkg, all libraries, and NSIS if they are missing.
    ```powershell
-   # If you haven't done so yet:
-   .\scripts\windows\setup\install-vcpkg-deps.ps1
+   # Double-click this file or run it in CMD/PowerShell:
+   .\scripts\windows\setup-windows.bat
    ```
 
 2. **Run the compilation script:**
+   ```powershell
+   .\scripts\windows\compilation\compile.ps1 -OutputDir "D:\FTorrent-compilation"
+   ```
    ```powershell
    .\scripts\windows\compilation\compile.ps1 -OutputDir "D:\FTorrent-compilation"
    ```
@@ -295,11 +299,9 @@ cmake --build . --config Debug
 
 ## 📝 Pre-Compilation Checklist
 
-- [ ] vcpkg installed in `C:\vcpkg`
+- [ ] Run the automated setup (`.\scripts\windows\setup-windows.bat`)
 - [ ] Visual Studio 2019+ installed
 - [ ] CMake 3.15+ installed
-- [ ] Dependencies installed (`.\scripts\windows\setup\install-vcpkg-deps.ps1`)
-- [ ] vcpkg integrated (`vcpkg integrate install`)
 - [ ] Git installed (optional but recommended)
 
 ---

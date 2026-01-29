@@ -10,9 +10,7 @@ All scripts mentioned here are located in the `scripts/` directory.
 
 ### Windows
 - **Visual Studio 2019 or 2022** with "Desktop development with C++" workload.
-- **CMake** 3.15 or higher.
-- **vcpkg** (recommended for satisfying dependencies).
-  - Run `.\scripts\windows\setup\install-vcpkg-deps.ps1` in the project root to install dependencies.
+- **Automated Setup**: Run `.\scripts\windows\setup-windows.bat` in the project root. This installs vcpkg, all libraries, and NSIS automatically.
 
 ### Linux
 - **C++ Compiler** (GCC 7+ or Clang 6+).
@@ -25,8 +23,9 @@ All scripts mentioned here are located in the `scripts/` directory.
 ## 🏗️ 1. Compiling from Source
 
 ### Windows
-Run the following script to compile the project:
+Run the setup script first (only once), then the build script:
 ```powershell
+.\scripts\windows\setup-windows.bat
 .\scripts\windows\compilation\build-win.ps1
 ```
 *The executable will be generated in `build_windows/bin/`.*

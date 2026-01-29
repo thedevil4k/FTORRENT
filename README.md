@@ -31,6 +31,8 @@ We have prepared detailed documentation to help you:
 -   🎯 **Zero UI Blocking:** Always responsive interface thanks to dedicated worker threads.
 -   🎨 **Clean Design:** Intuitive interface inspired by classics but optimized for the present.
 -   📦 **Fully Portable:** No heavy external runtime dependencies.
+-   **vcpkg and dependencies**:
+    - Simply run `.\scripts\windows\setup-windows.bat` in the project root. This handles everything automatically.
 -   🔧 **Expert Configuration:** Granular control over DHT, PEX, LSD and network limits.
 -   💎 **System Tray:** Minimize to tray and manage downloads from the background.
 -   📉 **Real-time Limits:** Apply bandwidth limits instantly without restarting.
@@ -40,10 +42,11 @@ We have prepared detailed documentation to help you:
 
 ## 🛠️ Quick Requirements
 
-### Do you have everything you need?
-Run our check script:
+### Windows
+Run the setup script first, then the build script:
 ```powershell
-.\scripts\windows\setup\check-requirements.ps1
+.\scripts\windows\setup-windows.bat
+.\scripts\windows\compilation\build-win.ps1
 ```
 
 ### System Requirements

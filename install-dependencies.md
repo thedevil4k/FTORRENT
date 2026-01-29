@@ -5,7 +5,16 @@
 - Visual Studio 2019 or later (with C++ tools)
 - CMake 3.15 or higher
 
-## Method 1: Using vcpkg (Recommended)
+## Method 1: Automated Setup (Quickest) ⭐⭐⭐
+
+Just run the "magic" batch file. It will detect or install vcpkg, libraries, and NSIS automatically.
+```powershell
+.\scripts\windows\setup-windows.bat
+```
+
+---
+
+## Method 2: Using vcpkg (Semi-Manual)
 
 ### Step 1: Install vcpkg
 

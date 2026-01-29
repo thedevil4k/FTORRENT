@@ -9,45 +9,42 @@ Write-Host ""
 
 # Verificar si vcpkg existe
 if (-not (Test-Path $VcpkgRoot)) {
-    Write-Host "vcpkg no encontrado en $VcpkgRoot" -ForegroundColor Yellow
-    Write-Host ""
-    $install = Read-Host "¿Deseas instalar vcpkg ahora? (s/n)"
+    Write-Host "vcpkg no encontrado en $VcpkgRoot. Instalando automáticamente..." -ForegroundColor Yellow
     
-    if ($install -eq "s" -or $install -eq "S") {
-        Write-Host ""
-        Write-Host "Clonando vcpkg..." -ForegroundColor Yellow
-        
-        $parentDir = Split-Path $VcpkgRoot -Parent
-        Push-Location $parentDir
-        
-        git clone https://github.com/microsoft/vcpkg.git
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "ERROR: No se pudo clonar vcpkg" -ForegroundColor Red
-            Pop-Location
-            exit 1
-        }
-        
-        Push-Location "vcpkg"
-        
-        Write-Host "Bootstrapping vcpkg..." -ForegroundColor Yellow
-        .\bootstrap-vcpkg.bat
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "ERROR: Bootstrap falló" -ForegroundColor Red
-            Pop-Location
-            Pop-Location
-            exit 1
-        }
-        
+    Write-Host ""
+    Write-Host "Clonando vcpkg..." -ForegroundColor Yellow
+    
+    $parentDir = Split-Path $VcpkgRoot -Parent
+    if (-not (Test-Path $parentDir)) {
+        New-Item -ItemType Directory -Force -Path $parentDir | Out-Null
+    }
+    
+    Push-Location $parentDir
+    
+    git clone https://github.com/microsoft/vcpkg.git
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: No se pudo clonar vcpkg" -ForegroundColor Red
         Pop-Location
-        Pop-Location
-        
-        Write-Host "vcpkg instalado correctamente!" -ForegroundColor Green
-    } else {
-        Write-Host "Instalación cancelada" -ForegroundColor Red
         exit 1
     }
+    
+    Push-Location "vcpkg"
+    
+    Write-Host "Bootstrapping vcpkg..." -ForegroundColor Yellow
+    .\bootstrap-vcpkg.bat
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Bootstrap falló" -ForegroundColor Red
+        Pop-Location
+        Pop-Location
+        exit 1
+    }
+    
+    Pop-Location
+    Pop-Location
+    
+    Write-Host "vcpkg instalado correctamente!" -ForegroundColor Green
 }
 
 $VcpkgExe = Join-Path $VcpkgRoot "vcpkg.exe"
