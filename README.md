@@ -1,88 +1,97 @@
-# 🌪️ FTorrent
+# 🌪️ FTorrent | Ultra-Lightweight Open Source BitTorrent Client
 
-**The Best uTorrent & qBittorrent Alternative for Power Users.**
+**The High-Performance, Privacy-Focused uTorrent & qBittorrent Alternative for Power Users.**
 
-A modern, minimalist, and ultra-lightweight BitTorrent client built with **C++20**, **FLTK**, and **libtorrent-rasterbar**. Experience extreme performance with zero ads and total privacy.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/thedevil4k/FTORRENT)](https://github.com/thedevil4k/FTORRENT/releases)
+[![GitHub stars](https://img.shields.io/github/stars/thedevil4k/FTORRENT?style=social)](https://github.com/thedevil4k/FTORRENT/stargazers)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/thedevil4k/FTORRENT/releases)
+
+A modern, minimalist, and ultra-lightweight BitTorrent client built with **C++20**, **FLTK**, and **libtorrent-rasterbar**. Experience extreme performance with zero ads, total privacy, and a tiny memory footprint.
 
 ---
 
-### 🚀 Why Switch to FTorrent?
+## ⚡ Quick Start: Download Now
+
+Get the latest version of FTorrent for your platform. No installation required for portable versions!
+
+> [!TIP]
+> ### [🚀 Download Latest Release](https://github.com/thedevil4k/FTORRENT/releases)
+> *Secure, ad-free, and open-source torrenting.*
+
+---
+
+### 🚀 Why Choose FTorrent?
 
 | Feature | **FTORRENT** | qBittorrent | uTorrent |
 | :--- | :---: | :---: | :---: |
 | **Ads & Bloat** | ❌ None | ❌ None | ✅ Heavy Ads |
-| **Memory Usage** | 💎 <20MB | 🐢 100MB+ | 🐌 80MB+ |
+| **Memory Usage** | 💎 **<20MB** | 🐢 100MB+ | 🐌 80MB+ |
 | **Engine** | Native C++20 | Qt Framework | Proprietary |
 | **Speed** | ⚡ Ultra-High | ✅ Standard | ⚠️ Throttled |
 
 ---
 
-## 📚 Documentation
-
-We have prepared detailed documentation to help you:
-
--   📖 **[User Guide](USER-GUIDE.md)**: How to use the program, configure downloads, and optimize your network.
--   🛠️ **[Technical Reference](TECHNICAL-REFERENCE.md)**: Details about the architecture, classes, and data flow for developers.
--   🏗️ **[Architecture](ARCHITECTURE.md)**: In-depth vision of the system design.
--   ⚡ **[Multi-Threading Architecture](MULTITHREADING-ARCHITECTURE.md)**: Details about the multi-core and multi-threaded system.
--   🚀 **[Compilation and Packaging Guide](scripts/BUILDING.md)**: Detailed instructions to compile or create your own installable packages.
--   🚀 **[Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions to compile from source code.
-
----
-
 ## ✨ Key Features
 
--   🚀 **Native Performance:** Zero heavy frameworks, just pure C++.
--   💪 **Elite Engine:** Powered by `libtorrent-rasterbar` (the same engine as qBittorrent and Deluge).
--   ⚡ **Multi-Core/Multi-Thread:** Optimized architecture to take advantage of all available CPU cores.
--   🎯 **Zero UI Blocking:** Always responsive interface thanks to dedicated worker threads.
--   🎨 **Clean Design:** Intuitive interface inspired by classics but optimized for the present.
--   📦 **Fully Portable:** No heavy external runtime dependencies.
--   **vcpkg and dependencies**:
-    - Simply run `.\scripts\windows\setup-windows.bat` in the project root. This handles everything automatically.
--   🔧 **Expert Configuration:** Granular control over DHT, PEX, LSD and network limits.
--   💎 **System Tray:** Minimize to tray and manage downloads from the background.
--   📉 **Real-time Limits:** Apply bandwidth limits instantly without restarting.
--   📊 **Resource Monitor:** Integrated RAM and CPU usage display.
+-   🚀 **Native Performance:** No Electron, no heavy frameworks—just pure, high-performance C++20.
+-   💪 **Elite P2P Engine:** Powered by `libtorrent-rasterbar`, the industry standard for speed and stability.
+-   ⚡ **Multi-Core Optimized:** Modern multi-threaded architecture ensures zero UI lag.
+-   🎨 **Modern Classic UI:** A clean, intuitive design inspired by the best of uTorrent but built for today.
+-   📦 **Ultra-Portable:** Tiny executable with no external dependencies required.
+-   🔧 **Advanced Control:** Granular settings for DHT, PEX, LSD, and encryption.
+-   📉 **Real-time Limits:** Change bandwidth limits instantly without interruptions.
+-   📊 **Resource Efficient:** Built-in CPU and RAM monitor to keep track of performance.
 
 ---
 
-## 🛠️ Quick Requirements
+## 📚 Documentation
 
-### Windows
-Run the setup script first, then the build script:
+-   📖 **[User Guide](USER-GUIDE.md)**: Optimize your downloads and network settings.
+-   🏗️ **[Architecture Overview](ARCHITECTURE.md)**: Explore the system design and project structure.
+-   ⚡ **[Multithreading System](MULTITHREADING-ARCHITECTURE.md)**: Deep dive into the asynchronous core.
+-   🖥️ **[UI Design](UI-DESIGN.md)**: Details on the interface and layout.
+
+---
+
+## 🛠️ For Developers & Technical Users
+
+FTorrent is designed to be easily extensible and compilable from source.
+
+### 🚀 Compilation Guide
+If you want to build FTorrent yourself, please follow our detailed guides:
+
+-   **[Complete Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions for all platforms.
+-   **[Building & Packaging](scripts/BUILDING.md)**: How we create our installers and portable packages.
+
+### Windows Setup
 ```powershell
 .\scripts\windows\setup-windows.bat
 .\scripts\windows\compilation\build-win.ps1
 ```
 
 ### System Requirements
--   **Windows:** 10 or higher + Visual Studio 2019/2022.
--   **Linux:** GCC 7+ / Clang 6+ and CMake 3.15+.
--   **Dependencies:** FLTK 1.3.x and libtorrent 2.0.x (managed via vcpkg).
+-   **OS:** Windows 10/11 or modern Linux.
+-   **Compiler:** Visual Studio 2022 (Win) / GCC 7+ / Clang 6+ (Linux).
+-   **Tools:** CMake 3.15+ and vcpkg.
 
 ---
 
-## 🚀 Compilation and Packaging
+## 🤝 Contributing & Community
 
-Building FTorrent is simple. We provide specialized scripts for each platform:
+Contributions are what make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-- **Windows**: Use `scripts/windows/compilation/` and `scripts/windows/installers/`.
-- **Linux**: Use `scripts/linux/compilation/` and `scripts/linux/installers/`.
+1. Fork the Project
+2. Create your Feature Branch
+3. Open a Pull Request
 
-For a complete step-by-step manual, please see the **[Building Guide](scripts/BUILDING.md)**.
-
----
-
-## 🤝 Contributing
-
-Want to improve FTorrent? You're welcome! Check our [Technical Reference](TECHNICAL-REFERENCE.md) to understand how the pieces fit together before sending a Pull Request.
+Check our **[Technical Reference](TECHNICAL-REFERENCE.md)** for developer-focused documentation.
 
 ---
 
 ## 📝 License
 
-This project is distributed under the **MIT** license. Feel free to use, modify and share it.
+Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ---
-*Made with ❤️ for the BitTorrent community.*
+*Made with ❤️ by the community, for the BitTorrent community.*
