@@ -4,8 +4,16 @@ on:
   push:
     branches: [ main, master ]
     tags: [ 'v*' ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'trackersadd.txt'
   pull_request:
     branches: [ main, master ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'trackersadd.txt'
 
 jobs:
   release:
