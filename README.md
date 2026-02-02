@@ -1,12 +1,19 @@
 # 🌪️ FTorrent
 
-A modern, minimalist, and ultra-lightweight BitTorrent client built with **C++20**, **FLTK**, and **libtorrent-rasterbar**.
+**The Best uTorrent & qBittorrent Alternative for Power Users.**
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)
-![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey?style=for-the-badge)
+A modern, minimalist, and ultra-lightweight BitTorrent client built with **C++20**, **FLTK**, and **libtorrent-rasterbar**. Experience extreme performance with zero ads and total privacy.
 
-FTorrent is designed for users seeking efficiency without sacrificing power. It uses a low-consumption graphical toolkit to ensure that 100% of your resources are dedicated to what matters: your downloads.
+---
+
+### 🚀 Why Switch to FTorrent?
+
+| Feature | **FTORRENT** | qBittorrent | uTorrent |
+| :--- | :---: | :---: | :---: |
+| **Ads & Bloat** | ❌ None | ❌ None | ✅ Heavy Ads |
+| **Memory Usage** | 💎 <20MB | 🐢 100MB+ | 🐌 80MB+ |
+| **Engine** | Native C++20 | Qt Framework | Proprietary |
+| **Speed** | ⚡ Ultra-High | ✅ Standard | ⚠️ Throttled |
 
 ---
 
