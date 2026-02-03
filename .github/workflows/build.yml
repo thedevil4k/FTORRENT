@@ -64,7 +64,7 @@ jobs:
       run: |
         git clone https://github.com/microsoft/vcpkg.git
         .\vcpkg\bootstrap-vcpkg.bat
-        .\vcpkg\vcpkg install fltk libtorrent[pthreads] zlib libpng libjpeg-turbo --triplet x64-windows
+        .\vcpkg\vcpkg install fltk libtorrent zlib libpng libjpeg-turbo --triplet x64-windows
 
     - name: Configure CMake
       run: |
