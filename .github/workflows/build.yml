@@ -46,6 +46,7 @@ jobs:
         with:
           files: |
             ./artifacts/*.exe
+            ./artifacts/*.zip
             ./artifacts/*.deb
             ./artifacts/*.rpm
           generate_release_notes: true
@@ -73,11 +74,18 @@ jobs:
       run: |
         cmake --build build --config Release
 
+    - name: Generate Installer
+      working-directory: build
+      run: |
+        cpack -G "NSIS;ZIP" -C Release
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: fltorrent-windows
-        path: build/Release/FLTorrent.exe
+        path: |
+          build/*.exe
+          build/*.zip
 
   build-linux:
     runs-on: ubuntu-24.04
