@@ -67,6 +67,10 @@ jobs:
         restore-keys: |
           vcpkg-windows-${{ runner.os }}-
 
+    - name: Install NSIS
+      run: |
+        choco install nsis -y
+
     - name: Install dependencies
       run: |
         vcpkg install fltk libtorrent zlib libpng libjpeg-turbo --triplet x64-windows
