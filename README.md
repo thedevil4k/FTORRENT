@@ -1,13 +1,13 @@
-# 🌪️ FTorrent | Ultra-Lightweight Open Source BitTorrent Client
+# 🌪️ FTorrent | Best uTorrent Alternative & qBittorrent Rival 2026
 
-**The High-Performance, Privacy-Focused uTorrent & qBittorrent Alternative for Power Users.**
+**The Ultra-Lightweight, High-Performance, and Ad-Free BitTorrent Client for Power Users. Built with C++20.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/thedevil4k/FTORRENT)](https://github.com/thedevil4k/FTORRENT/releases)
 [![GitHub stars](https://img.shields.io/github/stars/thedevil4k/FTORRENT?style=social)](https://github.com/thedevil4k/FTORRENT/stargazers)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/thedevil4k/FTORRENT/releases)
 
-A modern, minimalist, and ultra-lightweight BitTorrent client built with **C++20**, **FLTK**, and **libtorrent-rasterbar**. Experience extreme performance with zero ads, total privacy, and a tiny memory footprint.
+A modern, minimalist, and ultra-lightweight BitTorrent client designed for Windows and Linux. Built with **C++20**, **FLTK**, and **libtorrent-rasterbar**. Experience extreme performance with zero ads, total privacy, and a tiny memory footprint. The #1 alternative to uTorrent web and qBittorrent.
 
 ---
 
@@ -94,4 +94,9 @@ Check our **[Technical Reference](TECHNICAL-REFERENCE.md)** for developer-focuse
 Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ---
+---
 *Made with ❤️ by the community, for the BitTorrent community.*
+
+---
+
+**Keywords:** uTorrent alternative, qBittorrent rival, best torrent client 2026, lightweight bittorrent client, open source torrent downloader, fast torrenting, no ads torrent client, windows 11 torrent client, linux torrent client, fastest bittorrent software, secure p2p downloader, privacy focused torrenting.
