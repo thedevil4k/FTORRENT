@@ -351,12 +351,53 @@ void TorrentListWidget::drawProgressBar(double progress, int x, int y, int w, in
 int TorrentListWidget::handle(int event) {
     int result = Fl_Table_Row::handle(event);
     
-    // Handle double-click
+    // Handle column header clicks for sorting
+    if (event == FL_RELEASE) {
+        if (callback_context() == CONTEXT_COL_HEADER) {
+            // Only sort if it wasn't a resize operation (drag)
+            // Fl::event_is_click() returns true if the mouse hasn't moved "much"
+            if (Fl::event_is_click()) {
+                int col = callback_col();
+                if (col >= 0 && col < COL_COUNT) {
+                    // Check if we are clicking the same column
+                    if ((Column)col == m_sortColumn) {
+                        // Toggle order
+                        sortBy((Column)col, !m_sortAscending);
+                    } else {
+                        // New column, default to descending for speed/size, ascending for names
+                        // But for simplicity/standard behavior, let's default to ascending or 
+                        // specific defaults per column type if desired. 
+                        // The user requested "intuitiva", usually expected behavior:
+                        // Name -> Ascending
+                        // Size -> Descending (largest first)
+                        // Speed -> Descending (fastest first)
+                        // Progress -> Descending (most complete first)
+                        // Status -> Ascending?
+                        
+                        bool defaultAscending = true;
+                        if (col == COL_SIZE || col == COL_PROGRESS || 
+                            col == COL_DOWN_SPEED || col == COL_UP_SPEED || 
+                            col == COL_RATIO || col == COL_PEERS) {
+                            defaultAscending = false;
+                        }
+                        
+                        sortBy((Column)col, defaultAscending);
+                    }
+                    return 1; // Event handled
+                }
+            }
+        }
+    }
+    
+    // Handle double-click on rows
     if (event == FL_PUSH && Fl::event_clicks() > 0) {
         // Double-click action (open details dialog)
-        TorrentItem* torrent = getSelectedTorrent();
-        if (torrent) {
-            showDetailsDialog(torrent);
+        // Ensure we are clicking on a cell, not header
+        if (callback_context() == CONTEXT_CELL) {
+            TorrentItem* torrent = getSelectedTorrent();
+            if (torrent) {
+                showDetailsDialog(torrent);
+            }
         }
     }
     
