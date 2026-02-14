@@ -73,11 +73,13 @@ private:
     TorrentManager* m_manager;
     
     // Icons
-    // Icons
-    Fl_Image* m_brightIcon;
-    Fl_Image* m_darkIcon;
-    Fl_Image* m_addIcon;
-    Fl_Image* m_createIcon;
+    Fl_RGB_Image* m_brightIcon;
+    Fl_RGB_Image* m_darkIcon;
+    Fl_RGB_Image* m_addIcon;
+    Fl_RGB_Image* m_createIcon;
+    Fl_RGB_Image* m_ecoIcon;
+    Fl_RGB_Image* m_normalIcon;
+    Fl_RGB_Image* m_turboIcon;
     
     // Layout constants
     static constexpr int MENU_HEIGHT = 0;

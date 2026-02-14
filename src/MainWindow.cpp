@@ -35,6 +35,9 @@ MainWindow::MainWindow(int w, int h, const char* title)
     , m_darkIcon(nullptr)
     , m_addIcon(nullptr)
     , m_createIcon(nullptr)
+    , m_ecoIcon(nullptr)
+    , m_normalIcon(nullptr)
+    , m_turboIcon(nullptr)
     , m_limitModerate(false)
 {
     // Initialize image support
@@ -86,6 +89,30 @@ MainWindow::MainWindow(int w, int h, const char* title)
         delete imgTemp;
     }
 
+    imgTemp = new Fl_PNG_Image((assetsDir + "eco.png").c_str());
+    if (imgTemp->d() == 0) { // Failed
+        delete imgTemp;
+    } else {
+        m_ecoIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+
+    imgTemp = new Fl_PNG_Image((assetsDir + "default.png").c_str());
+    if (imgTemp->d() == 0) { // Failed
+        delete imgTemp;
+    } else {
+        m_normalIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+
+    imgTemp = new Fl_PNG_Image((assetsDir + "turbo.png").c_str());
+    if (imgTemp->d() == 0) { // Failed
+        delete imgTemp;
+    } else {
+        m_turboIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+
     createToolbar();
     createTorrentList();
     createStatusBar();
@@ -112,6 +139,11 @@ MainWindow::~MainWindow() {
 #endif
     delete m_brightIcon;
     delete m_darkIcon;
+    delete m_addIcon;
+    delete m_createIcon;
+    delete m_ecoIcon;
+    delete m_normalIcon;
+    delete m_turboIcon;
     saveWindowState();
     Fl::remove_timeout(updateTimerCallback, this);
 }
@@ -190,9 +222,28 @@ void MainWindow::createToolbar() {
 
     // Dynamic RAM Mode Selector
     m_choiceRamMode = new Fl_Choice(0, 0, 150, 30);
-    m_choiceRamMode->add("Mode: ECO");
-    m_choiceRamMode->add("Mode: NORMAL");
-    m_choiceRamMode->add("Mode: TURBO");
+    // Add items with icons if available
+    int idx;
+    
+    idx = m_choiceRamMode->add("  ECO");
+    if (m_ecoIcon) {
+        // We need to access the menu item directly to set the image
+        Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
+        item->image(m_ecoIcon);
+    }
+    
+    idx = m_choiceRamMode->add("  NORMAL");
+    if (m_normalIcon) {
+        Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
+        item->image(m_normalIcon);
+    }
+    
+    idx = m_choiceRamMode->add("  TURBO");
+    if (m_turboIcon) {
+        Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
+        item->image(m_turboIcon);
+    }
+    
     m_choiceRamMode->box(FL_FLAT_BOX);
     m_choiceRamMode->tooltip("RAM Usage Mode: ECO (Zero Buffer), Normal (Balanced), TURBO (Max Buffer)");
     m_choiceRamMode->callback(onRamModeChanged, this);
