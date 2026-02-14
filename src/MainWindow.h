@@ -27,6 +27,8 @@ public:
     MainWindow(int w, int h, const char* title);
     ~MainWindow();
 
+    static constexpr const char* VERSION = "0.3.0";
+
     // Window management
     void show();
     int handle(int event) override;

@@ -504,6 +504,9 @@ std::string MainWindow::formatStatusBar() const {
     // Add RAM usage
     oss << "  |  RAM: " << SystemUtils::getRamUsage();
     
+    // Add Application Version
+    oss << "  |  FTORRENT " << VERSION;
+    
     return oss.str();
 }
 
