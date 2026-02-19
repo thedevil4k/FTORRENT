@@ -4,6 +4,7 @@
 #include <FL/Fl_Table_Row.H>
 #include <vector>
 #include <string>
+#include <functional>
 #include "TorrentItem.h"
 
 /**
@@ -53,6 +54,9 @@ public:
     // Sorting
     void sortBy(Column column, bool ascending = true);
     
+    // Drag-and-drop
+    void setOnDropCallback(std::function<void(const std::string&)> cb) { m_onDropCallback = cb; }
+    
     // Context menu
     void showContextMenu();
     
@@ -65,6 +69,7 @@ protected:
                    int x, int y, int w, int h) override;
     
     int handle(int event) override;
+    void draw() override;
     
 private:
     std::vector<TorrentItem*> m_torrents;
@@ -72,6 +77,10 @@ private:
     
     Column m_sortColumn;
     bool m_sortAscending;
+    
+    // Drag-and-drop state
+    bool m_dropHighlight;
+    std::function<void(const std::string&)> m_onDropCallback;
     
     // Column info
     struct ColumnInfo {
@@ -92,6 +101,7 @@ private:
     void drawHeader(int col, int x, int y, int w, int h);
     void drawCell(int row, int col, int x, int y, int w, int h);
     void drawProgressBar(double progress, int x, int y, int w, int h);
+    void drawDropOverlay();
     
     // Sorting comparator
     bool compareTorrents(int idx1, int idx2) const;

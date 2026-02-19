@@ -308,6 +308,22 @@ void MainWindow::setTorrentManager(TorrentManager* manager) {
         // Initial update
         updateUI();
     }
+    
+    // Register drag-and-drop callback on the torrent list (cross-platform).
+    // On Linux: FLTK DnD events inside TorrentListWidget fire this.
+    // On Windows: WM_DROPFILES in win_event_handler also calls addTorrentFile directly.
+    if (m_torrentList) {
+        m_torrentList->setOnDropCallback([this](const std::string& path) {
+            if (!m_manager) return;
+            std::string savePath = SettingsManager::instance().getDefaultSavePath();
+            bool ok = m_manager->addTorrentFile(path, savePath);
+            if (ok) {
+                updateUI();
+            } else {
+                fl_alert("Failed to add torrent: %s", path.c_str());
+            }
+        });
+    }
 }
 
 void MainWindow::updateUI() {
@@ -635,6 +651,8 @@ void MainWindow::show() {
     Fl_Double_Window::show();
 #ifdef _WIN32
     setupTrayIcon();
+    // Allow this window to receive files dropped from Windows Explorer
+    DragAcceptFiles(fl_xid(this), TRUE);
 #endif
 }
 
@@ -713,16 +731,37 @@ void MainWindow::removeTrayIcon() {
 }
 
 int MainWindow::win_event_handler(int event) {
-    // This is called by FLTK for every Windows message
-    // Note: We need to access the window instance. 
-    // Since we only have one main window, we can find it.
-    
-    // In FLTK, Windows messages are passed as the event argument in add_handler
-    // But we need the actual MSG or at least the hwnd/msg/wp/lp.
-    // FLTK's add_handler doesn't pass the MSG structure directly as an argument,
-    // but we can access it via fl_msg.
-    
     extern MSG fl_msg;
+
+    // ── WM_DROPFILES: user dropped files from Windows Explorer ────────────
+    if (fl_msg.message == WM_DROPFILES) {
+        MainWindow* win = (MainWindow*)Fl::first_window();
+        if (win && win->m_manager) {
+            HDROP hDrop = (HDROP)fl_msg.wParam;
+            UINT count = DragQueryFileA(hDrop, 0xFFFFFFFF, NULL, 0);
+            for (UINT i = 0; i < count; i++) {
+                char buf[MAX_PATH] = {};
+                DragQueryFileA(hDrop, i, buf, MAX_PATH);
+                std::string path(buf);
+                // Only process .torrent files
+                if (path.size() > 8 &&
+                    path.substr(path.size() - 8) == ".torrent") {
+                    std::string savePath =
+                        SettingsManager::instance().getDefaultSavePath();
+                    bool ok = win->m_manager->addTorrentFile(path, savePath);
+                    if (ok) {
+                        win->updateUI();
+                    } else {
+                        fl_alert("Failed to add torrent: %s", path.c_str());
+                    }
+                }
+            }
+            DragFinish(hDrop);
+        }
+        return 1;
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     if (fl_msg.message == WM_TRAY_MESSAGE) {
         if (LOWORD(fl_msg.lParam) == WM_LBUTTONDBLCLK || LOWORD(fl_msg.lParam) == WM_LBUTTONUP) {
             // Show/Restore window

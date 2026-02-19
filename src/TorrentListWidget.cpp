@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <string>
+#include <vector>
 
 const TorrentListWidget::ColumnInfo TorrentListWidget::COLUMN_INFO[COL_COUNT] = {
     {"Name",        300, FL_ALIGN_LEFT},
@@ -23,6 +25,7 @@ TorrentListWidget::TorrentListWidget(int x, int y, int w, int h, const char* lab
     : Fl_Table_Row(x, y, w, h, label)
     , m_sortColumn(COL_NAME)
     , m_sortAscending(true)
+    , m_dropHighlight(false)
 {
     initializeColumns();
     
@@ -348,7 +351,84 @@ void TorrentListWidget::drawProgressBar(double progress, int x, int y, int w, in
     fl_draw(text.c_str(), x, y, w, h, FL_ALIGN_CENTER);
 }
 
+// Helper: parse a "file://" URI list (newline-separated) into file paths
+static std::vector<std::string> parseDroppedPaths(const char* text) {
+    std::vector<std::string> paths;
+    if (!text) return paths;
+    std::istringstream ss(text);
+    std::string line;
+    while (std::getline(ss, line)) {
+        // Strip \r if present (Windows line endings in text)
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        // Strip "file://" prefix (Linux DnD)
+        if (line.substr(0, 7) == "file://") {
+            line = line.substr(7);
+        }
+        // URL-decode %20 etc (minimal: only %20 for spaces)
+        std::string decoded;
+        for (size_t i = 0; i < line.size(); i++) {
+            if (line[i] == '%' && i + 2 < line.size()) {
+                int val = 0;
+                char h1 = line[i+1], h2 = line[i+2];
+                auto hex = [](char c) -> int {
+                    if (c >= '0' && c <= '9') return c - '0';
+                    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                    return -1;
+                };
+                int v1 = hex(h1), v2 = hex(h2);
+                if (v1 >= 0 && v2 >= 0) {
+                    decoded += (char)(v1 * 16 + v2);
+                    i += 2;
+                    continue;
+                }
+            }
+            decoded += line[i];
+        }
+        if (!decoded.empty()) paths.push_back(decoded);
+    }
+    return paths;
+}
+
 int TorrentListWidget::handle(int event) {
+    // ── Drag-and-drop events (Linux/X11 via FLTK) ─────────────────────────
+    if (event == FL_DND_ENTER || event == FL_DND_DRAG) {
+        if (!m_dropHighlight) {
+            m_dropHighlight = true;
+            redraw();
+        }
+        return 1; // Accept the drag
+    }
+    if (event == FL_DND_LEAVE) {
+        if (m_dropHighlight) {
+            m_dropHighlight = false;
+            redraw();
+        }
+        return 1;
+    }
+    if (event == FL_DND_RELEASE) {
+        // Accept paste that will follow
+        m_dropHighlight = false;
+        redraw();
+        return 1;
+    }
+    if (event == FL_PASTE) {
+        // Fired after FL_DND_RELEASE; contains the URI list
+        const char* text = Fl::event_text();
+        if (text && m_onDropCallback) {
+            auto paths = parseDroppedPaths(text);
+            for (const auto& p : paths) {
+                // Only accept .torrent files
+                if (p.size() > 8 &&
+                    p.substr(p.size() - 8) == ".torrent") {
+                    m_onDropCallback(p);
+                }
+            }
+        }
+        return 1;
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     int result = Fl_Table_Row::handle(event);
     
     // Handle column header clicks for sorting
@@ -364,23 +444,12 @@ int TorrentListWidget::handle(int event) {
                         // Toggle order
                         sortBy((Column)col, !m_sortAscending);
                     } else {
-                        // New column, default to descending for speed/size, ascending for names
-                        // But for simplicity/standard behavior, let's default to ascending or 
-                        // specific defaults per column type if desired. 
-                        // The user requested "intuitiva", usually expected behavior:
-                        // Name -> Ascending
-                        // Size -> Descending (largest first)
-                        // Speed -> Descending (fastest first)
-                        // Progress -> Descending (most complete first)
-                        // Status -> Ascending?
-                        
                         bool defaultAscending = true;
                         if (col == COL_SIZE || col == COL_PROGRESS || 
                             col == COL_DOWN_SPEED || col == COL_UP_SPEED || 
                             col == COL_RATIO || col == COL_PEERS) {
                             defaultAscending = false;
                         }
-                        
                         sortBy((Column)col, defaultAscending);
                     }
                     return 1; // Event handled
@@ -391,8 +460,6 @@ int TorrentListWidget::handle(int event) {
     
     // Handle double-click on rows
     if (event == FL_PUSH && Fl::event_clicks() > 0) {
-        // Double-click action (open details dialog)
-        // Ensure we are clicking on a cell, not header
         if (callback_context() == CONTEXT_CELL) {
             TorrentItem* torrent = getSelectedTorrent();
             if (torrent) {
@@ -410,6 +477,51 @@ void TorrentListWidget::showDetailsDialog(TorrentItem* torrent) {
     TorrentDetailsDialog* dlg = new TorrentDetailsDialog(torrent);
     dlg->show_modal();
     delete dlg;
+}
+
+void TorrentListWidget::drawDropOverlay() {
+    // Get the inner table area (excludes headers/scrollbars)
+    int tx = x(), ty = y(), tw = w(), th = h();
+
+    // Semi-transparent blue overlay (simulate with a translucent rect)
+    // FLTK doesn't support true alpha, so we use a solid tinted color
+    fl_color(fl_rgb_color(20, 50, 100));
+    fl_rectf(tx, ty, tw, th);
+
+    // Dashed border box (inner margin)
+    int margin = 30;
+    int bx = tx + margin, by = ty + margin;
+    int bw = tw - margin * 2, bh = th - margin * 2;
+
+    fl_color(fl_rgb_color(80, 160, 255));
+    fl_line_style(FL_DASH, 3);
+    fl_rect(bx, by, bw, bh);
+    fl_line_style(0); // Reset line style
+
+    // Centered text
+    fl_color(FL_WHITE);
+    fl_font(FL_HELVETICA_BOLD, 22);
+    fl_draw("Drop .torrent files here",
+            bx, by, bw, bh,
+            FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
+
+    fl_color(fl_rgb_color(180, 200, 230));
+    fl_font(FL_HELVETICA, 13);
+    // Draw hint below the main text
+    fl_draw("or click \"Add Torrent\" to browse",
+            bx, by + 38, bw, bh,
+            FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
+}
+
+void TorrentListWidget::draw() {
+    // Draw normal table content first
+    Fl_Table_Row::draw();
+    // If a file is being dragged over us, paint the overlay on top
+    if (m_dropHighlight) {
+        fl_push_clip(x(), y(), w(), h());
+        drawDropOverlay();
+        fl_pop_clip();
+    }
 }
 
 Fl_Color TorrentListWidget::getRowColor(int row) const {
