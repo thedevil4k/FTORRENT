@@ -483,9 +483,9 @@ void TorrentListWidget::drawDropOverlay() {
     // Get the inner table area (excludes headers/scrollbars)
     int tx = x(), ty = y(), tw = w(), th = h();
 
-    // Semi-transparent blue overlay (simulate with a translucent rect)
+    // Semi-transparent green overlay (simulate with a translucent rect)
     // FLTK doesn't support true alpha, so we use a solid tinted color
-    fl_color(fl_rgb_color(20, 50, 100));
+    fl_color(fl_rgb_color(20, 100, 50));
     fl_rectf(tx, ty, tw, th);
 
     // Dashed border box (inner margin)
@@ -493,7 +493,7 @@ void TorrentListWidget::drawDropOverlay() {
     int bx = tx + margin, by = ty + margin;
     int bw = tw - margin * 2, bh = th - margin * 2;
 
-    fl_color(fl_rgb_color(80, 160, 255));
+    fl_color(fl_rgb_color(80, 255, 100));
     fl_line_style(FL_DASH, 3);
     fl_rect(bx, by, bw, bh);
     fl_line_style(0); // Reset line style

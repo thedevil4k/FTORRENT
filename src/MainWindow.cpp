@@ -221,7 +221,7 @@ void MainWindow::createToolbar() {
     spacer3->box(FL_NO_BOX);
 
     // Dynamic RAM Mode Selector
-    m_choiceRamMode = new Fl_Choice(0, 0, 72, 30);
+    m_choiceRamMode = new Fl_Choice(0, 0, 50, 30);
     // Add items with icons if available
     int idx;
     
