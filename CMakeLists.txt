@@ -87,7 +87,7 @@ target_link_libraries(FTorrent PRIVATE
 
 # Platform-specific settings
 if(WIN32)
-    target_link_libraries(FTorrent PRIVATE ws2_32 wsock32 comctl32)
+    target_link_libraries(FTorrent PRIVATE ws2_32 wsock32 comctl32 wininet)
     # Use standard windowed app (no console)
     set_target_properties(FTorrent PROPERTIES WIN32_EXECUTABLE ON)
     # Define Windows version

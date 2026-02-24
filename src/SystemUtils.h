@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 
 /**
  * @brief Cross-platform system utilities for FTorrent
@@ -13,6 +14,12 @@ public:
      * @brief Get the current process RAM usage as a formatted string
      */
     static std::string getRamUsage();
+
+    /**
+     * @brief Async fetch public IP and country code.
+     * @param callback Called with (ip, countryCode). E.g. ("x.y.z.w", "ES")
+     */
+    static void fetchPublicIpAndCountry(std::function<void(std::string, std::string)> callback);
 
     /**
      * @brief Get the standard configuration directory for the current OS

@@ -1,13 +1,16 @@
 #include "SystemUtils.h"
 #include <sstream>
 #include <iomanip>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
 #include <shlobj.h>
 #include <shellapi.h>
+#include <wininet.h>
 #pragma comment(lib, "psapi.lib")
+#pragma comment(lib, "wininet.lib")
 #elif __APPLE__
 #include <mach/mach.h>
 #include <unistd.h>
@@ -183,4 +186,69 @@ std::string SystemUtils::getArchitecture() {
     return "unknown";
 #endif
 #endif
+}
+
+void SystemUtils::fetchPublicIpAndCountry(std::function<void(std::string, std::string)> callback) {
+    if (!callback) return;
+    
+    std::thread([callback]() {
+        std::string ip = "";
+        std::string country = "";
+        std::string url = "http://ip-api.com/line/?fields=status,countryCode,query";
+
+#ifdef _WIN32
+        HINTERNET hInternet = InternetOpenA("FTorrent", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+        if (hInternet) {
+            HINTERNET hConnect = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+            if (hConnect) {
+                char buffer[1024];
+                DWORD bytesRead = 0;
+                std::string response = "";
+                while (InternetReadFile(hConnect, buffer, sizeof(buffer) - 1, &bytesRead) && bytesRead > 0) {
+                    buffer[bytesRead] = '\0';
+                    response += buffer;
+                }
+                InternetCloseHandle(hConnect);
+                
+                // Parse response: line 1: status, line 2: countryCode, line 3: ip
+                std::stringstream ss(response);
+                std::string status;
+                std::getline(ss, status);
+                if (!status.empty() && status.back() == '\r') status.pop_back();
+                if (status == "success") {
+                    std::getline(ss, country);
+                    if (!country.empty() && country.back() == '\r') country.pop_back();
+                    std::getline(ss, ip);
+                    if (!ip.empty() && ip.back() == '\r') ip.pop_back();
+                }
+            }
+            InternetCloseHandle(hInternet);
+        }
+#else
+        // Use popen with curl on Linux/macOS
+        std::string cmd = "curl -s \"" + url + "\"";
+        FILE* pipe = popen(cmd.c_str(), "r");
+        if (pipe) {
+            char buffer[1024];
+            std::string response = "";
+            while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+                response += buffer;
+            }
+            pclose(pipe);
+            
+            std::stringstream ss(response);
+            std::string status;
+            std::getline(ss, status);
+            if (!status.empty() && status.back() == '\r') status.pop_back();
+            if (status == "success") {
+                std::getline(ss, country);
+                if (!country.empty() && country.back() == '\r') country.pop_back();
+                std::getline(ss, ip);
+                if (!ip.empty() && ip.back() == '\r') ip.pop_back();
+            }
+        }
+#endif
+        
+        callback(ip, country);
+    }).detach();
 }

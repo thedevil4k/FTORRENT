@@ -66,6 +66,10 @@ public:
     int getActiveTorrentsCount() const;
     std::string getSessionStats() const;
 
+    // IP and Country
+    std::string getPublicIp() const;
+    std::string getCountryCode() const;
+
     // Update - called from UI thread timer (thread-safe)
     void update();
     void processAlerts();
@@ -83,6 +87,12 @@ private:
     std::vector<std::unique_ptr<TorrentItem>> m_torrents;
     std::atomic<bool> m_initialized;
     std::atomic<bool> m_running;
+
+    // IP and Country
+    std::string m_publicIp;
+    std::string m_countryCode;
+    mutable std::mutex m_ipMutex;
+    std::chrono::steady_clock::time_point m_lastIpCheck;
 
     // Thread synchronization
     mutable std::mutex m_torrentsMutex;

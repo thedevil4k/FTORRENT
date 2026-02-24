@@ -5,12 +5,17 @@
 #include <chrono>
 #include <fstream>
 #include <filesystem>
+#include "SystemUtils.h"
 
 TorrentManager::TorrentManager()
     : m_initialized(false)
     , m_running(false)
+    , m_publicIp("")
+    , m_countryCode("")
 {
     m_session = std::make_unique<TorrentSession>();
+    // Make sure first check happens immediately
+    m_lastIpCheck = std::chrono::steady_clock::now() - std::chrono::hours(1);
 }
 
 TorrentManager::~TorrentManager() {
@@ -268,6 +273,16 @@ std::string TorrentManager::getSessionStats() const {
     return m_session->getSessionStats();
 }
 
+std::string TorrentManager::getPublicIp() const {
+    std::lock_guard<std::mutex> lock(m_ipMutex);
+    return m_publicIp;
+}
+
+std::string TorrentManager::getCountryCode() const {
+    std::lock_guard<std::mutex> lock(m_ipMutex);
+    return m_countryCode;
+}
+
 void TorrentManager::update() {
     if (!m_initialized.load()) {
         return;
@@ -288,6 +303,20 @@ void TorrentManager::update() {
             torrent->update();
             notifyTorrentUpdated(torrent.get());
         }
+    }
+
+    // IP Address Check (every 15 minutes)
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::minutes>(now - m_lastIpCheck).count() >= 15) {
+        m_lastIpCheck = now;
+        SystemUtils::fetchPublicIpAndCountry([this](std::string ip, std::string country) {
+            {
+                std::lock_guard<std::mutex> lock(m_ipMutex);
+                m_publicIp = ip;
+                m_countryCode = country;
+            }
+            notifyStatsUpdated();
+        });
     }
 
     // Periodic resume data saving (every 30 seconds)

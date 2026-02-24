@@ -23,6 +23,21 @@
 #include <shellapi.h>
 #endif
 
+// Helper to get country flag emoji
+static std::string getFlagEmoji(std::string code) {
+    if (code.length() != 2) return "";
+    std::transform(code.begin(), code.end(), code.begin(), ::toupper);
+    std::string emoji = "";
+    for (char c : code) {
+        if (c >= 'A' && c <= 'Z') {
+            emoji += (char)0xF0;
+            emoji += (char)0x9F;
+            emoji += (char)0x87;
+            emoji += (char)(0xA6 + (c - 'A'));
+        }
+    }
+    return emoji;
+}
 
 MainWindow::MainWindow(int w, int h, const char* title)
     : Fl_Double_Window(w, h, title)
@@ -522,6 +537,11 @@ std::string MainWindow::formatStatusBar() const {
     
     // Add Application Version
     oss << "  |  FTORRENT " << VERSION;
+    
+    std::string ip = m_manager->getPublicIp();
+    if (!ip.empty()) {
+        oss << "  |  IP: " << ip << " " << getFlagEmoji(m_manager->getCountryCode());
+    }
     
     return oss.str();
 }
