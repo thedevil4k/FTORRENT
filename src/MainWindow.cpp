@@ -231,10 +231,6 @@ void MainWindow::createToolbar() {
     m_darkModeBtn->tooltip("Switch Theme");
     m_darkModeBtn->callback(onToggleTheme, this);
 
-    // Spacer
-    Fl_Box* spacer3 = new Fl_Box(0, 0, 40, 30);
-    spacer3->box(FL_NO_BOX);
-
     // Dynamic RAM Mode Selector
     m_choiceRamMode = new Fl_Choice(0, 0, 50, 30);
     // Add items with icons if available
