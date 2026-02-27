@@ -252,3 +252,87 @@ void SystemUtils::fetchPublicIpAndCountry(std::function<void(std::string, std::s
         callback(ip, country);
     }).detach();
 }
+
+#include <chrono>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#endif
+
+int SystemUtils::measureLatency() {
+    const char* targetHost = "8.8.8.8";
+    int targetPort = 53; // DNS port
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    
+#ifdef _WIN32
+    // Winsock is already initialized by libtorrent/wininet usually, 
+    // but we can ensure it or just try to create socket.
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock == INVALID_SOCKET) return -1;
+    
+    // Set non-blocking for timeout
+    u_long mode = 1;
+    ioctlsocket(sock, FIONBIO, &mode);
+    
+    sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(targetPort);
+    inet_pton(AF_INET, targetHost, &addr.sin_addr);
+    
+    connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+    
+    fd_set writeSet;
+    FD_ZERO(&writeSet);
+    FD_SET(sock, &writeSet);
+    
+    timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    
+    int res = select(0, NULL, &writeSet, NULL, &timeout);
+    closesocket(sock);
+    
+    if (res > 0) {
+        auto end = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    }
+#else
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return -1;
+    
+    // Set non-blocking
+    int flags = fcntl(sock, F_GETFL, 0);
+    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(targetPort);
+    inet_aton(targetHost, &addr.sin_addr);
+    
+    connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+    
+    fd_set writeSet;
+    FD_ZERO(&writeSet);
+    FD_SET(sock, &writeSet);
+    
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    
+    int res = select(sock + 1, NULL, &writeSet, NULL, &timeout);
+    close(sock);
+    
+    if (res > 0) {
+        auto end = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    }
+#endif
+    
+    return -1;
+}

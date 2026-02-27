@@ -141,6 +141,8 @@ MainWindow::MainWindow(int w, int h, const char* title)
     restoreWindowState();
     
     // Set up update timer (100ms for faster alert processing)
+    m_latency = -2; // Initial state: "measuring..."
+    m_latencyTicker = 10; // Trigger measurement almost immediately
     Fl::add_timeout(0.1, updateTimerCallback, this);
 
 #ifdef _WIN32
@@ -539,6 +541,12 @@ std::string MainWindow::formatStatusBar() const {
         oss << "  |  IP: " << ip << " " << getFlagEmoji(m_manager->getCountryCode());
     }
     
+    if (m_latency >= 0) {
+        oss << "  |  LATENCY: " << m_latency << " ms";
+    } else if (m_latency == -2) {
+        oss << "  |  LATENCY: -- ms";
+    }
+    
     return oss.str();
 }
 
@@ -889,6 +897,22 @@ void MainWindow::updateTimerCallback(void* data) {
     if (win && win->m_manager) {
         win->m_manager->update();
         win->updateToolbar(); // Keep toolbar updated as selection might change or items might disappear
+
+        // Latency update every second (10 * 0.1s)
+        win->m_latencyTicker++;
+        if (win->m_latencyTicker >= 10) {
+            win->m_latencyTicker = 0;
+            // Run latency measurement in a separate thread to avoid UI freeze
+            std::thread([win]() {
+                int lat = SystemUtils::measureLatency();
+                // Pass back to UI thread safely via Fl::awake
+                Fl::awake([](void* d) {
+                    MainWindow* w = (MainWindow*)d;
+                    w->updateStatusBar();
+                }, win);
+                win->m_latency = lat;
+            }).detach();
+        }
 
         // En Modo ECO, forzamos la liberación de memoria de forma agresiva cada 100ms
         if (SettingsManager::instance().getRamMode() == 0) {

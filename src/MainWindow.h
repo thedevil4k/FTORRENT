@@ -83,6 +83,10 @@ private:
     Fl_Image* m_normalIcon;
     Fl_Image* m_turboIcon;
     
+    // Latency measurement
+    int m_latency = -1;
+    int m_latencyTicker = 0;
+    
     // Layout constants
     static constexpr int MENU_HEIGHT = 0;
     static constexpr int TOOLBAR_HEIGHT = 40;

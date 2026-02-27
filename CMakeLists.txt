@@ -107,21 +107,24 @@ install(TARGETS FTorrent
 
 if(WIN32)
     # Force inclusion of critical DLLs in the installer package
-    # This works as a fallback if the automatic vcpkg bundling misses them
-    set(DLL_LIST 
-        "torrent-rasterbar.dll"
-        "libcrypto-3-x64.dll"
-        "libssl-3-x64.dll"
-        "libpng16.dll"
-        "jpeg62.dll"
-        "zlib1.dll"
+    # Using globbing to handle different architectures (x64 vs ARM64)
+    set(DLL_PATTERNS
+        "torrent-rasterbar*.dll"
+        "libcrypto-*.dll"
+        "libssl-*.dll"
+        "libpng*.dll"
+        "jpeg*.dll"
+        "zlib*.dll"
     )
     
-    foreach(dll ${DLL_LIST})
-        install(FILES "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/${dll}"
-            DESTINATION ${CMAKE_INSTALL_BINDIR}
-            OPTIONAL
-        )
+    foreach(pattern ${DLL_PATTERNS})
+        file(GLOB FOUND_DLLS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/${pattern}")
+        foreach(dll ${FOUND_DLLS})
+            install(FILES "${dll}"
+                DESTINATION ${CMAKE_INSTALL_BINDIR}
+                OPTIONAL
+            )
+        endforeach()
     endforeach()
 
 

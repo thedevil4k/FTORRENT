@@ -66,6 +66,12 @@ public:
      * @brief Forces the OS to release unused memory and trim the working set
      */
     static void releaseMemory();
+
+    /**
+     * @brief Measure network latency (ping) to a reliable host
+     * @return Latency in milliseconds, or -1 on error
+     */
+    static int measureLatency();
 };
 
 #endif // SYSTEM_UTILS_H

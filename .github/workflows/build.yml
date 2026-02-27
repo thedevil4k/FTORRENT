@@ -23,23 +23,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download Windows Artifact
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: fltorrent-windows
           path: ./artifacts
-
-      - name: Download DEB Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: FTorrent-deb
-          path: ./artifacts
-
-      - name: Download RPM Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: FTorrent-rpm
-          path: ./artifacts
+          merge-multiple: true
 
       - name: Create Tagged Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -69,6 +57,9 @@ jobs:
           draft: false
           prerelease: true
   build-windows:
+    strategy:
+      matrix:
+        arch: [x64, arm64]
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
@@ -79,9 +70,9 @@ jobs:
         path: |
           C:/vcpkg/installed
           C:/vcpkg/archives
-        key: vcpkg-windows-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+        key: vcpkg-windows-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt') }}
         restore-keys: |
-          vcpkg-windows-${{ runner.os }}-
+          vcpkg-windows-${{ matrix.arch }}-
 
     - name: Install NSIS
       run: |
@@ -89,11 +80,12 @@ jobs:
 
     - name: Install dependencies
       run: |
-        vcpkg install fltk libtorrent zlib libpng libjpeg-turbo --triplet x64-windows
+        vcpkg install fltk libtorrent zlib libpng libjpeg-turbo --triplet ${{ matrix.arch }}-windows
 
     - name: Configure CMake
       run: |
-        cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
+        $arch_flag = if ("${{ matrix.arch }}" -eq "arm64") { "-A ARM64" } else { "" }
+        cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows $arch_flag
 
     - name: Build
       run: |
@@ -107,15 +99,25 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: fltorrent-windows
+        name: fltorrent-windows-${{ matrix.arch }}
         path: |
           build/*.exe
           build/*.zip
 
   build-linux:
+    strategy:
+      matrix:
+        arch: [x86_64, i386]
     runs-on: ubuntu-24.04
+    container:
+      image: ${{ matrix.arch == 'i386' && 'i386/ubuntu:24.04' || 'ubuntu:24.04' }}
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install sudo (if missing in container)
+      run: |
+        apt-get update && apt-get install -y sudo
+      if: matrix.arch == 'i386'
 
     - name: Install Dependencies
       run: bash scripts/linux/setup/setup-linux.sh
@@ -123,26 +125,26 @@ jobs:
     - name: Build Project
       run: bash scripts/linux/compilation/build-linux.sh
       env:
-        BUILD_DIR: build_linux
+        BUILD_DIR: build_linux_${{ matrix.arch }}
 
     - name: Create Debian Package
       run: bash scripts/linux/installers/create-linux-deb.sh
       env:
-        BUILD_DIR: build_linux
+        BUILD_DIR: build_linux_${{ matrix.arch }}
 
     - name: Create RPM Package
       run: bash scripts/linux/installers/create-linux-rpm.sh
       env:
-        BUILD_DIR: build_linux
+        BUILD_DIR: build_linux_${{ matrix.arch }}
 
     - name: Upload DEB Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: FTorrent-deb
-        path: build_linux/*.deb
+        name: FTorrent-deb-${{ matrix.arch }}
+        path: build_linux_${{ matrix.arch }}/*.deb
 
     - name: Upload RPM Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: FTorrent-rpm
-        path: build_linux/*.rpm
+        name: FTorrent-rpm-${{ matrix.arch }}
+        path: build_linux_${{ matrix.arch }}/*.rpm
