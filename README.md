@@ -4,6 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/thedevil4k/FTORRENT)](https://github.com/thedevil4k/FTORRENT/releases)
+[![Build FLTorrent](https://github.com/thedevil4k/FTORRENT/actions/workflows/build.yml/badge.svg)](https://github.com/thedevil4k/FTORRENT/actions/workflows/build.yml)
 [![GitHub stars](https://img.shields.io/github/stars/thedevil4k/FTORRENT?style=social)](https://github.com/thedevil4k/FTORRENT/stargazers)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/thedevil4k/FTORRENT/releases)
 
@@ -71,8 +72,8 @@ If you want to build FTorrent yourself, please follow our detailed guides:
 ```
 
 ### System Requirements
--   **OS:** Windows 10/11 or modern Linux.
--   **Compiler:** Visual Studio 2022 (Win) / GCC 7+ / Clang 6+ (Linux).
+-   **OS:** Windows 10/11 or modern Linux (Ubuntu 24.04+ recommended).
+-   **Compiler:** Visual Studio 2022 (Win) / GCC 11+ / Clang 14+ (Linux) for C++20 support.
 -   **Tools:** CMake 3.15+ and vcpkg.
 
 ---

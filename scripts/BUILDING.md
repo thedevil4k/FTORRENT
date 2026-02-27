@@ -13,7 +13,7 @@ All scripts mentioned here are located in the `scripts/` directory.
 - **Automated Setup**: Run `.\scripts\windows\setup-windows.bat` in the project root. This installs vcpkg, all libraries, and NSIS automatically.
 
 ### Linux
-- **C++ Compiler** (GCC 7+ or Clang 6+).
+- **C++ Compiler** (GCC 11+ or Clang 14+).
 - **CMake** 3.15 or higher.
 - **Development Libraries**: FLTK, libtorrent-rasterbar, zlib, libpng, libjpeg.
   - You can use our setup script: `bash ./scripts/linux/setup/setup-linux.sh`.

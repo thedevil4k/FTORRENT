@@ -174,6 +174,7 @@ FTorrent/
 ✅ Compilation script  
 ✅ vcpkg configuration  
 ✅ Windows/Linux support  
+✅ **Multi-architecture GitHub Actions CI (x64, ARM64, i386)**  
 
 ### Documentation (100%)
 ✅ Complete README.md  
@@ -364,8 +365,8 @@ copy C:\vcpkg\installed\x64-windows\bin\*.dll FTorrent-portable\
 ## 📐 Technical Specifications
 
 ### Requirements:
-- **OS:** Windows 10+ / Linux (Ubuntu 20.04+)
-- **Compiler:** MSVC 2019+ / GCC 7+ / Clang 6+
+- **OS:** Windows 10+ / Linux (Ubuntu 24.04+ / Debian 12+)
+- **Compiler:** MSVC 2022 / GCC 11+ / Clang 14+
 - **CMake:** 3.15+
 - **RAM:** ~50-100 MB (estimated)
 - **Disk:** ~20 MB executable + torrents

@@ -106,11 +106,12 @@ jobs:
 
   build-linux:
     strategy:
+      fail-fast: false
       matrix:
         arch: [x86_64, i386]
     runs-on: ubuntu-24.04
     container:
-      image: ${{ matrix.arch == 'i386' && 'i386/ubuntu:24.04' || 'ubuntu:24.04' }}
+      image: ${{ matrix.arch == 'i386' && 'i386/debian:bookworm' || 'ubuntu:24.04' }}
     steps:
     - uses: actions/checkout@v4
 

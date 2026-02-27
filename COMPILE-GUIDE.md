@@ -195,19 +195,23 @@ chmod +x scripts/linux/setup/setup-linux.sh
 ./scripts/linux/setup/setup-linux.sh
 ```
 
-Or install manually (Ubuntu/Debian example):
+Or install manually (Ubuntu 24.04+ / Debian 12+ example):
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
-    build-essential \
+    build-essential \ # Requires GCC 11+ for C++20
     cmake \
     libfltk1.3-dev \
     libtorrent-rasterbar-dev \
     libpng-dev \
     libjpeg-dev \
     zlib1g-dev \
-    rpm # Required for packaging
+    rpm \ # Required for packaging
+    git
 ```
+
+> [!NOTE]
+> For **32-bit (i386)** builds, we recommend and use **Debian Bookworm** in our CI, as it provides the most stable environment with all necessary dependencies (libtorrent 2.0+) for that architecture.
 
 ### 2. Compilation using Scripts (Recommended)
 
