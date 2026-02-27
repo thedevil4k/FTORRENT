@@ -81,6 +81,7 @@ jobs:
     - name: Install dependencies
       run: |
         vcpkg install fltk libtorrent zlib libpng libjpeg-turbo --triplet ${{ matrix.arch }}-windows
+        if ("${{ matrix.arch }}" -eq "arm64") { vcpkg install fltk --triplet x64-windows }
 
     - name: Configure CMake
       run: |

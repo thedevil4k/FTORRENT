@@ -44,7 +44,9 @@ case $OS in
             zlib1g-dev \
             pkg-config \
             rpm \
-            git
+            git \
+            file \
+            nodejs
 
         # Version check for libtorrent if on Ubuntu
         if [ "$OS" == "ubuntu" ]; then
