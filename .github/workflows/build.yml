@@ -85,8 +85,11 @@ jobs:
 
     - name: Configure CMake
       run: |
-        $arch_flag = if ("${{ matrix.arch }}" -eq "arm64") { "-A ARM64" } else { "" }
-        cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows $arch_flag
+        if ("${{ matrix.arch }}" -eq "arm64") {
+          cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows -A ARM64
+        } else {
+          cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows
+        }
 
     - name: Build
       run: |
@@ -109,35 +112,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, i386]
+        include:
+          - arch: x86_64
+            image: ubuntu:24.04
+          - arch: i386
+            image: i386/debian:bookworm
     runs-on: ubuntu-24.04
-    container:
-      image: ${{ matrix.arch == 'i386' && 'i386/debian:bookworm' || 'ubuntu:24.04' }}
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install sudo (if missing in container)
+    - name: Build and Package
       run: |
-        apt-get update && apt-get install -y sudo
-      if: matrix.arch == 'i386'
-
-    - name: Install Dependencies
-      run: bash scripts/linux/setup/setup-linux.sh
-
-    - name: Build Project
-      run: bash scripts/linux/compilation/build-linux.sh
-      env:
-        BUILD_DIR: build_linux_${{ matrix.arch }}
-
-    - name: Create Debian Package
-      run: bash scripts/linux/installers/create-linux-deb.sh
-      env:
-        BUILD_DIR: build_linux_${{ matrix.arch }}
-
-    - name: Create RPM Package
-      run: bash scripts/linux/installers/create-linux-rpm.sh
-      env:
-        BUILD_DIR: build_linux_${{ matrix.arch }}
+        docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ${{ matrix.image }} bash -c " \
+          apt-get update && apt-get install -y sudo git file nodejs && \
+          bash scripts/linux/setup/setup-linux.sh && \
+          BUILD_DIR=build_linux_${{ matrix.arch }} bash scripts/linux/compilation/build-linux.sh && \
+          BUILD_DIR=build_linux_${{ matrix.arch }} bash scripts/linux/installers/create-linux-deb.sh && \
+          BUILD_DIR=build_linux_${{ matrix.arch }} bash scripts/linux/installers/create-linux-rpm.sh && \
+          chmod -R 777 build_linux_${{ matrix.arch }} \
+        "
 
     - name: Upload DEB Artifact
       uses: actions/upload-artifact@v4
