@@ -86,7 +86,8 @@ jobs:
     - name: Configure CMake
       run: |
         if ("${{ matrix.arch }}" -eq "arm64") {
-          cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows -A ARM64
+          $FLUID_PATH = "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/tools/fltk/fluid.exe"
+          cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows -A ARM64 "-DFLTK_FLUID_EXECUTABLE=$FLUID_PATH"
         } else {
           cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows
         }
