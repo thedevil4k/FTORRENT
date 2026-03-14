@@ -7,9 +7,9 @@
     <link rel="icon" type="image/png" href="img/logo.png">
     <title>FTORRENT | Best uTorrent Alternative & qBittorrent Rival 2026 | Ad-Free & Lightweight</title>
     <meta name="description"
-        content="FTORRENT is the #1 ultra-lightweight, ad-free uTorrent alternative and qBittorrent rival. Native C++20 speed, peak privacy, and zero bloat. Download the fastest BitTorrent client for Windows and Linux now.">
+        content="FTORRENT is the #1 ultra-lightweight, ad-free uTorrent alternative and qBittorrent rival. Now with ARM64 and x86-32 support. Native C++20 speed, peak privacy, and zero bloat.">
     <meta name="keywords"
-        content="utorrent alternative 2026, qbittorrent rival, bittorrent without ads, fast torrent client, lightweight torrent downloader, open source bittorrent, ftorrent, free torrent client no ads, best torrent client for windows 11, linux torrent client, fastest torrent downloader, secure p2p client">
+        content="utorrent alternative 2026, qbittorrent rival, bittorrent without ads, fast torrent client, lightweight torrent downloader, open source bittorrent, ftorrent, free torrent client no ads, best torrent client for windows 11, linux torrent client, arm64 torrent client, x86 32-bit torrent, fastest torrent downloader, secure p2p client">
     <meta name="author" content="thedevil4k">
     <link rel="canonical" href="https://thedevil4k.github.io/FTORRENT/">
 
@@ -104,7 +104,7 @@
 
     <div class="container">
         <!-- Header / Hero Section -->
-        <header>
+        <header class="reveal">
             <div class="logo-wrapper">
                 <img src="img/logo.png" alt="FTORRENT Logo" class="logo-main">
                 <h1 aria-label="FTORRENT"><span class="sr-only">FT</span>ORRENT</h1>
@@ -113,14 +113,18 @@
                 BitTorrent client engineered for efficiency, speed, and absolute control.</p>
 
             <div class="platform-badges"
-                style="margin-bottom: 2rem; display: flex; justify-content: center; gap: 1rem;">
+                style="margin-bottom: 2rem; display: flex; justify-content: center; flex-wrap: wrap; gap: 0.8rem;">
                 <span class="badge"
                     style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
-                    <i class="fab fa-windows" style="color: #00a4ef;"></i> Windows 10/11
+                    <i class="fab fa-windows" style="color: #00a4ef;"></i> Win & Linux
                 </span>
                 <span class="badge"
                     style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
-                    <i class="fab fa-linux" style="color: #fca311;"></i> Linux
+                    <i class="fas fa-microchip" style="color: #61dafb;"></i> ARM64 Support
+                </span>
+                <span class="badge"
+                    style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
+                    <i class="fas fa-processor" style="color: #ff9f43;"></i> x86 (32-bit)
                 </span>
                 <span class="badge"
                     style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
@@ -144,7 +148,7 @@
         </header>
 
         <!-- Features Section -->
-        <section id="features">
+        <section id="features" class="reveal">
             <h2 class="section-title">Professional Performance</h2>
             <div class="grid">
                 <div class="card">
@@ -187,10 +191,10 @@
                     <div style="font-size: 2.5rem; margin-bottom: 1rem; color: #2ecc71;">
                         <i class="fab fa-windows"></i>
                         <i class="fab fa-linux"></i>
+                        <i class="fas fa-microchip" style="font-size: 1.8rem; margin-left: 0.5rem;"></i>
                     </div>
-                    <h3>Available Devices</h3>
-                    <p>FTorrent is fully compatible with <strong>Windows 10/11</strong> and <strong>Linux</strong>
-                        distributions. Native binaries optimized for each OS.</p>
+                    <h3>Broad Platform Support</h3>
+                    <p>FTorrent is fully compatible with <strong>Windows (x86/x64/ARM64)</strong> and <strong>Linux (x86/x64/ARM64)</strong>. Native binaries optimized for every architecture, from high-end workstations to <strong>Raspberry Pi</strong> and legacy hardware.</p>
                 </div>
                 <div class="card">
                     <i class="fas fa-code" style="color: #2ecc71;"></i>
@@ -202,7 +206,7 @@
         </section>
 
         <!-- Comparison Section (SEO Powerhouse) -->
-        <section id="comparison">
+        <section id="comparison" class="reveal">
             <h2 class="section-title">The Better Choice</h2>
             <div class="comparison-container">
                 <table class="comparison-table">
@@ -239,6 +243,12 @@
                             <td>Qt (Heavier)</td>
                             <td>Custom</td>
                         </tr>
+                        <tr>
+                            <td>Architectures</td>
+                            <td class="high-check">x64, x86, ARM64</td>
+                            <td>Mainly x64</td>
+                            <td>Proprietary</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -251,7 +261,7 @@
         </section>
 
         <!-- Visible SEO Layer (FAQ Section) -->
-        <section id="faq">
+        <section id="faq" class="reveal">
             <h2 class="section-title">Common Questions</h2>
             <div class="grid">
                 <div class="card">
@@ -267,17 +277,15 @@
                         and faster UI response times.</p>
                 </div>
                 <div class="card">
-                    <h3>Does it support Windows 11 and Linux?</h3>
-                    <p>Yes, FTORRENT is fully compatible with <strong>Windows 10, Windows 11</strong>, and all major
-                        <strong>Linux</strong> distributions. We provide native binaries optimized for each operating
-                        system.
+                    <h3>What architectures are supported?</h3>
+                    <p>We support <strong>x86 (32-bit)</strong>, <strong>x64 (64-bit)</strong>, and <strong>ARM64</strong> for both Windows and Linux. Whether you are on a legacy PC or a modern ARM device, FTORRENT delivers peak performance.
                     </p>
                 </div>
             </div>
         </section>
 
         <!-- Technical Section -->
-        <section id="tech-stack" class="tech-box">
+        <section id="tech-stack" class="tech-box reveal">
             <div class="tech-grid">
                 <div class="tech-content">
                     <h2 class="tech-title">Technical Excellence</h2>
@@ -324,7 +332,7 @@
                         style="color: #fff; font-weight: 800; font-size: 2rem;">...</span>
                 </p>
             </div>
-            <div id="release-list" class="stats-container">
+            <div id="release-list" class="stats-container reveal">
                 <!-- Populated by JS -->
                 <div class="release-row" style="justify-content: center; opacity: 0.5;">
                     <i class="fas fa-spinner fa-spin"></i> &nbsp; Fetching latest data from GitHub...
