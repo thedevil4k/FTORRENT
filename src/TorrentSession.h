@@ -27,7 +27,7 @@ public:
     void shutdown();
     
     // Torrent operations
-    bool addTorrentFile(const std::string& torrentFile, const std::string& savePath);
+    bool addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities = {});
     bool addMagnetLink(const std::string& magnetLink, const std::string& savePath);
     void removeTorrent(const lt::torrent_handle& handle, bool deleteFiles = false);
     void pauseTorrent(const lt::torrent_handle& handle);

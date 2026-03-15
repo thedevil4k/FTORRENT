@@ -46,9 +46,10 @@ public:
     void applyTheme();
     void toggleDarkMode();
     void toggleNetworkLimit();
+    void toggleCensorship();
     
     // Actions
-    void showAddTorrentDialog();
+    void showAddTorrentDialog(const std::string& prefilledPath = "", const std::string& prefilledMagnet = "");
     void showCreateTorrentDialog();
     void showPreferencesDialog();
     void showAboutDialog();
@@ -67,9 +68,11 @@ private:
     Fl_Button* m_darkModeBtn;
     TorrentListWidget* m_torrentList;
     Fl_Box* m_statusBar;
+    Fl_Button* m_btnCensor;
     Fl_Button* m_btnLimit;
     Fl_Choice* m_choiceRamMode;
     bool m_limitModerate;
+    bool m_censored;
     
     // Manager
     TorrentManager* m_manager;
@@ -82,6 +85,8 @@ private:
     Fl_Image* m_ecoIcon;
     Fl_Image* m_normalIcon;
     Fl_Image* m_turboIcon;
+    Fl_Image* m_eyeOpenedIcon;
+    Fl_Image* m_eyeClosedIcon;
     
     // Latency measurement
     int m_latency = -1;
@@ -108,6 +113,7 @@ private:
     static void onPreferences(Fl_Widget* w, void* data);
     static void onToggleTheme(Fl_Widget* w, void* data);
     static void onToggleLimit(Fl_Widget* w, void* data);
+    static void onToggleCensorship(Fl_Widget* w, void* data);
     static void onRamModeChanged(Fl_Widget* w, void* data);
     
     // Update timer

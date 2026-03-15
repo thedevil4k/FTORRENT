@@ -51,9 +51,12 @@ MainWindow::MainWindow(int w, int h, const char* title)
     , m_addIcon(nullptr)
     , m_createIcon(nullptr)
     , m_ecoIcon(nullptr)
-    , m_normalIcon(nullptr)
-    , m_turboIcon(nullptr)
-    , m_limitModerate(false)
+    ,m_normalIcon(nullptr)
+    ,m_turboIcon(nullptr)
+    ,m_eyeOpenedIcon(nullptr)
+    ,m_eyeClosedIcon(nullptr)
+    ,m_limitModerate(false)
+    ,m_censored(false)
 {
     // Initialize image support
     fl_register_images();
@@ -128,6 +131,29 @@ MainWindow::MainWindow(int w, int h, const char* title)
         delete imgTemp;
     }
 
+    // Load eye icons
+    m_censored = SettingsManager::instance().getIpCensored();
+    bool darkMode = SettingsManager::instance().getDarkMode();
+    
+    std::string openedFile = darkMode ? "eye_opened_dark.png" : "eye_opened_bright.png";
+    std::string closedFile = darkMode ? "eye_closed_dark.png" : "eye_closed_bright.png";
+
+    imgTemp = new Fl_PNG_Image((assetsDir + openedFile).c_str());
+    if (imgTemp->d() == 0) {
+        delete imgTemp;
+    } else {
+        m_eyeOpenedIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+
+    imgTemp = new Fl_PNG_Image((assetsDir + closedFile).c_str());
+    if (imgTemp->d() == 0) {
+        delete imgTemp;
+    } else {
+        m_eyeClosedIcon = imgTemp->copy(20, 20);
+        delete imgTemp;
+    }
+
     createToolbar();
     createTorrentList();
     createStatusBar();
@@ -161,6 +187,8 @@ MainWindow::~MainWindow() {
     delete m_ecoIcon;
     delete m_normalIcon;
     delete m_turboIcon;
+    delete m_eyeOpenedIcon;
+    delete m_eyeClosedIcon;
     saveWindowState();
     Fl::remove_timeout(updateTimerCallback, this);
 }
@@ -281,10 +309,30 @@ void MainWindow::createTorrentList() {
 void MainWindow::createStatusBar() {
     int y = h() - STATUS_HEIGHT;
     
-    m_statusBar = new Fl_Box(0, y, w(), STATUS_HEIGHT);
-    m_statusBar->box(FL_DOWN_BOX);
+    Fl_Group* statusGroup = new Fl_Group(0, y, w(), STATUS_HEIGHT);
+    statusGroup->box(FL_DOWN_BOX);
+    statusGroup->begin();
+    
+    // Status text (flexible width)
+    m_statusBar = new Fl_Box(2, y + 2, w() - 35, STATUS_HEIGHT - 4);
     m_statusBar->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     m_statusBar->label("Ready");
+    
+    // Censor button (fixed width, at the right)
+    m_btnCensor = new Fl_Button(w() - 30, y + 2, 26, STATUS_HEIGHT - 4);
+    m_btnCensor->box(FL_FLAT_BOX);
+    m_btnCensor->clear_visible_focus();
+    m_btnCensor->callback(onToggleCensorship, this);
+    m_btnCensor->tooltip("Hide/Show Sensitive Info");
+    
+    if (m_censored && m_eyeClosedIcon) {
+        m_btnCensor->image(m_eyeClosedIcon);
+    } else if (!m_censored && m_eyeOpenedIcon) {
+        m_btnCensor->image(m_eyeOpenedIcon);
+    }
+    
+    statusGroup->end();
+    statusGroup->resizable(m_statusBar); // Text box takes extra space
 }
 
 void MainWindow::setTorrentManager(TorrentManager* manager) {
@@ -328,13 +376,8 @@ void MainWindow::setTorrentManager(TorrentManager* manager) {
     if (m_torrentList) {
         m_torrentList->setOnDropCallback([this](const std::string& path) {
             if (!m_manager) return;
-            std::string savePath = SettingsManager::instance().getDefaultSavePath();
-            bool ok = m_manager->addTorrentFile(path, savePath);
-            if (ok) {
-                updateUI();
-            } else {
-                fl_alert("Failed to add torrent: %s", path.c_str());
-            }
+            // Always show dialog for confirmation and file selection
+            showAddTorrentDialog(path);
         });
     }
 }
@@ -435,6 +478,44 @@ void MainWindow::applyTheme() {
             else m_darkModeBtn->label("Dark Mode");
         }
     }
+
+    // Refresh eye icons for the new theme
+    std::string appDir = PathUtils::getAppDirPath();
+    std::string assetsDir = appDir + "/assets/";
+    std::replace(assetsDir.begin(), assetsDir.end(), '\\', '/');
+
+    delete m_eyeOpenedIcon;
+    delete m_eyeClosedIcon;
+    m_eyeOpenedIcon = nullptr;
+    m_eyeClosedIcon = nullptr;
+
+    std::string openedFile = darkMode ? "eye_opened_dark.png" : "eye_opened_bright.png";
+    std::string closedFile = darkMode ? "eye_closed_dark.png" : "eye_closed_bright.png";
+
+    Fl_PNG_Image* imgTemp;
+    imgTemp = new Fl_PNG_Image((assetsDir + openedFile).c_str());
+    if (imgTemp->d() > 0) {
+        m_eyeOpenedIcon = imgTemp->copy(20, 20);
+    }
+    delete imgTemp;
+
+    imgTemp = new Fl_PNG_Image((assetsDir + closedFile).c_str());
+    if (imgTemp->d() > 0) {
+        m_eyeClosedIcon = imgTemp->copy(20, 20);
+    }
+    delete imgTemp;
+
+    if (m_btnCensor) {
+        if (m_censored && m_eyeClosedIcon) m_btnCensor->image(m_eyeClosedIcon);
+        else if (!m_censored && m_eyeOpenedIcon) m_btnCensor->image(m_eyeOpenedIcon);
+        
+        if (darkMode) {
+            m_btnCensor->color(fl_rgb_color(20, 20, 20));
+        } else {
+            m_btnCensor->color(fl_rgb_color(225, 225, 225));
+        }
+        m_btnCensor->redraw();
+    }
     
     // Aplicar a todos los widgets existentes
     for (int i = 0; i < children(); i++) {
@@ -509,6 +590,22 @@ void MainWindow::toggleNetworkLimit() {
     }
 }
 
+void MainWindow::toggleCensorship() {
+    m_censored = !m_censored;
+    SettingsManager::instance().setIpCensored(m_censored);
+    SettingsManager::instance().save();
+    
+    if (m_btnCensor) {
+        if (m_censored && m_eyeClosedIcon) {
+            m_btnCensor->image(m_eyeClosedIcon);
+        } else if (!m_censored && m_eyeOpenedIcon) {
+            m_btnCensor->image(m_eyeOpenedIcon);
+        }
+        m_btnCensor->redraw();
+    }
+    updateStatusBar();
+}
+
 std::string MainWindow::formatStatusBar() const {
     if (!m_manager) {
         return "Not initialized";
@@ -538,7 +635,11 @@ std::string MainWindow::formatStatusBar() const {
     
     std::string ip = m_manager->getPublicIp();
     if (!ip.empty()) {
-        oss << "  |  IP: " << ip << " " << getFlagEmoji(m_manager->getCountryCode());
+        if (m_censored) {
+            oss << "  |  IP: ***.***.***.*** " << getFlagEmoji(m_manager->getCountryCode());
+        } else {
+            oss << "  |  IP: " << ip << " " << getFlagEmoji(m_manager->getCountryCode());
+        }
     }
     
     if (m_latency >= 0) {
@@ -550,17 +651,25 @@ std::string MainWindow::formatStatusBar() const {
     return oss.str();
 }
 
-void MainWindow::showAddTorrentDialog() {
+void MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const std::string& prefilledMagnet) {
     AddTorrentDialog* dlg = new AddTorrentDialog();
+    
+    if (!prefilledPath.empty()) {
+        dlg->setTorrentPath(prefilledPath);
+    }
+    if (!prefilledMagnet.empty()) {
+        dlg->setMagnetLink(prefilledMagnet);
+    }
     
     if (dlg->show_modal() && m_manager) {
         std::string path = dlg->getTorrentPath();
         std::string magnet = dlg->getMagnetLink();
         std::string savePath = dlg->getSavePath();
+        auto filePriorities = dlg->getFilePriorities();
         
         bool success = false;
         if (!path.empty()) {
-            success = m_manager->addTorrentFile(path, savePath);
+            success = m_manager->addTorrentFile(path, savePath, filePriorities);
         } else if (!magnet.empty()) {
             success = m_manager->addMagnetLink(magnet, savePath);
         }
@@ -770,14 +879,7 @@ int MainWindow::win_event_handler(int event) {
                 // Only process .torrent files
                 if (path.size() > 8 &&
                     path.substr(path.size() - 8) == ".torrent") {
-                    std::string savePath =
-                        SettingsManager::instance().getDefaultSavePath();
-                    bool ok = win->m_manager->addTorrentFile(path, savePath);
-                    if (ok) {
-                        win->updateUI();
-                    } else {
-                        fl_alert("Failed to add torrent: %s", path.c_str());
-                    }
+                    win->showAddTorrentDialog(path);
                 }
             }
             DragFinish(hDrop);
@@ -879,6 +981,10 @@ void MainWindow::onToggleTheme(Fl_Widget* w, void* data) {
 
 void MainWindow::onToggleLimit(Fl_Widget* w, void* data) {
     ((MainWindow*)data)->toggleNetworkLimit();
+}
+
+void MainWindow::onToggleCensorship(Fl_Widget* w, void* data) {
+    ((MainWindow*)data)->toggleCensorship();
 }
 
 void MainWindow::onRamModeChanged(Fl_Widget* w, void* data) {

@@ -78,6 +78,9 @@ public:
     int getRamMode() const; // 0=Low, 1=Normal, 2=Turbo
     void setRamMode(int mode);
     
+    bool getIpCensored() const;
+    void setIpCensored(bool censored);
+    
     // Advanced settings
     std::string getUserAgent() const;
     void setUserAgent(const std::string& agent);

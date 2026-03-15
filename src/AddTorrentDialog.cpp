@@ -74,16 +74,13 @@ void AddTorrentDialog::createUI() {
     y += 40;
 
     // --- Files Preview Section ---
-    Fl_Box* filesLabel = new Fl_Box(20, y, 100, 25, "Files in torrent:");
+    Fl_Box* filesLabel = new Fl_Box(20, y, 400, 25, "Files to download (uncheck to skip):");
     filesLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     y += 25;
 
-    m_filesBuffer = new Fl_Text_Buffer();
-    m_filesDisplay = new Fl_Text_Display(20, y, 460, 120);
-    m_filesDisplay->buffer(m_filesBuffer);
-    m_filesDisplay->textfont(FL_COURIER);
-    m_filesDisplay->textsize(11);
-    y += 130;
+    m_fileBrowser = new Fl_Check_Browser(20, y, 460, 150);
+    m_fileBrowser->textsize(12);
+    y += 160;
 }
 
 void AddTorrentDialog::createButtons() {
@@ -132,8 +129,22 @@ bool AddTorrentDialog::validate() {
     }
     m_savePath = m_savePathInput->value();
     
-    // Get other settings
-    m_startImmediatelyResult = (m_startImmediately->value() != 0);
+    // Validate file selection
+    m_filePriorities.clear();
+    bool anySelected = false;
+    for (int i = 1; i <= m_fileBrowser->nitems(); ++i) {
+        if (m_fileBrowser->checked(i)) {
+            m_filePriorities.push_back(1); // Priority 1 (Normal)
+            anySelected = true;
+        } else {
+            m_filePriorities.push_back(0); // Priority 0 (Skip)
+        }
+    }
+    
+    if (m_fileBrowser->nitems() > 0 && !anySelected) {
+        fl_alert("Please select at least one file to download");
+        return false;
+    }
     
     switch (m_priorityChoice->value()) {
         case 0: m_priority = Priority::Normal; break;
@@ -201,44 +212,46 @@ void AddTorrentDialog::onCancel(Fl_Widget* w, void* data) {
     dlg->hide();
 }
 
+void AddTorrentDialog::setTorrentPath(const std::string& path) {
+    if (m_filePathInput) {
+        m_filePathInput->value(path.c_str());
+        updateFileList(path);
+    }
+}
+
+void AddTorrentDialog::setMagnetLink(const std::string& magnet) {
+    if (m_magnetInput) {
+        m_magnetInput->value(magnet.c_str());
+    }
+}
+
+void AddTorrentDialog::setSavePath(const std::string& path) {
+    if (m_savePathInput) {
+        m_savePathInput->value(path.c_str());
+    }
+}
+
 #include <libtorrent/torrent_info.hpp>
 #include "TorrentItem.h"
 
 void AddTorrentDialog::updateFileList(const std::string& torrentPath) {
+    m_fileBrowser->clear();
     if (torrentPath.empty()) {
-        m_filesBuffer->text("");
         return;
     }
 
     try {
         lt::torrent_info info(torrentPath);
-        std::ostringstream oss;
-        
-
-        oss << std::left << std::setw(35) << "Filename" << " | " 
-            << std::setw(8) << "Ext" << " | " 
-            << "Size" << "\n";
-        oss << std::string(60, '-') << "\n";
-        
         auto const& fs = info.files();
+        
         for (int i = 0; i < fs.num_files(); ++i) {
             std::string fname = fs.file_name(lt::file_index_t(i)).to_string();
-            std::filesystem::path p(fname);
-            std::string ext = p.extension().string();
-            // Remove leading dot if present
-            if (!ext.empty() && ext[0] == '.') ext = ext.substr(1);
+            int64_t fsize = fs.file_size(lt::file_index_t(i));
             
-            // Truncate filename if needed
-            if (fname.length() > 34) fname = fname.substr(0, 31) + "...";
-
-            oss << std::left << std::setw(35) << fname << " | "
-                << std::setw(8) << ext << " | "
-                << TorrentItem::formatSize(fs.file_size(lt::file_index_t(i))) << "\n";
+            std::string label = fname + " (" + TorrentItem::formatSize(fsize) + ")";
+            m_fileBrowser->add(label.c_str(), 1); // Checked by default
         }
-        
-        m_filesBuffer->text(oss.str().c_str());
-        
     } catch (const std::exception& e) {
-        m_filesBuffer->text(("Error reading torrent file: " + std::string(e.what())).c_str());
+        m_fileBrowser->add(("Error: " + std::string(e.what())).c_str(), 0);
     }
 }

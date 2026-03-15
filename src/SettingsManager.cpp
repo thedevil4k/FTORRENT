@@ -76,7 +76,8 @@ void SettingsManager::setDefaults() {
     setWindowY(100);
     setWindowMaximized(false);
     setDarkMode(false);
-    setRamMode(0); // ECO (Default)
+    setRamMode(1); // Normal (Default)
+    setIpCensored(false);
     
     // Advanced
     setUserAgent("FTorrent/0.1.0");
@@ -295,6 +296,14 @@ int SettingsManager::getRamMode() const {
 
 void SettingsManager::setRamMode(int mode) {
     setInt("RamMode", mode);
+}
+
+bool SettingsManager::getIpCensored() const {
+    return getBool("IpCensored", false);
+}
+
+void SettingsManager::setIpCensored(bool censored) {
+    setBool("IpCensored", censored);
 }
 
 std::string SettingsManager::getUserAgent() const {

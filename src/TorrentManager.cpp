@@ -72,12 +72,12 @@ void TorrentManager::shutdown() {
 }
 
 // Async operations for non-blocking UI
-std::future<bool> TorrentManager::addTorrentFileAsync(const std::string& torrentFile, const std::string& savePath) {
+std::future<bool> TorrentManager::addTorrentFileAsync(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities) {
     // For now, execute synchronously but return as future
     auto promise = std::make_shared<std::promise<bool>>();
     auto future = promise->get_future();
     
-    bool result = addTorrentFile(torrentFile, savePath);
+    bool result = addTorrentFile(torrentFile, savePath, file_priorities);
     promise->set_value(result);
     
     return future;
@@ -95,13 +95,13 @@ std::future<bool> TorrentManager::addMagnetLinkAsync(const std::string& magnetLi
 }
 
 // Synchronous operations
-bool TorrentManager::addTorrentFile(const std::string& torrentFile, const std::string& savePath) {
+bool TorrentManager::addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities) {
     if (!m_initialized.load()) {
         notifyError("Session not initialized");
         return false;
     }
 
-    bool success = m_session->addTorrentFile(torrentFile, savePath);
+    bool success = m_session->addTorrentFile(torrentFile, savePath, file_priorities);
     
     if (success) {
         std::lock_guard<std::mutex> lock(m_torrentsMutex);

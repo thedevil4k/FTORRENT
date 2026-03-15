@@ -6,9 +6,9 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
-#include <FL/Fl_Text_Display.H>
-#include <FL/Fl_Text_Buffer.H>
+#include <FL/Fl_Check_Browser.H>
 #include <string>
+#include <vector>
 
 /**
  * @brief Diálogo avanzado para añadir torrents
@@ -39,7 +39,13 @@ public:
     std::string getSavePath() const { return m_savePath; }
     bool getStartImmediately() const { return m_startImmediatelyResult; }
     Priority getPriority() const { return m_priority; }
+    std::vector<int> getFilePriorities() const { return m_filePriorities; }
     bool isMagnet() const { return !m_magnetLink.empty(); }
+    
+    // Setters for pre-filling
+    void setTorrentPath(const std::string& path);
+    void setMagnetLink(const std::string& magnet);
+    void setSavePath(const std::string& path);
     
 private:
     
@@ -57,8 +63,7 @@ private:
     Fl_Input* m_magnetInput;
     
     // Files display
-    Fl_Text_Display* m_filesDisplay;
-    Fl_Text_Buffer* m_filesBuffer;
+    Fl_Check_Browser* m_fileBrowser;
     
     // Buttons
     Fl_Button* m_okButton;
@@ -68,6 +73,7 @@ private:
     std::string m_torrentPath;
     std::string m_magnetLink;
     std::string m_savePath;
+    std::vector<int> m_filePriorities;
     bool m_startImmediatelyResult;
     Priority m_priority;
     bool m_okClicked;

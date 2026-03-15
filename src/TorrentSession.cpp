@@ -112,7 +112,7 @@ void TorrentSession::setupSessionSettings() {
     // For now, using defaults from initialize()
 }
 
-bool TorrentSession::addTorrentFile(const std::string& torrentFile, const std::string& savePath) {
+bool TorrentSession::addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities) {
     if (!m_initialized || !m_session) {
         std::cerr << "Session not initialized" << std::endl;
         return false;
@@ -123,12 +123,20 @@ bool TorrentSession::addTorrentFile(const std::string& torrentFile, const std::s
         params.ti = std::make_shared<lt::torrent_info>(torrentFile);
         params.save_path = savePath;
         
+        // Apply file priorities if provided
+        if (!file_priorities.empty()) {
+            params.file_priorities.reserve(file_priorities.size());
+            for (int p : file_priorities) {
+                params.file_priorities.push_back(lt::download_priority_t(static_cast<std::uint8_t>(p)));
+            }
+        }
+        
         // Add flags for better handling
         params.flags |= lt::torrent_flags::auto_managed | lt::torrent_flags::duplicate_is_error;
         
         m_session->async_add_torrent(params);
         
-        std::cout << "Added torrent: " << params.ti->name() << std::endl;
+        std::cout << "Added torrent: " << params.ti->name() << " with " << file_priorities.size() << " priority overrides." << std::endl;
         return true;
         
     } catch (const std::exception& e) {
