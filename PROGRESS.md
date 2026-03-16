@@ -151,6 +151,7 @@ FTorrent/
 ✅ Automatic update (1 sec)  
 ✅ Window state saving  
 ✅ Double-click for details  
+✅ **Privacy Mode (IP Censorship)** - Hide public IP/sensitive data in UI  
 ✅ **Windows System Tray integration** (Context menu + Minimize to tray)  
 
 ### Advanced Dialogs (100%)

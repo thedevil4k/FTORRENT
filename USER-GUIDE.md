@@ -33,11 +33,18 @@ FTorrent can run in the background:
 -   **Context Menu:** Right-click the tray icon to quickly Pause/Resume all torrents or Exit the application.
 -   **Quick Restore:** Double-click the tray icon to bring the window back to front.
 
+## 🔒 Privacy & Stealth
+
+FTorrent includes built-in features to protect your sensitive information:
+-   **IP Censorship:** Click the **eye icon** in the status bar to mask your public IP address. This is useful for streamers or when sharing screenshots.
+-   **Persistent Privacy:** Your censorship preference is saved automatically for future sessions.
+
 ## 📊 Understanding the Interface
 
 -   **Torrent List:** Shows the name, size, progress, speed, and status of each download.
 -   **Status Bar:** At the bottom, you will see:
     -   **Total Speed:** Combined download and upload rates.
+    -   **Privacy Toggle:** Hidden/Visible eye icon to mask your public IP and sensitive data.
     -   **Resource Monitor:** Real-time RAM consumption of the application.
     -   **Session Status:** Indicates if the engine is running or paused.
 -   **Control Icons:**

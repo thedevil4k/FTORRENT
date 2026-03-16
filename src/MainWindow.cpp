@@ -702,12 +702,13 @@ void MainWindow::showPreferencesDialog() {
 }
 
 void MainWindow::showAboutDialog() {
-    fl_message(
-        "FTorrent v0.1.0\n\n"
-        "A lightweight BitTorrent client built with FLTK\n\n"
-        "Powered by libtorrent-rasterbar\n\n"
-        "© 2026"
-    );
+    std::string message = "FTorrent v";
+    message += VERSION;
+    message += "\n\n"
+               "A lightweight BitTorrent client built with FLTK\n\n"
+               "Powered by libtorrent-rasterbar\n\n"
+               "© 2026";
+    fl_message("%s", message.c_str());
 }
 
 void MainWindow::toggleSelectedTorrents() {

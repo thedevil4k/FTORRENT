@@ -38,6 +38,7 @@
 - Total torrents count
 - Active torrents count
 - Real-time Download/Upload speeds
+- Privacy Toggle: Hidden/Visible eye icon to mask public IP
 - Status: Idle/Active
 
 #### Features:
@@ -137,7 +138,7 @@ User selects torrent + clicks "Pause"
 │                                                      │
 │                                                      │
 ├──────────────────────────────────────────────────────┤
-│ Torrents: 3 (Active: 2)  |  ↓ 2.5 MB/s  ↑ 500 KB/s  │ ← Status Bar
+│ Torrents: 3 (Active: 2)  |  ↓ 2.5 MB/s  ↑ 500 KB/s  | 👁️ │ ← Status Bar
 └──────────────────────────────────────────────────────┘
 ```
 

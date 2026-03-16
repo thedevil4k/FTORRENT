@@ -27,7 +27,7 @@ public:
     MainWindow(int w, int h, const char* title);
     ~MainWindow();
 
-    static constexpr const char* VERSION = "0.4.0";
+    static constexpr const char* VERSION = "0.4.1";
 
     // Window management
     void show();

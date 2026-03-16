@@ -37,6 +37,7 @@ Get the latest version of FTorrent for your platform. No installation required f
 
 -   🚀 **Native Performance:** No Electron, no heavy frameworks—just pure, high-performance C++20.
 -   💪 **Elite P2P Engine:** Powered by `libtorrent-rasterbar`, the industry standard for speed and stability.
+-   🔒 **Privacy Focused:** Built-in IP censorship/privacy mode to protect your identity in UI and screenshots.
 -   ⚡ **Multi-Core Optimized:** Modern multi-threaded architecture ensures zero UI lag.
 -   🎨 **Modern Classic UI:** A clean, intuitive design inspired by the best of uTorrent but built for today.
 -   📦 **Ultra-Portable:** Tiny executable with no external dependencies required.
