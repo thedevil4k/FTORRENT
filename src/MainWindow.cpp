@@ -135,8 +135,8 @@ MainWindow::MainWindow(int w, int h, const char* title)
     m_censored = SettingsManager::instance().getIpCensored();
     bool darkMode = SettingsManager::instance().getDarkMode();
     
-    std::string openedFile = darkMode ? "eye_opened_dark.png" : "eye_opened_bright.png";
-    std::string closedFile = darkMode ? "eye_closed_dark.png" : "eye_closed_bright.png";
+    std::string openedFile = darkMode ? "eye_opened_bright.png" : "eye_opened_dark.png";
+    std::string closedFile = darkMode ? "eye_closed_bright.png" : "eye_closed_dark.png";
 
     imgTemp = new Fl_PNG_Image((assetsDir + openedFile).c_str());
     if (imgTemp->d() == 0) {
@@ -489,8 +489,8 @@ void MainWindow::applyTheme() {
     m_eyeOpenedIcon = nullptr;
     m_eyeClosedIcon = nullptr;
 
-    std::string openedFile = darkMode ? "eye_opened_dark.png" : "eye_opened_bright.png";
-    std::string closedFile = darkMode ? "eye_closed_dark.png" : "eye_closed_bright.png";
+    std::string openedFile = darkMode ? "eye_opened_bright.png" : "eye_opened_dark.png";
+    std::string closedFile = darkMode ? "eye_closed_bright.png" : "eye_closed_dark.png";
 
     Fl_PNG_Image* imgTemp;
     imgTemp = new Fl_PNG_Image((assetsDir + openedFile).c_str());
