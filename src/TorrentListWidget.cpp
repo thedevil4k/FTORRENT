@@ -34,8 +34,9 @@ TorrentListWidget::TorrentListWidget(int x, int y, int w, int h, const char* lab
     when(FL_WHEN_RELEASE);
     
     // Modernize scrollbar
-    // scrollbar_size(10);
-    // scrollbar.box(FL_FLAT_BOX);
+    Fl::scrollbar_size(10);
+    vscrollbar->box(FL_FLAT_BOX);
+    hscrollbar->box(FL_FLAT_BOX);
     
     end();
 }
