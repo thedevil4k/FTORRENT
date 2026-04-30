@@ -1,0 +1,5 @@
+D:/FTORRENT-client/build_test/CMakeFiles/FTorrent.dir
+D:/FTORRENT-client/build_test/CMakeFiles/PACKAGE.dir
+D:/FTORRENT-client/build_test/CMakeFiles/INSTALL.dir
+D:/FTORRENT-client/build_test/CMakeFiles/ALL_BUILD.dir
+D:/FTORRENT-client/build_test/CMakeFiles/ZERO_CHECK.dir

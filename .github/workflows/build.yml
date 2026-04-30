@@ -1,4 +1,4 @@
-name: Build FLTorrent
+name: Build FTorrent
 
 on:
   push:
@@ -101,15 +101,17 @@ jobs:
     - name: Generate Installer
       working-directory: build
       run: |
-        cpack -G "NSIS;ZIP" -C Release
+        cpack -G NSIS -C Release
+        cpack -G ZIP -C Release
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: fltorrent-windows-${{ matrix.arch }}
+        name: FTorrent-windows-${{ matrix.arch }}
         path: |
           build/*.exe
           build/*.zip
+          build/Release/FTorrent.exe
 
   build-linux:
     strategy:

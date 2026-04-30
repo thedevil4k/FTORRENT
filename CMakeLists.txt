@@ -106,28 +106,41 @@ install(TARGETS FTorrent
 )
 
 if(WIN32)
-    # Force inclusion of critical DLLs in the installer package
-    # Using globbing to handle different architectures (x64 vs ARM64)
-    set(DLL_PATTERNS
-        "torrent-rasterbar*.dll"
-        "libcrypto-*.dll"
-        "libssl-*.dll"
-        "libpng*.dll"
-        "jpeg*.dll"
-        "zlib*.dll"
-    )
-    
-    foreach(pattern ${DLL_PATTERNS})
-        file(GLOB FOUND_DLLS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/${pattern}")
-        foreach(dll ${FOUND_DLLS})
-            install(FILES "${dll}"
-                DESTINATION ${CMAKE_INSTALL_BINDIR}
-                OPTIONAL
-            )
+    # Detect VCPKG installed directory if not set (crucial for GitHub Actions)
+    if(NOT VCPKG_INSTALLED_DIR)
+        if(DEFINED ENV{VCPKG_INSTALLATION_ROOT})
+            set(VCPKG_INSTALLED_DIR "$ENV{VCPKG_INSTALLATION_ROOT}/installed")
+        elseif(DEFINED ENV{VCPKG_ROOT})
+            set(VCPKG_INSTALLED_DIR "$ENV{VCPKG_ROOT}/installed")
+        endif()
+    endif()
+
+    if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
+        message(STATUS "VCPKG DLL collection enabled. Using: ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
+        # Force inclusion of critical DLLs in the installer package
+        set(DLL_PATTERNS
+            "torrent-rasterbar*.dll"
+            "libcrypto-*.dll"
+            "libssl-*.dll"
+            "libpng*.dll"
+            "jpeg*.dll"
+            "zlib*.dll"
+        )
+        
+        foreach(pattern ${DLL_PATTERNS})
+            file(GLOB FOUND_DLLS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/${pattern}")
+            foreach(dll ${FOUND_DLLS})
+                get_filename_component(DLL_NAME "${dll}" NAME)
+                message(STATUS "  Found DLL: ${DLL_NAME}")
+                install(FILES "${dll}"
+                    DESTINATION ${CMAKE_INSTALL_BINDIR}
+                    OPTIONAL
+                )
+            endforeach()
         endforeach()
-    endforeach()
-
-
+    else()
+        message(WARNING "VCPKG_INSTALLED_DIR or VCPKG_TARGET_TRIPLET not set. Skipping manual DLL collection.")
+    endif()
 endif()
 
 
