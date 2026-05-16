@@ -91,11 +91,6 @@
 </head>
 
 <body>
-    <!-- Advertisement Banner -->
-    <div id="frame" style="width: 100%;margin: auto;position: relative; z-index: 99998;">
-        <iframe data-aa='2426784' src='//acceptable.a-ads.com/2426784/?size=Adaptive'
-            style='border:0; padding:0; width:70%; height:auto; overflow:hidden;display: block;margin: auto'></iframe>
-    </div>
 
 
     <div class="bg-gradient"></div>
@@ -116,21 +111,22 @@
                 style="margin-bottom: 2rem; display: flex; justify-content: center; flex-wrap: wrap; gap: 0.8rem;">
                 <span class="badge"
                     style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
-                    <i class="fab fa-windows" style="color: #00a4ef;"></i> Win & Linux
+                    <i class="fab fa-windows" style="color: #00a4ef;"></i> Win & Linux (x64/ARM)
                 </span>
                 <span class="badge"
                     style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
-                    <i class="fas fa-microchip" style="color: #61dafb;"></i> ARM64 Support
+                    <i class="fas fa-box" style="color: #61dafb;"></i> DEB & RPM (32/64-bit)
                 </span>
                 <span class="badge"
                     style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
-                    <i class="fas fa-processor" style="color: #ff9f43;"></i> x86 (32-bit)
+                    <i class="fas fa-microchip" style="color: #ff9f43;"></i> Raspberry Pi & ARM64
                 </span>
                 <span class="badge"
                     style="background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border);">
                     <i class="fas fa-code" style="color: var(--primary);"></i> Fully Compilable
                 </span>
             </div>
+
 
             <div class="cta-group">
                 <a href="https://github.com/thedevil4k/FTORRENT/releases/latest" class="btn btn-primary">
@@ -142,9 +138,10 @@
             </div>
 
             <!-- App Screenshot / Preview -->
-            <img src="https://github.com/user-attachments/assets/07a35ad0-474f-4f1e-8417-d07bd2717a46"
-                alt="FTORRENT Main Interface - Fast and Lightweight Torrent Client for Windows and Linux"
+            <img src="img/app-screenshot.png"
+                alt="FTORRENT v0.4.1 Interface - Professional Dark Mode Torrent Client"
                 class="app-preview">
+
         </header>
 
         <!-- Features Section -->
@@ -184,8 +181,7 @@
                 <div class="card">
                     <i class="fas fa-leaf"></i>
                     <h3>Low Footprint</h3>
-                    <p>Optimized for long-running sessions. Minimal RAM consumption allows it to run in the background
-                        without impacting system performance.</p>
+                    <p>Optimized for long-running sessions. Extreme efficiency with only <strong>7.6MB RAM</strong> footprint, allowing it to run in the background without impacting system performance.</p>
                 </div>
                 <div class="card">
                     <div style="font-size: 2.5rem; margin-bottom: 1rem; color: #2ecc71;">
@@ -194,7 +190,7 @@
                         <i class="fas fa-microchip" style="font-size: 1.8rem; margin-left: 0.5rem;"></i>
                     </div>
                     <h3>Broad Platform Support</h3>
-                    <p>FTorrent is fully compatible with <strong>Windows (x86/x64/ARM64)</strong> and <strong>Linux (x86/x64/ARM64)</strong>. Native binaries optimized for every architecture, from high-end workstations to <strong>Raspberry Pi</strong> and legacy hardware.</p>
+                    <p>FTorrent is fully compatible with <strong>Windows (x86/x64/ARM64)</strong> and <strong>Linux (x86/x64/ARM64)</strong>. We provide native <strong>DEB and RPM packages</strong> for both 32-bit and 64-bit systems, optimized for everything from high-end workstations to <strong>Raspberry Pi</strong> and legacy hardware.</p>
                 </div>
                 <div class="card">
                     <i class="fas fa-code" style="color: #2ecc71;"></i>
@@ -209,49 +205,140 @@
         <section id="comparison" class="reveal">
             <h2 class="section-title">The Better Choice</h2>
             <div class="comparison-container">
-                <table class="comparison-table">
-                    <thead>
-                        <tr>
-                            <th>Feature</th>
-                            <th class="highlight">FTORRENT</th>
-                            <th>qBittorrent</th>
-                            <th>uTorrent</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Advertisements</td>
-                            <td class="high-check">None</td>
-                            <td>None</td>
-                            <td class="bad-cross">Yes</td>
-                        </tr>
-                        <tr>
-                            <td>RAM Usage</td>
-                            <td class="high-check">&lt; 20MB</td>
-                            <td>100MB+</td>
-                            <td>80MB+ (Ads)</td>
-                        </tr>
-                        <tr>
-                            <td>Native Engine</td>
-                            <td class="high-check">Pure C++20</td>
-                            <td>Qt Framework</td>
-                            <td>Proprietary</td>
-                        </tr>
-                        <tr>
-                            <td>UI Toolkit</td>
-                            <td class="high-check">FLTK (Fast)</td>
-                            <td>Qt (Heavier)</td>
-                            <td>Custom</td>
-                        </tr>
-                        <tr>
-                            <td>Architectures</td>
-                            <td class="high-check">x64, x86, ARM64</td>
-                            <td>Mainly x64</td>
-                            <td>Proprietary</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="barcode-comparison">
+                    <!-- Feature 1: RAM Usage -->
+                    <div class="barcode-row reveal">
+                        <div class="feature-header">
+                            <span class="feature-name">RAM Usage</span>
+                            <span class="feature-value">7.6MB vs 8MB vs 40MB+</span>
+                        </div>
+                        <div class="barcode-stack">
+                            <div class="barcode-item ft">
+                                <span class="client-label">FTORRENT</span>
+                                <div class="barcode-visual"><div class="bars"></div></div>
+                            </div>
+                            <div class="barcode-item qb">
+                                <span class="client-label">qBittorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 30%"></div></div>
+                            </div>
+                            <div class="barcode-item ut">
+                                <span class="client-label">uTorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 15%"></div></div>
+                            </div>
+                            <div class="barcode-item tr">
+                                <span class="client-label">Transmission</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 92%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feature 2: Native Engine -->
+                    <div class="barcode-row reveal">
+                        <div class="feature-header">
+                            <span class="feature-name">Engine Efficiency</span>
+                            <span class="feature-value">Pure C++20 vs Frameworks</span>
+                        </div>
+                        <div class="barcode-stack">
+                            <div class="barcode-item ft">
+                                <span class="client-label">FTORRENT</span>
+                                <div class="barcode-visual"><div class="bars"></div></div>
+                            </div>
+                            <div class="barcode-item qb">
+                                <span class="client-label">qBittorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 100%"></div></div>
+                            </div>
+                            <div class="barcode-item ut">
+                                <span class="client-label">uTorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 35%"></div></div>
+                            </div>
+                            <div class="barcode-item tr">
+                                <span class="client-label">Transmission</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 85%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feature 3: Advertisements -->
+                    <div class="barcode-row reveal">
+                        <div class="feature-header">
+                            <span class="feature-name">Clean Experience</span>
+                            <span class="feature-value">Ad-Free vs Commercial</span>
+                        </div>
+                        <div class="barcode-stack">
+                            <div class="barcode-item ft">
+                                <span class="client-label">FTORRENT</span>
+                                <div class="barcode-visual"><div class="bars"></div></div>
+                            </div>
+                            <div class="barcode-item qb">
+                                <span class="client-label">qBittorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 100%"></div></div>
+                            </div>
+                            <div class="barcode-item ut">
+                                <span class="client-label">uTorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 15%"></div></div>
+                            </div>
+                            <div class="barcode-item tr">
+                                <span class="client-label">Transmission</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 100%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feature 4: UI Responsiveness -->
+                    <div class="barcode-row reveal">
+                        <div class="feature-header">
+                            <span class="feature-name">UI Latency</span>
+                            <span class="feature-value">Zero-Lag vs Weighted UI</span>
+                        </div>
+                        <div class="barcode-stack">
+                            <div class="barcode-item ft">
+                                <span class="client-label">FTORRENT</span>
+                                <div class="barcode-visual"><div class="bars"></div></div>
+                            </div>
+                            <div class="barcode-item qb">
+                                <span class="client-label">qBittorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 65%"></div></div>
+                            </div>
+                            <div class="barcode-item ut">
+                                <span class="client-label">uTorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 40%"></div></div>
+                            </div>
+                            <div class="barcode-item tr">
+                                <span class="client-label">Transmission</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 80%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feature 5: Architectures -->
+                    <div class="barcode-row reveal">
+                        <div class="feature-header">
+                            <span class="feature-name">Architecture Support</span>
+                            <span class="feature-value">x64, x86, ARM64 | DEB & RPM</span>
+                        </div>
+                        <div class="barcode-stack">
+                            <div class="barcode-item ft">
+                                <span class="client-label">FTORRENT</span>
+                                <div class="barcode-visual"><div class="bars"></div></div>
+                            </div>
+                            <div class="barcode-item qb">
+                                <span class="client-label">qBittorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 55%"></div></div>
+                            </div>
+                            <div class="barcode-item ut">
+                                <span class="client-label">uTorrent</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 20%"></div></div>
+                            </div>
+                            <div class="barcode-item tr">
+                                <span class="client-label">Transmission</span>
+                                <div class="barcode-visual"><div class="bars" style="width: 95%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+
             <div style="text-align: center; margin-top: 2rem;">
                 <p style="color: var(--text-muted); font-size: 0.9rem;">
                     If you are searching for a <strong>uTorrent alternative</strong> or a faster <strong>qBittorrent
@@ -273,12 +360,12 @@
                 <div class="card">
                     <h3>Is it better than qBittorrent?</h3>
                     <p>As a <strong>qBittorrent rival</strong>, FTORRENT focuses on minimalism and speed. While
-                        qBittorrent is feature-rich, FTORRENT uses the FLTK toolkit to ensure a much lower RAM footprint
-                        and faster UI response times.</p>
+                        qBittorrent is feature-rich, FTORRENT uses the FLTK toolkit to ensure a much lower <strong>7.6MB RAM footprint</strong>
+                        and faster UI response times than both qBittorrent and Transmission.</p>
                 </div>
                 <div class="card">
                     <h3>What architectures are supported?</h3>
-                    <p>We support <strong>x86 (32-bit)</strong>, <strong>x64 (64-bit)</strong>, and <strong>ARM64</strong> for both Windows and Linux. Whether you are on a legacy PC or a modern ARM device, FTORRENT delivers peak performance.
+                    <p>We support <strong>x86 (32-bit)</strong> and <strong>x64 (64-bit)</strong> via native <strong>DEB</strong> and <strong>RPM</strong> packages, as well as <strong>ARM64</strong> for both Windows and Linux. Whether you are on a legacy PC or a modern ARM device, FTORRENT delivers peak performance.
                     </p>
                 </div>
             </div>

@@ -122,13 +122,19 @@ jobs:
             image: ubuntu:24.04
           - arch: i386
             image: i386/debian:bookworm
+          - arch: arm64
+            image: arm64v8/ubuntu:24.04
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up QEMU
+      if: matrix.arch == 'arm64'
+      uses: docker/setup-qemu-action@v3
+
     - name: Build and Package
       run: |
-        docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ${{ matrix.image }} bash -c " \
+        docker run --rm --platform linux/${{ matrix.arch == 'arm64' && 'arm64' || (matrix.arch == 'i386' && '386' || 'amd64') }} -v ${{ github.workspace }}:/workspace -w /workspace ${{ matrix.image }} bash -c " \
           apt-get update && apt-get install -y sudo git file nodejs && \
           bash scripts/linux/setup/setup-linux.sh && \
           BUILD_DIR=build_linux_${{ matrix.arch }} bash scripts/linux/compilation/build-linux.sh && \
@@ -148,3 +154,4 @@ jobs:
       with:
         name: FTorrent-rpm-${{ matrix.arch }}
         path: build_linux_${{ matrix.arch }}/*.rpm
+
