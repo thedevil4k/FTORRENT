@@ -256,7 +256,7 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
 
     for (int i = 0; i < fs.num_files(); ++i) {
         FileInfo fi;
-        fi.name = fs.file_name(lt::file_index_t(i)).to_string();
+        fi.name = std::string(fs.file_name(lt::file_index_t(i)));
         fi.size = fs.file_size(lt::file_index_t(i));
         
         if (fi.size > 0 && i < (int)file_progress.size()) {

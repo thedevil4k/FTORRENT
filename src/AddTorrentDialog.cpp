@@ -245,7 +245,7 @@ void AddTorrentDialog::updateFileList(const std::string& torrentPath) {
         auto const& fs = info.files();
         
         for (int i = 0; i < fs.num_files(); ++i) {
-            std::string fname = fs.file_name(lt::file_index_t(i)).to_string();
+            std::string fname = std::string(fs.file_name(lt::file_index_t(i)));
             int64_t fsize = fs.file_size(lt::file_index_t(i));
             
             std::string label = fname + " (" + TorrentItem::formatSize(fsize) + ")";
