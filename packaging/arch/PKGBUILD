@@ -1,0 +1,29 @@
+# Maintainer: FTorrent Team <dev@ftorrent.org>
+pkgname=ftorrent
+pkgver=0.4.1
+pkgrel=1
+pkgdesc='A lightweight and fast BitTorrent client'
+arch=('x86_64')
+url='https://github.com/thedevil4k/FTORRENT'
+license=('MIT')
+depends=('fltk' 'libtorrent-rasterbar' 'libpng' 'libjpeg-turbo' 'zlib')
+makedepends=('cmake')
+source=()
+sha256sums=()
+
+# Repo root: FTP_SRC is set by create-linux-arch.sh;
+# fallback works when makepkg is run from packaging/arch/.
+if [ -z "${FTP_SRC:-}" ]; then
+    FTP_SRC="$(cd "${startdir}/../.." && pwd)"
+fi
+
+build() {
+    cmake -B "${srcdir}/build" -S "${FTP_SRC}" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build "${srcdir}/build" -j"$(nproc)"
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install "${srcdir}/build"
+}

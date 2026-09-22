@@ -62,6 +62,16 @@ bash ./scripts/linux/installers/create-linux-rpm.sh
 ```
 *The `.rpm` file will be located in the `build_linux/` folder.*
 
+### Linux (Arch/CachyOS .pkg.tar.zst)
+To create an Arch package (requires `base-devel`, run as a regular user, not root):
+```bash
+bash ./scripts/linux/installers/create-linux-arch.sh
+```
+*The `.pkg.tar.zst` file will be located in the `build_linux/` folder. Install it with:*
+```bash
+sudo pacman -U build_linux/ftorrent-*.pkg.tar.zst
+```
+
 ---
 
 ## 💡 Troubleshooting

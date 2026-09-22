@@ -73,7 +73,7 @@ case $OS in
             pkgconfig \
             git
         ;;
-    arch|manjaro)
+    arch|manjaro|cachyos|endeavouros|garuda)
         echo "Installing dependencies for Arch Linux..."
         run_as_root pacman -S --needed --noconfirm \
             base-devel \

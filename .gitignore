@@ -37,6 +37,11 @@ Thumbs.db
 *.log
 *.bak
 
+# Arch package build
+packaging/arch/src/
+packaging/arch/pkg/
+packaging/arch/*.pkg.tar*
+
 # Project specific
 *.torrent
 downloads/
