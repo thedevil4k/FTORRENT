@@ -78,6 +78,7 @@ case $OS in
         run_as_root pacman -S --needed --noconfirm \
             base-devel \
             cmake \
+            boost \
             fltk \
             libtorrent-rasterbar \
             libpng \
