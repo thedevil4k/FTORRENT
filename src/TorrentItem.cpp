@@ -1,5 +1,6 @@
 #include "TorrentItem.h"
 #include <libtorrent/torrent_info.hpp>
+#include <libtorrent/version.hpp>
 #include <libtorrent/hex.hpp>
 #include <libtorrent/announce_entry.hpp>
 #include <libtorrent/peer_info.hpp>
@@ -224,7 +225,12 @@ std::vector<TorrentItem::PeerInfo> TorrentItem::getPeers() const {
 
     for (const auto& p : peers) {
         PeerInfo info;
+#if LIBTORRENT_VERSION_NUM >= 20100
+        // peer_info::ip was removed in libtorrent 2.1, use remote_endpoint().
+        info.ip = p.remote_endpoint().address().to_string();
+#else
         info.ip = p.ip.address().to_string();
+#endif
         info.client = p.client;
         info.downloadRate = p.down_speed;
         info.uploadRate = p.up_speed;
@@ -236,7 +242,12 @@ std::vector<TorrentItem::PeerInfo> TorrentItem::getPeers() const {
         if (p.flags & lt::peer_info::remote_interested) info.flags += "i";
         if (p.flags & lt::peer_info::remote_choked) info.flags += "c";
         if (p.flags & lt::peer_info::supports_extensions) info.flags += "e";
+#if LIBTORRENT_VERSION_NUM >= 20100
+        // local_connection was removed in libtorrent 2.1, outgoing_connection is equivalent.
+        if (p.flags & lt::peer_info::outgoing_connection) info.flags += "L";
+#else
         if (p.flags & lt::peer_info::local_connection) info.flags += "L";
+#endif
         
         result.push_back(info);
     }
@@ -250,7 +261,12 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
     auto info = m_handle.torrent_file();
     if (!info) return result;
 
+#if LIBTORRENT_VERSION_NUM >= 20100
+    // torrent_info::files() was removed in libtorrent 2.1, use layout() instead.
+    lt::file_storage const& fs = info->layout();
+#else
     lt::file_storage const& fs = info->files();
+#endif
     std::vector<int64_t> file_progress;
     m_handle.file_progress(file_progress);
 

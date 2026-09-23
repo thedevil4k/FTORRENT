@@ -3,6 +3,7 @@
 #include <libtorrent/read_resume_data.hpp>
 #include <libtorrent/alert_types.hpp>
 #include <libtorrent/torrent_info.hpp>
+#include <libtorrent/load_torrent.hpp>
 #include <iostream>
 #include <filesystem>
 #include <fstream>
@@ -120,7 +121,9 @@ bool TorrentSession::addTorrentFile(const std::string& torrentFile, const std::s
 
     try {
         lt::add_torrent_params params;
-        params.ti = std::make_shared<lt::torrent_info>(torrentFile);
+        // load_torrent_file() works on libtorrent 2.0 and 2.1
+        // (the torrent_info filename constructor was removed in 2.1).
+        params.ti = lt::load_torrent_file(torrentFile).ti;
         params.save_path = savePath;
         
         // Apply file priorities if provided

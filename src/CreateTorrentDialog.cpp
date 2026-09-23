@@ -5,6 +5,7 @@
 #include <FL/fl_ask.H>
 #include "PathUtils.h"
 #include <libtorrent/create_torrent.hpp>
+#include <libtorrent/version.hpp>
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/bencode.hpp>
 #include <libtorrent/file_storage.hpp>
@@ -283,9 +284,6 @@ void CreateTorrentDialog::processCreate() {
     // Hashing process in a basic way for now
     // In a real app, this should be in a thread with UI updates
     try {
-        lt::file_storage fs;
-        lt::add_files(fs, source);
-
         int pieceSize = 0;
         int choice = m_pieceSize->value();
         if (choice > 0) pieceSize = (16 * 1024) << (choice - 1);
@@ -295,7 +293,17 @@ void CreateTorrentDialog::processCreate() {
         // canonical_files is the modern equivalent for aligning and ordering files.
         if (m_optimizeAlignment->value()) flags |= lt::create_torrent::canonical_files;
 
+#if LIBTORRENT_VERSION_NUM >= 20100
+        // libtorrent 2.1+: add_files() and the file_storage constructor were removed.
+        // New API builds the file list as std::vector<create_file_entry>.
+        std::vector<lt::create_file_entry> files = lt::list_files(source, flags);
+        lt::create_torrent ct(std::move(files), pieceSize, flags);
+#else
+        lt::file_storage fs;
+        lt::add_files(fs, source);
+
         lt::create_torrent ct(fs, pieceSize, flags);
+#endif
         
         // Add trackers
         std::stringstream ss(m_trackers->value());

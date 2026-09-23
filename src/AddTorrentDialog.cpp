@@ -5,6 +5,9 @@
 #include <FL/Fl_File_Chooser.H>
 #include <FL/fl_ask.H>
 #include "PathUtils.h"
+#include <libtorrent/version.hpp>
+#include <libtorrent/load_torrent.hpp>
+#include <libtorrent/torrent_info.hpp>
 #include <iomanip>
 #include <filesystem>
 
@@ -241,8 +244,15 @@ void AddTorrentDialog::updateFileList(const std::string& torrentPath) {
     }
 
     try {
-        lt::torrent_info info(torrentPath);
-        auto const& fs = info.files();
+        // load_torrent_file() works on libtorrent 2.0 and 2.1
+        // (the torrent_info filename constructor was removed in 2.1).
+        lt::add_torrent_params atp = lt::load_torrent_file(torrentPath);
+#if LIBTORRENT_VERSION_NUM >= 20100
+        // torrent_info::files() was removed in 2.1, use layout() instead.
+        auto const& fs = atp.ti->layout();
+#else
+        auto const& fs = atp.ti->files();
+#endif
         
         for (int i = 0; i < fs.num_files(); ++i) {
             std::string fname = std::string(fs.file_name(lt::file_index_t(i)));
