@@ -75,11 +75,14 @@ case $OS in
         ;;
     arch|manjaro|cachyos|endeavouros|garuda)
         echo "Installing dependencies for Arch Linux..."
+        # 'cairo' provides <cairo.h> (/usr/include/cairo); Arch's fltk is built
+        # with Cairo support (FLTK_HAVE_CAIRO), so it is needed to compile.
         run_as_root pacman -S --needed --noconfirm \
             base-devel \
             cmake \
             boost \
             fltk \
+            cairo \
             libtorrent-rasterbar \
             libpng \
             libjpeg-turbo \

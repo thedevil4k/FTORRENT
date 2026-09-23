@@ -7,7 +7,10 @@ arch=('x86_64')
 url='https://github.com/thedevil4k/FTORRENT'
 license=('MIT')
 depends=('fltk' 'libtorrent-rasterbar' 'libpng' 'libjpeg-turbo' 'zlib')
-makedepends=('cmake' 'boost')
+# 'cairo' is required at build time: Arch's fltk is built with Cairo support
+# (FLTK_HAVE_CAIRO), so <FL/Fl_Cairo.H> includes <cairo.h> from
+# /usr/include/cairo, which is shipped by the cairo package.
+makedepends=('cmake' 'boost' 'cairo')
 source=()
 sha256sums=()
 

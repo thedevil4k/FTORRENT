@@ -164,9 +164,11 @@ jobs:
 
     - name: Build Arch Package
       run: |
+        # 'cairo' provides <cairo.h> (/usr/include/cairo) which is required
+        # because Arch's fltk is built with Cairo support (FLTK_HAVE_CAIRO).
         docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace archlinux:latest bash -c " \
           pacman -Syu --noconfirm && \
-          pacman -S --noconfirm --needed base-devel cmake boost fltk libtorrent-rasterbar libpng libjpeg-turbo zlib && \
+          pacman -S --noconfirm --needed base-devel cmake boost fltk libtorrent-rasterbar libpng libjpeg-turbo zlib cairo && \
           BUILD_DIR=build_linux_x86_64 bash scripts/linux/installers/create-linux-arch.sh && \
           chmod -R 777 build_linux_x86_64 \
         "

@@ -11,7 +11,31 @@ if(WIN32)
 endif()
 
 # Find FLTK
-find_package(FLTK REQUIRED COMPONENTS images)
+#
+# FLTK 1.4 installations ship their own CMake package (FLTKConfig.cmake) which
+# reports ALL include directories of the FLTK build, including those of optional
+# dependencies. This is required on distributions that build FLTK with Cairo
+# support enabled (e.g. Arch Linux): <FL/Fl_Cairo.H> then includes <cairo.h>,
+# which lives in <prefix>/include/cairo. CMake's legacy FindFLTK module does not
+# report that directory (and does not even set FLTK_INCLUDE_DIRS), which makes
+# the build fail with "cairo.h: No such file or directory".
+#
+# On Windows (vcpkg) the module is kept because it provides absolute library
+# paths, which is what the toolchain expects.
+if(WIN32)
+    find_package(FLTK REQUIRED COMPONENTS images)
+else()
+    find_package(FLTK CONFIG QUIET COMPONENTS images)
+    if(NOT FLTK_FOUND OR NOT FLTK_INCLUDE_DIRS OR NOT FLTK_LIBRARIES)
+        # Fallback: CMake's built-in FindFLTK module (FLTK 1.3.x < 1.4 installs)
+        find_package(FLTK REQUIRED COMPONENTS images)
+    endif()
+endif()
+
+# Include directory reported by CMake's legacy FindFLTK module; FLTK_INCLUDE_DIRS
+# stays empty when FLTK is found through that module.
+list(APPEND FLTK_INCLUDE_DIRS ${FLTK_INCLUDE_DIR})
+list(REMOVE_DUPLICATES FLTK_INCLUDE_DIRS)
 
 # Find Dependencies
 find_package(ZLIB REQUIRED)
