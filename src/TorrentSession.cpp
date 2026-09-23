@@ -349,7 +349,9 @@ void TorrentSession::processAlerts() {
     for (lt::alert* alert : alerts) {
         // Handle different alert types
         if (auto* err = lt::alert_cast<lt::torrent_error_alert>(alert)) {
-            std::string msg = std::string("Torrent error [") + err->torrent_name() + "]: " + err->message();
+            // torrent_alert::torrent_name() was removed in libtorrent 2.1 builds
+            // with deprecated functions disabled (vcpkg); use filename() instead.
+            std::string msg = std::string("Torrent error [") + err->filename() + "]: " + err->message();
             std::cerr << msg << std::endl;
             if (m_errorCallback) m_errorCallback(msg);
         }
@@ -371,7 +373,13 @@ void TorrentSession::processAlerts() {
             }
         }
         else if (auto* ma = lt::alert_cast<lt::metadata_received_alert>(alert)) {
-            std::cout << "Metadata received for: " << ma->torrent_name() << std::endl;
+            // torrent_alert::torrent_name() was removed in libtorrent 2.1 builds
+            // with deprecated functions disabled (vcpkg); get the name from torrent_file().
+            std::string metaName = "torrent";
+            try {
+                if (auto ti = ma->handle.torrent_file()) metaName = ti->name();
+            } catch (...) {}
+            std::cout << "Metadata received for: " << metaName << std::endl;
             ma->handle.save_resume_data();
         }
         else if (auto* rd = lt::alert_cast<lt::save_resume_data_alert>(alert)) {
