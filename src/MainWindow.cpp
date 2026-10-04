@@ -5,18 +5,30 @@
 #include "Resources.h"
 #include "SystemUtils.h"
 #include "PathUtils.h"
+#include "SearchManager.h"
+#include "HttpClient.h"
 #include <FL/Fl.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Input.H>
-#include <FL/fl_ask.H>
+#include <FL/fl_ask.H>   // fl_choice, fl_input, fl_alert, fl_message all live here
 #include <FL/Fl_Shared_Image.H>
 #include <FL/Fl_PNG_Image.H>
 #include <FL/Fl_Choice.H>
+#include <FL/Fl_Window.H>
 #include <FL/x.H>
+#include <fstream>
+#include <thread>
 #include <sstream>
 #include <cstdint>
+#include <cstring>
 #include <iomanip>
+#include <cctype>
+#include <cstdio>
+#include <algorithm>
+#include <filesystem>
+#include <system_error>
+#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -39,11 +51,26 @@ static std::string getFlagEmoji(std::string code) {
     return emoji;
 }
 
+std::atomic<bool> MainWindow::s_alive{true};
+
 MainWindow::MainWindow(int w, int h, const char* title)
     : Fl_Double_Window(w, h, title)
     , m_toolbar(nullptr)
+    , m_statusGroup(nullptr)
     , m_darkModeBtn(nullptr)
     , m_torrentList(nullptr)
+    , m_searchView(nullptr)
+    , m_searchInput(nullptr)
+    , m_btnSearchGo(nullptr)
+    , m_btnSearchCancel(nullptr)
+    , m_choiceSearchEngine(nullptr)
+    , m_choiceSearchCategory(nullptr)
+    , m_searchStatus(nullptr)
+    , m_searchResults(nullptr)
+    , m_searching(false)
+    , m_searchCancelled(false)
+    , m_searchGeneration(0)
+    , m_showSearchView(false)
     , m_statusBar(nullptr)
     , m_manager(nullptr)
     , m_brightIcon(nullptr)
@@ -56,7 +83,9 @@ MainWindow::MainWindow(int w, int h, const char* title)
     ,m_eyeOpenedIcon(nullptr)
     ,m_eyeClosedIcon(nullptr)
     ,m_limitModerate(false)
-    ,m_censored(false)
+    ,m_censored(false)    , m_showPublicIp(true)
+    , m_darkMode(true)
+    , m_toolbarLevel(0)
 {
     // Initialize image support
     fl_register_images();
@@ -133,7 +162,8 @@ MainWindow::MainWindow(int w, int h, const char* title)
 
     // Load eye icons
     m_censored = SettingsManager::instance().getIpCensored();
-    bool darkMode = SettingsManager::instance().getDarkMode();
+    m_showPublicIp = SettingsManager::instance().getShowPublicIp();
+    bool darkMode = m_darkMode;
     
     std::string openedFile = darkMode ? "eye_opened_bright.png" : "eye_opened_dark.png";
     std::string closedFile = darkMode ? "eye_closed_bright.png" : "eye_closed_dark.png";
@@ -156,11 +186,16 @@ MainWindow::MainWindow(int w, int h, const char* title)
 
     createToolbar();
     createTorrentList();
+    createSearchView();
+    loadSearchEngines();
     createStatusBar();
     
     applyTheme();
     
     resizable(m_torrentList);
+// Minimum size so the toolbar and the torrent list stay usable.
+// 720px is enough for the icon-only toolbar level.
+size_range(720, 480);
     end();
     
     // Restore window state
@@ -177,6 +212,8 @@ MainWindow::MainWindow(int w, int h, const char* title)
 }
 
 MainWindow::~MainWindow() {
+    // Stop any worker thread from handing data back to a window that is gone
+    s_alive = false;
 #ifdef _WIN32
     removeTrayIcon();
 #endif
@@ -206,6 +243,7 @@ void MainWindow::createToolbar() {
     m_btnAdd = new Fl_Button(0, 0, 130, 30, " Add Torrent");
     m_btnAdd->box(FL_FLAT_BOX);
     m_btnAdd->callback(onAddTorrent, this);
+    m_btnAdd->tooltip("Add Torrent");
     if (m_addIcon) {
         m_btnAdd->image(m_addIcon);
         m_btnAdd->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
@@ -215,14 +253,15 @@ void MainWindow::createToolbar() {
     m_btnCreate = new Fl_Button(0, 0, 130, 30, " Create Torrent");
     m_btnCreate->box(FL_FLAT_BOX);
     m_btnCreate->callback(onCreateTorrent, this);
+    m_btnCreate->tooltip("Create Torrent");
     if (m_createIcon) { 
         m_btnCreate->image(m_createIcon);
         m_btnCreate->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
     }
     
     // Spacer
-    Fl_Box* spacer1 = new Fl_Box(0, 0, 20, 30);
-    spacer1->box(FL_NO_BOX);
+    m_spacer1 = new Fl_Box(0, 0, 20, 30);
+    m_spacer1->box(FL_NO_BOX);
     
     // Toggle Pause/Resume button
     m_btnTogglePause = new Fl_Button(0, 0, 40, 30);
@@ -243,16 +282,17 @@ void MainWindow::createToolbar() {
     }
     
     // Spacer
-    Fl_Box* spacer2 = new Fl_Box(0, 0, 20, 30);
-    spacer2->box(FL_NO_BOX);
+    m_spacer2 = new Fl_Box(0, 0, 20, 30);
+    m_spacer2->box(FL_NO_BOX);
     
     // Preferences button
-    Fl_Button* btnPrefs = new Fl_Button(0, 0, 120, 30, "Preferences");
-    btnPrefs->box(FL_FLAT_BOX);
-    btnPrefs->callback(onPreferences, this);
+    m_btnPrefs = new Fl_Button(0, 0, 120, 30, "Preferences");
+    m_btnPrefs->box(FL_FLAT_BOX);
+    m_btnPrefs->callback(onPreferences, this);
+    m_btnPrefs->tooltip("Preferences");
     if (Resources::getSettingsIcon()) {
-        btnPrefs->image(Resources::getSettingsIcon());
-        btnPrefs->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
+        m_btnPrefs->image(Resources::getSettingsIcon());
+        m_btnPrefs->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
     }
     
     // Theme button
@@ -296,22 +336,291 @@ void MainWindow::createToolbar() {
     m_btnLimit->tooltip("Limit network speed");
     m_btnLimit->callback(onToggleLimit, this);
     
+    // Search toggle, last on the right. Fl_Pack lays children out in creation
+    // order, so creating it here puts it at the far right of the toolbar.
+    m_btnSearch = new Fl_Button(0, 0, 40, 30);
+    m_btnSearch->box(FL_FLAT_BOX);
+    m_btnSearch->tooltip("Search torrents");
+    m_btnSearch->callback(onSearchToggle, this);
+    if (Resources::getSearchIcon()) {
+        m_btnSearch->image(Resources::getSearchIcon());
+    }
+    
     m_toolbar->end();
+    
+    // Start from the widest layout and let resize() narrow it down if needed
+    layoutToolbar(w());
 }
 
 void MainWindow::createTorrentList() {
     int y = MENU_HEIGHT + TOOLBAR_HEIGHT;
     int list_h = h() - y - STATUS_HEIGHT;
     
+    // TorrentListWidget's constructor already restores the current group with
+    // its own end(), so the widgets created after this still land in the window.
     m_torrentList = new TorrentListWidget(0, y, w(), list_h);
+}
+
+// The search view is a panel below the toolbar: the toolbar stays untouched
+// and visible, only the area where the torrent list lives is replaced.
+// Child coordinates are absolute (window) coordinates, as everywhere in FLTK.
+void MainWindow::createSearchView() {
+    int y = MENU_HEIGHT + TOOLBAR_HEIGHT;
+    int viewH = h() - y - STATUS_HEIGHT;
+    int barY = y + 4;
+    int barH = SEARCH_BAR_HEIGHT - 10;
+    
+    m_searchView = new Fl_Group(0, y, w(), viewH);
+    m_searchView->box(FL_FLAT_BOX);
+    m_searchView->begin();
+    
+    // --- Bar: engine chooser, category, query, buttons ---
+    m_choiceSearchEngine = new Fl_Choice(10, barY, 150, barH);
+    m_choiceSearchEngine->box(FL_FLAT_BOX);
+    m_choiceSearchEngine->tooltip("Search engine");
+    m_choiceSearchEngine->callback([](Fl_Widget* w, void* data) {
+        MainWindow* win = (MainWindow*)data;
+        if (win) win->updateCategoryChoice();
+    }, this);
+    
+    m_choiceSearchCategory = new Fl_Choice(165, barY, 95, barH);
+    m_choiceSearchCategory->box(FL_FLAT_BOX);
+    m_choiceSearchCategory->tooltip("Category (depends on the engine)");
+    m_choiceSearchCategory->hide();   // only engines with categories show it
+    
+    m_searchInput = new Fl_Input(170, barY, 300, barH);
+    m_searchInput->tooltip("Type what to look for and press Enter");
+    m_searchInput->when(FL_WHEN_ENTER_KEY);
+    m_searchInput->callback([](Fl_Widget* w, void* data) {
+        MainWindow* win = (MainWindow*)data;
+        if (win) win->startSearch();
+    }, this);
+    
+    m_btnSearchGo = new Fl_Button(480, barY, 80, barH, "Search");
+    m_btnSearchGo->callback(onSearchGo, this);
+    
+    // Cancel, in red because it aborts the running search
+    m_btnSearchCancel = new Fl_Button(795, barY, 100, barH, "Cancel");
+    m_btnSearchCancel->box(FL_DOWN_BOX);
+    m_btnSearchCancel->labelsize(13);
+    m_btnSearchCancel->labelcolor(FL_RED);
+    m_btnSearchCancel->selection_color(fl_rgb_color(200, 60, 60));
+    m_btnSearchCancel->color(fl_rgb_color(64, 20, 20));
+    m_btnSearchCancel->tooltip("Stop the search in progress");
+    m_btnSearchCancel->callback(onSearchCancelClick, this);
+    m_btnSearchCancel->hide();   // only while searching
+    
+    // --- Status line, under the bar and above the results ---
+    int stY = y + SEARCH_BAR_HEIGHT;
+    m_searchStatus = new Fl_Box(10, stY, w() - 20, SEARCH_STATUS_HEIGHT,
+                                "Type something and press Enter");
+    m_searchStatus->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    m_searchStatus->labelsize(11);
+    m_searchStatus->labelcolor(fl_rgb_color(120, 120, 120));
+    
+    // --- Results fill the rest ---
+    int resY = stY + SEARCH_STATUS_HEIGHT;
+    int resH = h() - resY - STATUS_HEIGHT;
+    m_searchResults = new SearchResultsWidget(0, resY, w(), resH);
+    // (SearchResultsWidget's constructor already restores the current group)
+    
+    m_searchView->end();
+    
+    // Results go straight to the add dialog, same as a dropped .torrent file
+    m_searchResults->setOnDownloadCallback([this](const SearchResult& r) {
+        showAddTorrentDialog("", r.magnet);
+        switchView(false);
+    });
+    
+    m_searchView->hide();   // Torrent list is what you see first
+    
+    layoutSearchViewContents(w());   // replace the hardcoded bar widths
+}
+
+void MainWindow::switchView(bool showSearch) {
+    m_showSearchView = showSearch;
+    
+    if (m_searchView) {
+        if (showSearch) m_searchView->show();
+        else m_searchView->hide();
+    }
+    if (m_torrentList) {
+        if (showSearch) m_torrentList->hide();
+        else m_torrentList->show();
+    }
+    if (m_btnSearch) {
+        m_btnSearch->tooltip(showSearch ? "Back to my torrents" : "Search torrents");
+    }
+    
+    // Re-run the layout: one view appeared and the other disappeared
+    layoutSearchView();
+    redraw();
+}
+
+// Positions whichever view is visible in the rectangle below the toolbar.
+void MainWindow::layoutSearchView() {
+    int y = MENU_HEIGHT + TOOLBAR_HEIGHT;
+    int listH = h() - y - STATUS_HEIGHT;
+    if (listH < 40) listH = 40;
+    int viewW = w();
+    
+    if (m_showSearchView) {
+        if (m_searchView) m_searchView->resize(0, y, viewW, listH);
+        layoutSearchViewContents(viewW);
+    } else if (m_torrentList) {
+        m_torrentList->resize(0, y, viewW, listH);
+    }
+}
+
+void MainWindow::layoutSearchViewContents(int available) {
+    int y = MENU_HEIGHT + TOOLBAR_HEIGHT;
+    int barY = y + 4;
+    int barH = SEARCH_BAR_HEIGHT - 10;
+    
+    // The query field takes whatever the fixed-width widgets leave, so the
+    // bar adapts to the window instead of clipping the buttons.
+    // Positions: 10 | engine | 5 | category? | 5 | input | 5 | Search
+    const int wGo = 80, wCancel = 100;
+    const int MARGIN_L = 10, MARGIN_R = 10, GAP = 5;
+    int wEngine = (available < 820) ? 120 : 150;
+    int wCat = (m_choiceSearchCategory && m_choiceSearchCategory->visible()) ? 95 : 0;
+    int fixed = MARGIN_L + wEngine + GAP + wCat + (wCat > 0 ? GAP : 0)
+              + GAP + wGo
+              + GAP + wCancel + MARGIN_R;
+    int wInput = available - fixed;
+    if (wInput < 120) wInput = 120;
+    
+    m_choiceSearchEngine->resize(MARGIN_L, barY, wEngine, barH);
+    int cx = MARGIN_L + wEngine + GAP;
+    if (wCat > 0 && m_choiceSearchCategory) {
+        m_choiceSearchCategory->resize(cx, barY, wCat, barH);
+        cx += wCat + GAP;
+    }
+    m_searchInput->resize(cx, barY, wInput, barH);
+    
+    int bx = cx + wInput + GAP;
+    m_btnSearchGo->resize(bx, barY, wGo, barH);
+    bx += wGo + GAP;
+    if (m_btnSearchCancel) m_btnSearchCancel->resize(bx, barY, wCancel, barH);
+    
+    // Status line spans the panel so long messages are not cut off
+    int stY = y + SEARCH_BAR_HEIGHT;
+    m_searchStatus->resize(MARGIN_L, stY, available - MARGIN_L - MARGIN_R, SEARCH_STATUS_HEIGHT);
+    
+    int resY = stY + SEARCH_STATUS_HEIGHT;
+    int resH = h() - resY - STATUS_HEIGHT;
+    if (resH < 40) resH = 40;
+    
+    if (m_searchResults) {
+        m_searchResults->resize(0, resY, available, resH);
+    }
+}
+
+// The toolbar has no layout manager that shrinks widgets for us: Fl_Pack lays
+// every child out at the width it was constructed with, and if they add up to
+// more than the window it grows past the window edge instead. So we pick a
+// level of detail from the space available and set the widths ourselves.
+//
+//   2 = full text, 1 = short text, 0 = icons only
+void MainWindow::layoutToolbar(int available) {
+    if (!m_toolbar) return;
+    
+    // Widths needed by each level, including Fl_Pack's 5px spacing (gaps between
+    // the 11 children, so 10 gaps).
+    //   770+50 = 820px -> full text
+    //   586+50 = 636px -> short text
+    //   360+50 = 410px -> icons only (safety net, below the 720px minimum)
+    const int FULL  = 130 + 130 + 20 + 40 + 40 + 20 + 120 + 30 + 50 + 40 + 150;
+    const int SHORT =  90 +  95 +  8 + 40 + 40 +  8 +  75 + 30 + 50 + 40 + 110;
+    const int ICONS =  40 +  40 +  0 + 40 + 40 +  0 +  40 + 30 + 50 + 40 +  40;
+    const int SPACING = 5;
+    const int GAPS = 10;   // 11 children
+    
+    int level;
+    if (available >= FULL + SPACING * GAPS) {
+        level = 2;
+    } else if (available >= SHORT + SPACING * GAPS) {
+        level = 1;
+    } else {
+        level = 0;
+    }
+    
+    if (level == m_toolbarLevel) return; // Nothing changed, don't churn the UI
+    m_toolbarLevel = level;
+    
+    switch (level) {
+        case 2:
+            m_btnAdd->label(" Add Torrent");
+            m_btnAdd->resize(m_btnAdd->x(), m_btnAdd->y(), 130, m_btnAdd->h());
+            m_btnCreate->label(" Create Torrent");
+            m_btnCreate->resize(m_btnCreate->x(), m_btnCreate->y(), 130, m_btnCreate->h());
+            m_spacer1->show(); m_spacer1->resize(m_spacer1->x(), m_spacer1->y(), 20, m_spacer1->h());
+            m_btnPrefs->label("Preferences");
+            m_btnPrefs->resize(m_btnPrefs->x(), m_btnPrefs->y(), 120, m_btnPrefs->h());
+            m_spacer2->show(); m_spacer2->resize(m_spacer2->x(), m_spacer2->y(), 20, m_spacer2->h());
+            break;
+            
+        case 1:
+            m_btnAdd->label(" Add");
+            m_btnAdd->resize(m_btnAdd->x(), m_btnAdd->y(), 90, m_btnAdd->h());
+            m_btnCreate->label(" Create");
+            m_btnCreate->resize(m_btnCreate->x(), m_btnCreate->y(), 95, m_btnCreate->h());
+            m_spacer1->show(); m_spacer1->resize(m_spacer1->x(), m_spacer1->y(), 8, m_spacer1->h());
+            m_btnPrefs->label("Prefs");
+            m_btnPrefs->resize(m_btnPrefs->x(), m_btnPrefs->y(), 75, m_btnPrefs->h());
+            m_spacer2->show(); m_spacer2->resize(m_spacer2->x(), m_spacer2->y(), 8, m_spacer2->h());
+            break;
+            
+        default:
+            // Icons only: no room for any text
+            m_btnAdd->label(nullptr);
+            m_btnAdd->resize(m_btnAdd->x(), m_btnAdd->y(), 40, m_btnAdd->h());
+            m_btnCreate->label(nullptr);
+            m_btnCreate->resize(m_btnCreate->x(), m_btnCreate->y(), 40, m_btnCreate->h());
+            m_spacer1->hide(); m_spacer1->resize(m_spacer1->x(), m_spacer1->y(), 0, m_spacer1->h());
+            m_btnPrefs->label(nullptr);
+            m_btnPrefs->resize(m_btnPrefs->x(), m_btnPrefs->y(), 40, m_btnPrefs->h());
+            m_spacer2->hide(); m_spacer2->resize(m_spacer2->x(), m_spacer2->y(), 0, m_spacer2->h());
+            break;
+    }
+    
+    // Fixed-size buttons never change
+    m_btnTogglePause->resize(m_btnTogglePause->x(), m_btnTogglePause->y(), 40, m_btnTogglePause->h());
+    m_btnRemove->resize(m_btnRemove->x(), m_btnRemove->y(), 40, m_btnRemove->h());
+    m_darkModeBtn->resize(m_darkModeBtn->x(), m_darkModeBtn->y(), 30, m_darkModeBtn->h());
+    m_choiceRamMode->resize(m_choiceRamMode->x(), m_choiceRamMode->y(), 50, m_choiceRamMode->h());
+    m_btnSearch->resize(m_btnSearch->x(), m_btnSearch->y(), 40, m_btnSearch->h());
+    
+    // The limit button keeps some text even at the narrowest level
+    m_btnLimit->resize(m_btnLimit->x(), m_btnLimit->y(),
+                        level == 2 ? 150 : (level == 1 ? 110 : 40),
+                        m_btnLimit->h());
+    applyLimitLabel();
+    
+    m_toolbar->redraw();
+}
+
+// Kept in its own function because both the layout and the toggle need it,
+// and the wording depends on how much room the toolbar currently has.
+void MainWindow::applyLimitLabel() {
+    if (!m_btnLimit) return;
+    
+    if (m_toolbarLevel == 0) {
+        m_btnLimit->label(nullptr);   // Icon-only level
+    } else if (m_toolbarLevel == 1) {
+        m_btnLimit->label(m_limitModerate ? " NET: 50%" : " NET: OFF");
+    } else {
+        m_btnLimit->label(m_limitModerate ? "LIMIT NET SPEED: 50%" : "LIMIT NET SPEED: OFF");
+    }
+    m_btnLimit->redraw();
 }
 
 void MainWindow::createStatusBar() {
     int y = h() - STATUS_HEIGHT;
     
-    Fl_Group* statusGroup = new Fl_Group(0, y, w(), STATUS_HEIGHT);
-    statusGroup->box(FL_DOWN_BOX);
-    statusGroup->begin();
+    m_statusGroup = new Fl_Group(0, y, w(), STATUS_HEIGHT);
+    m_statusGroup->box(FL_DOWN_BOX);
+    m_statusGroup->begin();
     
     // Status text (flexible width)
     m_statusBar = new Fl_Box(2, y + 2, w() - 35, STATUS_HEIGHT - 4);
@@ -325,14 +634,41 @@ void MainWindow::createStatusBar() {
     m_btnCensor->callback(onToggleCensorship, this);
     m_btnCensor->tooltip("Hide/Show Sensitive Info");
     
-    if (m_censored && m_eyeClosedIcon) {
-        m_btnCensor->image(m_eyeClosedIcon);
-    } else if (!m_censored && m_eyeOpenedIcon) {
-        m_btnCensor->image(m_eyeOpenedIcon);
+    m_statusGroup->end();
+    m_statusGroup->resizable(m_statusBar); // Text box takes extra space
+    
+    updateCensorButtonState();
+}
+
+void MainWindow::updateCensorButtonState() {
+    if (!m_btnCensor) return;
+    
+    // The eye button only makes sense while the public IP is shown at all
+    if (m_showPublicIp) {
+        m_btnCensor->show();
+        if (m_censored && m_eyeClosedIcon) {
+            m_btnCensor->image(m_eyeClosedIcon);
+        } else if (!m_censored && m_eyeOpenedIcon) {
+            m_btnCensor->image(m_eyeOpenedIcon);
+        }
+    } else {
+        m_btnCensor->hide();
+        m_btnCensor->image(nullptr);
     }
     
-    statusGroup->end();
-    statusGroup->resizable(m_statusBar); // Text box takes extra space
+    // Give the freed space back to the status text
+    if (m_statusBar && m_statusGroup) {
+        int rightMargin = m_showPublicIp ? 35 : 8;
+        m_statusBar->resize(2, m_statusBar->y(), m_statusGroup->w() - rightMargin, m_statusBar->h());
+        m_statusBar->redraw();
+    }
+    
+    // Keep the eye button pinned to the right edge of the status bar
+    if (m_btnCensor && m_statusGroup) {
+        m_btnCensor->resize(m_statusGroup->w() - 30, m_statusGroup->y() + 2, 26, STATUS_HEIGHT - 4);
+    }
+    
+    m_btnCensor->redraw();
 }
 
 void MainWindow::setTorrentManager(TorrentManager* manager) {
@@ -442,7 +778,7 @@ void MainWindow::updateToolbar() {
 }
 
 void MainWindow::applyTheme() {
-    bool darkMode = SettingsManager::instance().getDarkMode();
+    bool darkMode = m_darkMode;
     
     if (darkMode) {
         // Dark Mode Colors
@@ -506,16 +842,13 @@ void MainWindow::applyTheme() {
     delete imgTemp;
 
     if (m_btnCensor) {
-        if (m_censored && m_eyeClosedIcon) m_btnCensor->image(m_eyeClosedIcon);
-        else if (!m_censored && m_eyeOpenedIcon) m_btnCensor->image(m_eyeOpenedIcon);
-        
         if (darkMode) {
             m_btnCensor->color(fl_rgb_color(20, 20, 20));
         } else {
             m_btnCensor->color(fl_rgb_color(225, 225, 225));
         }
-        m_btnCensor->redraw();
     }
+    updateCensorButtonState();
     
     // Aplicar a todos los widgets existentes
     for (int i = 0; i < children(); i++) {
@@ -525,7 +858,10 @@ void MainWindow::applyTheme() {
     // Forzamos el rediseño de la ventana y sus hijos
     redraw();
     if (m_torrentList) {
-        m_torrentList->redraw();
+        m_torrentList->refreshThemeColors(darkMode);
+    }
+    if (m_searchResults) {
+        m_searchResults->applyTheme(darkMode);
     }
     
     if (m_btnLimit) {
@@ -552,9 +888,11 @@ void MainWindow::applyTheme() {
 }
 
 void MainWindow::toggleDarkMode() {
-    bool current = SettingsManager::instance().getDarkMode();
-    SettingsManager::instance().setDarkMode(!current);
-    SettingsManager::instance().save();
+    // Session only, on purpose. This used to be written to settings.ini, which
+    // is how a machine that had ever been left in light mode started light
+    // from then on. Nothing is persisted now: the next launch is dark whatever
+    // this button did here.
+    m_darkMode = !m_darkMode;
     applyTheme();
 }
 
@@ -562,8 +900,7 @@ void MainWindow::toggleNetworkLimit() {
     m_limitModerate = !m_limitModerate;
     
     if (m_btnLimit) {
-        m_btnLimit->label(m_limitModerate ? "LIMIT NET SPEED: 50%" : "LIMIT NET SPEED: OFF");
-        m_btnLimit->redraw();
+        applyLimitLabel();
     }
     
     if (m_manager) {
@@ -591,18 +928,15 @@ void MainWindow::toggleNetworkLimit() {
 }
 
 void MainWindow::toggleCensorship() {
+    if (!m_showPublicIp) {
+        return; // Nothing to censor while the public IP is disabled
+    }
+    
     m_censored = !m_censored;
     SettingsManager::instance().setIpCensored(m_censored);
     SettingsManager::instance().save();
     
-    if (m_btnCensor) {
-        if (m_censored && m_eyeClosedIcon) {
-            m_btnCensor->image(m_eyeClosedIcon);
-        } else if (!m_censored && m_eyeOpenedIcon) {
-            m_btnCensor->image(m_eyeOpenedIcon);
-        }
-        m_btnCensor->redraw();
-    }
+    updateCensorButtonState();
     updateStatusBar();
 }
 
@@ -633,12 +967,15 @@ std::string MainWindow::formatStatusBar() const {
     // Add Application Version
     oss << "  |  FTORRENT " << VERSION;
     
-    std::string ip = m_manager->getPublicIp();
-    if (!ip.empty()) {
-        if (m_censored) {
-            oss << "  |  IP: ***.***.***.*** " << getFlagEmoji(m_manager->getCountryCode());
-        } else {
-            oss << "  |  IP: " << ip << " " << getFlagEmoji(m_manager->getCountryCode());
+    // Public IP (only when enabled in Preferences; the flag is hidden too while censored)
+    if (m_showPublicIp) {
+        std::string ip = m_manager->getPublicIp();
+        if (!ip.empty()) {
+            if (m_censored) {
+                oss << "  |  IP: ***.***.***.***";
+            } else {
+                oss << "  |  IP: " << ip << " " << getFlagEmoji(m_manager->getCountryCode());
+            }
         }
     }
     
@@ -695,6 +1032,11 @@ void MainWindow::showPreferencesDialog() {
     
     if (dlg->show_modal()) {
         // Settings were saved, might need to apply some changes
+        auto& settings = SettingsManager::instance();
+        m_censored = settings.getIpCensored();
+        m_showPublicIp = settings.getShowPublicIp();
+        updateCensorButtonState();
+        updateStatusBar();
         updateUI();
     }
     
@@ -770,6 +1112,14 @@ void MainWindow::restoreWindowState() {
     auto& settings = SettingsManager::instance();
     settings.load();
     
+    // restoreWindowState() runs after the constructor already read these flags,
+    // and this load() just replaced the in-memory map with what is on disk, so
+    // they have to be read again or the saved value would be ignored.
+    m_censored = settings.getIpCensored();
+    m_showPublicIp = settings.getShowPublicIp();
+    updateCensorButtonState();
+    updateStatusBar();
+    
     int win_x = settings.getWindowX();
     int win_y = settings.getWindowY();
     int win_w = settings.getWindowWidth();
@@ -807,8 +1157,26 @@ int MainWindow::handle(int event) {
 void MainWindow::resize(int x, int y, int w, int h) {
     Fl_Double_Window::resize(x, y, w, h);
     
-    // Status bar is handled by FLTK if resizable is set.
-    // Dashboard widgets in toolbar are positioned by Fl_Pack.
+    // Only m_torrentList is resizable, so FLTK grows/shrinks just that one.
+    // Everything else has to be repositioned by hand, otherwise the toolbar
+    // and the status bar keep their construction geometry and the status bar
+    // ends up floating in the middle of the window (hiding the scrollbar).
+    int listH = h - MENU_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT;
+    if (listH < 40) listH = 40;
+    
+    if (m_toolbar) {
+        m_toolbar->resize(0, MENU_HEIGHT, w, TOOLBAR_HEIGHT);
+        layoutToolbar(w);   // Narrow the toolbar down to what actually fits
+    }
+    if (m_torrentList) {
+        m_torrentList->resize(0, MENU_HEIGHT + TOOLBAR_HEIGHT, w, listH);
+    }
+    layoutSearchView();
+    if (m_statusGroup) {
+        int sy = h - STATUS_HEIGHT;
+        m_statusGroup->resize(0, sy, w, STATUS_HEIGHT);
+        updateCensorButtonState(); // repositions the eye button and the status text
+    }
 }
 
 #ifdef _WIN32
@@ -988,6 +1356,316 @@ void MainWindow::onToggleCensorship(Fl_Widget* w, void* data) {
     ((MainWindow*)data)->toggleCensorship();
 }
 
+void MainWindow::onSearchToggle(Fl_Widget* w, void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (win) win->switchView(!win->m_showSearchView);
+}
+
+void MainWindow::onSearchGo(Fl_Widget* w, void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (win) win->startSearch();
+}
+
+void MainWindow::setSearchStatus(const std::string& text) {
+    if (m_searchStatus) {
+        m_searchStatus->copy_label(text.c_str());
+        m_searchStatus->redraw();
+    }
+}
+
+// Rebuilds the engine dropdown from SearchManager
+void MainWindow::updateEngineChoice() {
+    if (!m_choiceSearchEngine) return;
+    
+    m_choiceSearchEngine->clear();
+    int index = 0;
+    for (const auto& d : SearchManager::instance().engines()) {
+        if (!d.enabled) continue;
+        m_choiceSearchEngine->add(d.name.c_str());
+        index++;
+    }
+    if (index > 0) m_choiceSearchEngine->value(0);
+    m_choiceSearchEngine->redraw();
+    updateCategoryChoice();
+}
+
+// Rebuilds the category dropdown from the selected engine. Engines with a
+// single (or no) category hide the widget and always search "all".
+void MainWindow::updateCategoryChoice() {
+    if (!m_choiceSearchCategory) return;
+    
+    const SearchEngine::Definition* def = nullptr;
+    if (m_choiceSearchEngine && m_choiceSearchEngine->value() >= 0) {
+        int chosen = 0;
+        for (const auto& d : SearchManager::instance().engines()) {
+            if (!d.enabled) continue;
+            if (chosen++ == m_choiceSearchEngine->value()) {
+                def = &d;
+                break;
+            }
+        }
+    }
+    
+    m_choiceSearchCategory->clear();
+    if (!def || def->categories.size() < 2) {
+        m_choiceSearchCategory->hide();
+    } else {
+        int allAt = -1;
+        int index = 0;
+        for (const auto& kv : def->categories) {
+            m_choiceSearchCategory->add(kv.first.c_str());
+            if (kv.first == "All" || kv.first == "all") allAt = index;
+            index++;
+        }
+        m_choiceSearchCategory->value(allAt >= 0 ? allAt : 0);
+        m_choiceSearchCategory->show();
+    }
+    m_choiceSearchCategory->redraw();
+    if (m_searchView && m_searchView->visible()) {
+        layoutSearchViewContents(w());
+        redraw();
+    }
+}
+
+void MainWindow::loadSearchEngines() {
+    // Only predefined engines: the catalogue lives in the code, so there is
+    // nothing to load, merge or save. Stale plugin files from older versions
+    // are ignored on purpose.
+    SearchManager::instance().clear();
+    for (const auto& d : SearchEngine::builtinEngines()) {
+        SearchManager::instance().addEngine(d);
+    }
+    updateEngineChoice();
+}
+
+// Runs the query on a worker thread and hands the results back to the UI
+// thread through Fl::awake, since widgets may only be touched from there.
+void MainWindow::startSearch() {
+    if (m_searching) {
+        // A new search replaces the previous one instead of piling up: the old
+        // thread sees the flag and stops at its next checkpoint, and the new one
+        // takes over the flag below. Rows already shown are cleared once the
+        // previous thread hands the state back, so the two never interleave.
+        m_searchCancelled = true;
+        if (m_btnSearchCancel) m_btnSearchCancel->deactivate();
+    }
+    
+    if (!m_choiceSearchEngine || m_choiceSearchEngine->value() < 0) {
+        setSearchStatus("No search engine available");
+        return;
+    }
+    
+    std::string query = m_searchInput ? m_searchInput->value() : "";
+    if (query.empty()) {
+        setSearchStatus("Type something and press Enter");
+        return;
+    }
+    
+    std::vector<SearchEngine::Definition> engines;
+    int chosen = 0;
+    for (const auto& d : SearchManager::instance().engines()) {
+        if (!d.enabled) continue;
+        if (chosen++ == m_choiceSearchEngine->value()) {
+            engines.push_back(d);
+            break;
+        }
+    }
+    if (engines.empty()) {
+        setSearchStatus("No search engine available");
+        return;
+    }
+    
+    // Category of the selected engine, or "all" when it declares none.
+    std::string category = "all";
+    if (m_choiceSearchCategory && m_choiceSearchCategory->visible() &&
+        m_choiceSearchCategory->value() >= 0) {
+        const char* picked = m_choiceSearchCategory->text(m_choiceSearchCategory->value());
+        if (picked && picked[0] != '\0') category = picked;
+    }
+    
+    // Each search gets a number, so a thread that was superseded can tell that
+    // it no longer owns the state and hand it back untouched.
+    const unsigned long generation = ++m_searchGeneration;
+    m_searching = true;
+    m_searchCancelled = false;
+    setSearchStatus("Searching...");
+    if (m_searchResults) m_searchResults->clear();
+    {
+        // The generation was just bumped above, so no batch from the search
+        // being replaced can be parked after this point. Whatever it had
+        // already parsed is dropped here: the table was just emptied, and
+        // those rows belong to a search the user has moved on from.
+        std::lock_guard<std::mutex> lock(m_searchMutex);
+        m_pendingBatch.clear();
+    }
+    if (m_btnSearchCancel) m_btnSearchCancel->show();
+    if (m_btnSearchGo) m_btnSearchGo->deactivate();
+    m_toolbar->redraw();
+    
+    std::thread([this, query, engines, generation, category]() {
+        SearchEngine engine(engines[0]);
+        
+        auto isCurrent = [this, generation]() {
+            return generation == m_searchGeneration;
+        };
+        
+        // Rows are delivered as they are parsed rather than all at the end, so a
+        // slow site fills the table progressively. Fl::awake only takes a plain
+        // function, so the batch is parked under the mutex and picked up there.
+        std::string error;
+        engine.searchStreaming(query,
+            [this, isCurrent, generation](const std::vector<SearchResult>& batch) {
+                if (batch.empty() || !isCurrent()) return;
+                {
+                    std::lock_guard<std::mutex> lock(m_searchMutex);
+                    // Checked again with the lock held: a new search may have
+                    // taken over between the test above and this line, and its
+                    // table was cleared. Parking a batch from the superseded
+                    // search now would mix its rows into the new results.
+                    if (generation != m_searchGeneration.load()) return;
+                    m_pendingBatch.push_back(batch);
+                }
+                Fl::awake(&MainWindow::handleSearchBatch, this);
+            },
+            [this, isCurrent]() { return !isCurrent() || m_searchCancelled.load(); },
+            error,
+            category,
+            [this, isCurrent](const std::string& stage) {
+                if (!isCurrent() || stage.empty()) return;
+                {
+                    std::lock_guard<std::mutex> lock(m_searchMutex);
+                    m_pendingStatus = stage;
+                }
+                Fl::awake(&MainWindow::handleSearchStatus, this);
+            });
+        
+        // A newer search took over while this one was running: leave the state,
+        // the table and the buttons to it.
+        if (!isCurrent()) return;
+        
+        {
+            std::lock_guard<std::mutex> lock(m_searchMutex);
+            m_pendingSearch.results.clear();
+            m_pendingSearch.engine = engines[0].name;
+            m_pendingSearch.error = error;
+        }
+        Fl::awake(&MainWindow::handleSearchDone, this);
+    }).detach();
+}
+
+void MainWindow::appendSearchResults(const std::vector<SearchResult>& batch) {
+    if (m_searchResults) m_searchResults->appendResults(batch);
+}
+
+void MainWindow::onSearchCancelClick(Fl_Widget* w, void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (!win || !win->m_searching) return;
+    
+    // The flag alone is enough to stop an in-flight request: it is checked
+    // several times per second by the transfer, so the worker unwinds on its
+    // own and the UI is put back in order right away instead of after it.
+    win->m_searchCancelled = true;
+    win->m_searching = false;
+    win->setSearchStatus("Search cancelled");
+    
+    if (win->m_btnSearchCancel) win->m_btnSearchCancel->hide();
+    if (win->m_btnSearchGo) win->m_btnSearchGo->activate();
+    if (win->m_searchResults) {
+        int found = win->m_searchResults->rowCount();
+        if (found > 0) {
+            win->setSearchStatus("Cancelled with " + std::to_string(found) +
+                                 " results so far");
+        }
+    }
+    
+    // Bumping the generation tells the worker thread that its results no longer
+    // belong on screen, so nothing lands in the table after the cancel.
+    ++win->m_searchGeneration;
+}
+
+// Paints the results parsed by the search thread, so rows appear while the
+// search runs. Every batch waiting is painted, not just one: Fl::awake() wakes
+// the UI once per batch but the payload is parked in m_pendingBatch, so taking
+// a single slot silently threw away every batch but the last.
+void MainWindow::handleSearchBatch(void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (!win || !s_alive) return;
+    
+    // The whole queue moves out at once, so each batch is appended exactly
+    // once no matter how many times the UI thread is woken for it.
+    std::deque<std::vector<SearchResult>> batches;
+    {
+        std::lock_guard<std::mutex> lock(win->m_searchMutex);
+        batches.swap(win->m_pendingBatch);
+    }
+    if (batches.empty() || !win->m_searchResults) return;
+    
+    // Painted in the order the search produced them, so the table keeps the
+    // engine's ordering until the user re-sorts it by clicking a header.
+    for (const auto& batch : batches) {
+        if (!batch.empty()) win->appendSearchResults(batch);
+    }
+    win->setSearchStatus("Found " +
+        std::to_string(win->m_searchResults->rowCount()) + " results...");
+}
+
+// Restores the search controls once the worker thread is done.
+void MainWindow::handleSearchDone(void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (!win || !s_alive) return;
+    
+    PendingSearch pending;
+    {
+        std::lock_guard<std::mutex> lock(win->m_searchMutex);
+        pending = win->m_pendingSearch;
+        win->m_pendingSearch.results.clear();
+        win->m_pendingSearch.engine.clear();
+        win->m_pendingSearch.error.clear();
+    }
+    
+    win->m_searching = false;
+    win->m_searchCancelled = false;
+    if (win->m_btnSearchCancel) win->m_btnSearchCancel->hide();
+    if (win->m_btnSearchGo) win->m_btnSearchGo->activate();
+    win->onSearchResults(pending.results, pending.engine, pending.error);
+}
+
+// Paints a stage line posted by the search thread ("Contacting X..."), so a
+// stall names its culprit instead of leaving a bare "Searching...".
+void MainWindow::handleSearchStatus(void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (!win || !s_alive) return;
+    
+    std::string text;
+    {
+        std::lock_guard<std::mutex> lock(win->m_searchMutex);
+        text.swap(win->m_pendingStatus);
+    }
+    if (!text.empty()) win->setSearchStatus(text);
+}
+
+// Repaints the status bar after the latency measurement finishes.
+void MainWindow::handleStatusRefresh(void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (!win || !s_alive) return;
+    win->updateStatusBar();
+}
+
+void MainWindow::onSearchResults(const std::vector<SearchResult>& results,
+                                 const std::string& engineName,
+                                 const std::string& error) {
+    if (!results.empty() && m_searchResults) {
+        m_searchResults->appendResults(results);
+    }
+    
+    int count = m_searchResults ? m_searchResults->rowCount() : 0;
+    if (count > 0) {
+        setSearchStatus(std::to_string(count) + " results from " + engineName);
+    } else {
+        setSearchStatus(error.empty() ? "No results" : error);
+    }
+}
+
 void MainWindow::onRamModeChanged(Fl_Widget* w, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (win && win->m_choiceRamMode && win->m_manager) {
@@ -1013,10 +1691,7 @@ void MainWindow::updateTimerCallback(void* data) {
             std::thread([win]() {
                 int lat = SystemUtils::measureLatency();
                 // Pass back to UI thread safely via Fl::awake
-                Fl::awake([](void* d) {
-                    MainWindow* w = (MainWindow*)d;
-                    w->updateStatusBar();
-                }, win);
+                Fl::awake(&MainWindow::handleStatusRefresh, win);
                 win->m_latency = lat;
             }).detach();
         }

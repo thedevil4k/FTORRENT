@@ -10,6 +10,24 @@
 #include <libtorrent/torrent_info.hpp>
 #include <iomanip>
 #include <filesystem>
+#include <FL/fl_draw.H>
+
+namespace {
+
+// The green dot that sits at the right end of the magnet field. Drawn rather
+// than imaged, so it needs no asset and no theme lookup.
+class OriginDot : public Fl_Box {
+public:
+    OriginDot(int X, int Y, int W, int H) : Fl_Box(X, Y, W, H) {
+        box(FL_NO_BOX);
+    }
+    void draw() override {
+        fl_color(fl_rgb_color(64, 184, 80));
+        fl_pie(x() + 1, y() + 1, w() - 2, h() - 2, 0.0, 6.28318530718);
+    }
+};
+
+} // namespace
 
 AddTorrentDialog::AddTorrentDialog()
     : Fl_Window(500, 520, "Add Torrent")
@@ -50,6 +68,13 @@ void AddTorrentDialog::createUI() {
     
     m_magnetInput = new Fl_Input(20, y, 460, 30);
     m_magnetInput->tooltip("Paste magnet link here (magnet:?xt=...)");
+    // Marks the magnet field while this import is the one going through it.
+    m_magnetOriginDot = new OriginDot(462, y + 9, 12, 12);
+    m_magnetOriginDot->hide();
+    // FL_WHEN_CHANGED so the dot follows what is actually in the field while
+    // the user types or pastes, instead of only on release.
+    m_magnetInput->when(FL_WHEN_CHANGED);
+    m_magnetInput->callback(onMagnetFieldChanged, this);
     y += 55;
 
     // --- Save Path Section ---
@@ -161,6 +186,7 @@ bool AddTorrentDialog::validate() {
 
 bool AddTorrentDialog::show_modal() {
     m_okClicked = false;
+    updateOriginDot();
     show();
     
     while (shown()) {
@@ -184,6 +210,7 @@ void AddTorrentDialog::onBrowseFile(Fl_Widget* w, void* data) {
     if (filename) {
         dlg->m_filePathInput->value(filename);
         dlg->updateFileList(filename);
+        dlg->updateOriginDot();
     }
 }
 
@@ -219,13 +246,33 @@ void AddTorrentDialog::setTorrentPath(const std::string& path) {
     if (m_filePathInput) {
         m_filePathInput->value(path.c_str());
         updateFileList(path);
+        updateOriginDot();
     }
 }
 
 void AddTorrentDialog::setMagnetLink(const std::string& magnet) {
     if (m_magnetInput) {
         m_magnetInput->value(magnet.c_str());
+        updateOriginDot();
     }
+}
+
+// Shows the dot only while the magnet is what validate() would actually use:
+// a .torrent file wins over a magnet when both are filled in, so a dot next
+// to the magnet field while a file is chosen would be a lie.
+void AddTorrentDialog::updateOriginDot() {
+    if (!m_magnetOriginDot) return;
+    const char* magnet = m_magnetInput ? m_magnetInput->value() : nullptr;
+    const char* file = m_filePathInput ? m_filePathInput->value() : nullptr;
+    bool byMagnet = magnet && *magnet && (!file || !*file);
+    if (byMagnet == (m_magnetOriginDot->visible() != 0)) return;
+    if (byMagnet) m_magnetOriginDot->show();
+    else m_magnetOriginDot->hide();
+    m_magnetOriginDot->redraw();
+}
+
+void AddTorrentDialog::onMagnetFieldChanged(Fl_Widget* w, void* data) {
+    ((AddTorrentDialog*)data)->updateOriginDot();
 }
 
 void AddTorrentDialog::setSavePath(const std::string& path) {

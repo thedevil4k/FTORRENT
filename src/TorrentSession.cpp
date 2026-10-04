@@ -365,11 +365,19 @@ void TorrentSession::processAlerts() {
                 std::string msg = std::string("Failed to add torrent: ") + add->error.message();
                 std::cerr << msg << std::endl;
                 if (m_errorCallback) m_errorCallback(msg);
-            } else {
+            } else if (add->handle.is_valid()) {
                 add->handle.set_flags(lt::torrent_flags::auto_managed);
                 add->handle.resume(); // Ensure it starts
                 // Trigger an initial save
                 add->handle.save_resume_data();
+            } else {
+                // libtorrent does deliver add_torrent_alert with a dead handle
+                // and no error (seen when a torrent cannot be restored, e.g.
+                // its data is gone). set_flags() on it throws
+                // "invalid torrent handle used" and takes the whole app down
+                // on the next update tick, so there is nothing to start here.
+                std::cerr << "Add torrent alert without a torrent; ignoring it"
+                          << std::endl;
             }
         }
         else if (auto* ma = lt::alert_cast<lt::metadata_received_alert>(alert)) {

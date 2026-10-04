@@ -36,6 +36,7 @@ private:
     Fl_Button* m_browsePath;
     Fl_Check_Button* m_startWithSystem;
     Fl_Check_Button* m_minimizeToTray;
+    Fl_Check_Button* m_showPublicIp;
     
     // Connection tab widgets
     Fl_Group* m_connectionTab;

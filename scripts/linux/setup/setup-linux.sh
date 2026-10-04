@@ -42,6 +42,7 @@ case $OS in
             libpng-dev \
             libjpeg-dev \
             zlib1g-dev \
+            libcurl4-openssl-dev \
             pkg-config \
             rpm \
             git \
@@ -69,6 +70,7 @@ case $OS in
             libpng-devel \
             libjpeg-turbo-devel \
             zlib-devel \
+            libcurl-devel \
             rpm-build \
             pkgconfig \
             git
@@ -87,6 +89,7 @@ case $OS in
             libpng \
             libjpeg-turbo \
             zlib \
+            curl \
             rpm-tools \
             git
         ;;

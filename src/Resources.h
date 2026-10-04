@@ -29,6 +29,7 @@ public:
     static Fl_Pixmap* getSettingsIcon();
     static Fl_Pixmap* getDownloadIcon();
     static Fl_Pixmap* getUploadIcon();
+    static Fl_Pixmap* getSearchIcon();
     
 private:
     static Fl_RGB_Image* s_logo;
@@ -39,6 +40,7 @@ private:
     static Fl_Pixmap* s_iconSettings;
     static Fl_Pixmap* s_iconDownload;
     static Fl_Pixmap* s_iconUpload;
+    static Fl_Pixmap* s_iconSearch;
 };
 
 #endif // RESOURCES_H

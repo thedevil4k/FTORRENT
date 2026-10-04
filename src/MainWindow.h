@@ -11,6 +11,12 @@
 #include "PreferencesDialog.h"
 #include "AddTorrentDialog.h"
 #include "TorrentDetailsDialog.h"
+#include "SearchResultsWidget.h"
+#include "SearchEngine.h"
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <deque>
 #ifdef _WIN32
 #include <shellapi.h>
 #define WM_TRAY_MESSAGE (WM_USER + 1)
@@ -22,12 +28,16 @@
  * Contains the menu, toolbar, torrent list and status bar.
  * Inspired by qBittorrent/Transmission.
  */
+
 class MainWindow : public Fl_Double_Window {
-public:
-    MainWindow(int w, int h, const char* title);
+public:    MainWindow(int w, int h, const char* title);
     ~MainWindow();
 
-    static constexpr const char* VERSION = "0.4.1";
+    static constexpr const char* VERSION = "0.5.0";
+
+    // False once the window is destroyed: worker threads check it before
+    // handing results back, so a search in flight cannot touch freed memory.
+    static bool isAlive() { return s_alive; }
 
     // Window management
     void show();
@@ -48,6 +58,9 @@ public:
     void toggleNetworkLimit();
     void toggleCensorship();
     
+    // Syncs the censor (eye) button with m_censored / m_showPublicIp
+    void updateCensorButtonState();
+    
     // Actions
     void showAddTorrentDialog(const std::string& prefilledPath = "", const std::string& prefilledMagnet = "");
     void showCreateTorrentDialog();
@@ -61,18 +74,91 @@ public:
 private:
     // UI Components
     Fl_Pack* m_toolbar;
+    Fl_Group* m_statusGroup;
     Fl_Button* m_btnAdd;
     Fl_Button* m_btnCreate;
+    Fl_Box* m_spacer1;
+    Fl_Box* m_spacer2;
+    Fl_Button* m_btnPrefs;
     Fl_Button* m_btnTogglePause;
     Fl_Button* m_btnRemove;
     Fl_Button* m_darkModeBtn;
+    Fl_Button* m_btnSearch;
     TorrentListWidget* m_torrentList;
+    
+    // Search view (shown in place of the torrent list)
+    Fl_Group* m_searchView;
+    Fl_Input* m_searchInput;
+    Fl_Button* m_btnSearchGo;
+    Fl_Button* m_btnSearchCancel;
+    Fl_Choice* m_choiceSearchEngine;
+    // Category for the selected engine (only visible when it declares more
+    // than one). Width is reclaimed by the query field when hidden.
+    Fl_Choice* m_choiceSearchCategory;
+    Fl_Box* m_searchStatus;
+    SearchResultsWidget* m_searchResults;
+    bool m_searching;
+    // Set when the user cancels: the worker checks it and stops early
+    std::atomic<bool> m_searchCancelled;
+    // Incremented on every search. A thread whose number is no longer the
+    // current one has been superseded and must not touch the UI state.
+    std::atomic<unsigned long> m_searchGeneration;
+    
+    // Which view is currently visible
+    bool m_showSearchView;
     Fl_Box* m_statusBar;
     Fl_Button* m_btnCensor;
     Fl_Button* m_btnLimit;
     Fl_Choice* m_choiceRamMode;
     bool m_limitModerate;
     bool m_censored;
+    bool m_showPublicIp;
+    
+    // The theme is not a preference any more. It is true from the moment the
+    // window is built and nothing but the toolbar button can change it, so no
+    // settings.ini can hand the light theme over to the next launch.
+    bool m_darkMode;
+    
+    // How much room the toolbar had when it was last laid out, so that
+    // toggleNetworkLimit() can reapply its label with the right detail level.
+    int m_toolbarLevel;
+    
+    // False once the window is destroyed: worker threads check it before
+    // handing results back, so a search in flight cannot touch freed memory.
+    static std::atomic<bool> s_alive;
+    
+    // Fl::awake() only accepts a plain function pointer, so a worker thread
+    // cannot carry its results inside a capturing lambda. They are parked here
+    // under a mutex instead, and the callback (which receives "this") picks
+    // them up on the UI thread.
+    struct PendingSearch {
+        std::vector<SearchResult> results;
+        std::string engine;
+        std::string error;
+    };
+    // Fl::awake() takes a plain function pointer, so the handlers that bring
+    // worker results back to the UI are static members: that way they keep
+    // access to the private state they need.
+    static void handleSearchBatch(void* data);
+    static void handleSearchDone(void* data);
+    static void handleStatusRefresh(void* data);
+    static void handleSearchStatus(void* data);
+    std::mutex m_searchMutex;
+    PendingSearch m_pendingSearch;
+    // Batches parsed by the search thread, waiting to be painted. Fl::awake
+    // only accepts a plain function, so the data travels through here.
+    //
+    // This is a queue and not a single batch on purpose. Fl::awake() only
+    // queues the handler, not the payload, so two batches parsed back to back
+    // woke the UI twice but left only the second one in memory: the handler
+    // drained an empty slot and the first batch was dropped without a trace.
+    // A search of 100 results showed 25 for that reason. Every batch is now
+    // parked in order and the handler takes all of them at once.
+    std::deque<std::vector<SearchResult>> m_pendingBatch;
+    // One-line status posted by the search thread ("Contacting X, page N").
+    // Painted on the UI thread so a stall names its culprit instead of
+    // leaving a bare "Searching...".
+    std::string m_pendingStatus;
     
     // Manager
     TorrentManager* m_manager;
@@ -96,11 +182,32 @@ private:
     static constexpr int MENU_HEIGHT = 0;
     static constexpr int TOOLBAR_HEIGHT = 40;
     static constexpr int STATUS_HEIGHT = 25;
+    // Search bar sits right under the toolbar; the status line under it
+    static constexpr int SEARCH_BAR_HEIGHT = 35;
+    static constexpr int SEARCH_STATUS_HEIGHT = 18;
     
     // UI Creation
     void createToolbar();
     void createTorrentList();
     void createStatusBar();
+    void createSearchView();
+    void layoutSearchView();
+    void layoutSearchViewContents(int available);
+    void switchView(bool showSearch);
+    void startSearch();
+    void updateEngineChoice();
+    void updateCategoryChoice();
+    void setSearchStatus(const std::string& text);
+    void onSearchResults(const std::vector<SearchResult>& results,
+                         const std::string& engineName,
+                         const std::string& error);
+    void appendSearchResults(const std::vector<SearchResult>& batch);
+    static void onSearchCancelClick(Fl_Widget* w, void* data);
+    void loadSearchEngines();
+    
+    // Responsive layout
+    void layoutToolbar(int available);
+    void applyLimitLabel();
     
     // Menu callbacks
     static void menuCallback(Fl_Widget* w, void* data);
@@ -112,6 +219,8 @@ private:
     static void onRemove(Fl_Widget* w, void* data);
     static void onPreferences(Fl_Widget* w, void* data);
     static void onToggleTheme(Fl_Widget* w, void* data);
+    static void onSearchToggle(Fl_Widget* w, void* data);
+    static void onSearchGo(Fl_Widget* w, void* data);
     static void onToggleLimit(Fl_Widget* w, void* data);
     static void onToggleCensorship(Fl_Widget* w, void* data);
     static void onRamModeChanged(Fl_Widget* w, void* data);

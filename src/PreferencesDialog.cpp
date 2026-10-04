@@ -55,6 +55,11 @@ void PreferencesDialog::createGeneralTab() {
     // Minimize to tray
     m_minimizeToTray = new Fl_Check_Button(20, 150, 250, 25, "Minimize to system tray");
     
+    // Show public IP in the status bar (privacy)
+    m_showPublicIp = new Fl_Check_Button(20, 180, 300, 25, "Show public IP in status bar");
+    m_showPublicIp->tooltip("When off, the public IP is not displayed and is not looked up online.\n"
+                            "The eye button in the status bar censors the IP while this is on.");
+    
     m_generalTab->end();
 }
 
@@ -187,6 +192,7 @@ void PreferencesDialog::loadSettings() {
     m_downloadPath->value(settings.getDefaultSavePath().c_str());
     m_startWithSystem->value(settings.getStartWithSystem() ? 1 : 0);
     m_minimizeToTray->value(settings.getMinimizeToTray() ? 1 : 0);
+    m_showPublicIp->value(settings.getShowPublicIp() ? 1 : 0);
     
     // Connection
     std::ostringstream port, maxDown, maxUp, maxConn;
@@ -217,6 +223,7 @@ void PreferencesDialog::saveSettings() {
     settings.setDefaultSavePath(m_downloadPath->value());
     settings.setStartWithSystem(m_startWithSystem->value() != 0);
     settings.setMinimizeToTray(m_minimizeToTray->value() != 0);
+    settings.setShowPublicIp(m_showPublicIp->value() != 0);
     
     // Connection
     settings.setListenPort(atoi(m_listenPort->value()));

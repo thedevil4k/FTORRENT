@@ -10,6 +10,7 @@ Fl_Pixmap* Resources::s_iconRemove = nullptr;
 Fl_Pixmap* Resources::s_iconSettings = nullptr;
 Fl_Pixmap* Resources::s_iconDownload = nullptr;
 Fl_Pixmap* Resources::s_iconUpload = nullptr;
+Fl_Pixmap* Resources::s_iconSearch = nullptr;
 
 void Resources::initialize() {
     // Create logo from PNG memory buffer
@@ -21,6 +22,7 @@ void Resources::initialize() {
     s_iconSettings = new Fl_Pixmap(icon_settings_xpm);
     s_iconDownload = new Fl_Pixmap(icon_download_xpm);
     s_iconUpload = new Fl_Pixmap(icon_upload_xpm);
+    s_iconSearch = new Fl_Pixmap(icon_search_xpm);
 }
 
 void Resources::cleanup() {
@@ -32,6 +34,7 @@ void Resources::cleanup() {
     delete s_iconSettings;
     delete s_iconDownload;
     delete s_iconUpload;
+    delete s_iconSearch;
     
     s_logo = nullptr;
     s_iconAdd = nullptr;
@@ -41,6 +44,7 @@ void Resources::cleanup() {
     s_iconSettings = nullptr;
     s_iconDownload = nullptr;
     s_iconUpload = nullptr;
+    s_iconSearch = nullptr;
 }
 
 Fl_RGB_Image* Resources::getLogoImage() {
@@ -73,4 +77,8 @@ Fl_Pixmap* Resources::getDownloadIcon() {
 
 Fl_Pixmap* Resources::getUploadIcon() {
     return s_iconUpload;
+}
+
+Fl_Pixmap* Resources::getSearchIcon() {
+    return s_iconSearch;
 }

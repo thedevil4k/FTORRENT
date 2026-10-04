@@ -157,6 +157,20 @@ void SystemUtils::openFolder(const std::string& path) {
 #endif
 }
 
+void SystemUtils::openUrl(const std::string& url) {
+    // Only ever called with the address we ship, never with user input, so the
+    // quoting here is just belt and braces.
+#ifdef _WIN32
+    ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#elif __APPLE__
+    std::string cmd = "open \"" + url + "\"";
+    system(cmd.c_str());
+#else
+    std::string cmd = "xdg-open \"" + url + "\"";
+    system(cmd.c_str());
+#endif
+}
+
 void SystemUtils::setProcessPriority(bool high) {
 #ifdef _WIN32
     SetPriorityClass(GetCurrentProcess(), high ? HIGH_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS);

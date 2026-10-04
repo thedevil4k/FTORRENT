@@ -50,6 +50,9 @@ public:
      * @brief Open a folder in the system file explorer
      */
     static void openFolder(const std::string& path);
+    // Opens a web address in the default browser. The address must already be
+    // one we trust, since it is handed to the shell.
+    static void openUrl(const std::string& url);
 
     /**
      * @brief Set the process priority (CPU/IO)

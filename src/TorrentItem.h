@@ -67,7 +67,7 @@ public:
     lt::torrent_handle getHandle() { return m_handle; } 
     const lt::torrent_handle getHandle() const { return m_handle; }
     bool isValid() const { return m_handle.is_valid(); }
-    
+
     // Data structures for detailed info
     struct TrackerInfo {
         std::string url;

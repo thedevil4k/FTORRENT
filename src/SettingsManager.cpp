@@ -5,6 +5,9 @@
 #include <cstdlib>
 #include <algorithm>
 
+// User agent reported to trackers. Bump it together with the project version.
+static const char* DEFAULT_USER_AGENT = "FTORRENT 0.5.0";
+
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;
     return instance;
@@ -32,7 +35,33 @@ bool SettingsManager::load() {
     }
 
     file.close();
+    
+    // The theme is not a setting any more, but parseLine() keeps every key it
+    // reads, so a DarkMode left by an older build would be written back on
+    // every save and the file would keep advertising something the app ignores.
+    // Dropping it here, next to the other post-parse fixup, is enough: the next
+    // save rewrites the file without it and no other key is affected.
+    m_settings.erase("DarkMode");
+    
+    migrateUserAgent();
     return true;
+}
+
+// The user agent is a persisted setting, so a value already stored in
+// settings.ini always wins over the default. Installations created before the
+// rename would therefore keep reporting the old agent forever, so swap the
+// old naming scheme for the current one on load.
+void SettingsManager::migrateUserAgent() {
+    std::string agent = getUserAgent();
+    
+    // Old scheme looked like "FTorrent/0.1.0"
+    bool isLegacy = agent.empty()
+                 || agent.compare(0, 8, "FTorrent") == 0;
+    
+    if (isLegacy) {
+        setUserAgent(DEFAULT_USER_AGENT);
+        save();
+    }
 }
 
 bool SettingsManager::save() {
@@ -75,12 +104,12 @@ void SettingsManager::setDefaults() {
     setWindowX(100);
     setWindowY(100);
     setWindowMaximized(false);
-    setDarkMode(false);
     setRamMode(1); // Normal (Default)
     setIpCensored(false);
+    setShowPublicIp(true);
     
     // Advanced
-    setUserAgent("FTorrent/0.1.0");
+    setUserAgent(DEFAULT_USER_AGENT);
 }
 
 std::string SettingsManager::getConfigPath() const {
@@ -282,14 +311,6 @@ void SettingsManager::setWindowMaximized(bool maximized) {
     setBool("WindowMaximized", maximized);
 }
 
-bool SettingsManager::getDarkMode() const {
-    return getBool("DarkMode");
-}
-
-void SettingsManager::setDarkMode(bool enabled) {
-    setBool("DarkMode", enabled);
-}
-
 int SettingsManager::getRamMode() const {
     return getInt("RamMode", 1); // Default to Normal (1)
 }
@@ -304,6 +325,14 @@ bool SettingsManager::getIpCensored() const {
 
 void SettingsManager::setIpCensored(bool censored) {
     setBool("IpCensored", censored);
+}
+
+bool SettingsManager::getShowPublicIp() const {
+    return getBool("ShowPublicIp", true);
+}
+
+void SettingsManager::setShowPublicIp(bool show) {
+    setBool("ShowPublicIp", show);
 }
 
 std::string SettingsManager::getUserAgent() const {

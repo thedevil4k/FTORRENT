@@ -26,19 +26,57 @@ TorrentListWidget::TorrentListWidget(int x, int y, int w, int h, const char* lab
     , m_sortColumn(COL_NAME)
     , m_sortAscending(true)
     , m_dropHighlight(false)
+    , m_headerBg(COLOR_HEADER_BG)
 {
+    for (int i = 0; i < COL_COUNT; i++) {
+        m_userResizedCol[i] = false;
+    }
+    
     initializeColumns();
     
     // Table settings
     type(SELECT_MULTI);
     when(FL_WHEN_RELEASE);
     
-    // Modernize scrollbar
-    Fl::scrollbar_size(10);
+    // Scrollbar width for this table only (avoid the global Fl::scrollbar_size,
+    // which would resize every scrollbar in the app and is applied lazily).
+    scrollbar_size(12);
     vscrollbar->box(FL_FLAT_BOX);
     hscrollbar->box(FL_FLAT_BOX);
+    applyScrollbarTheme(false);
     
     end();
+}
+
+void TorrentListWidget::applyScrollbarTheme(bool darkMode) {
+    Fl_Color trough;
+    Fl_Color knob;
+    
+    if (darkMode) {
+        trough = fl_rgb_color(45, 45, 45);
+        knob = fl_rgb_color(120, 120, 120);
+        m_headerBg = fl_rgb_color(55, 55, 55);
+    } else {
+        trough = fl_rgb_color(232, 232, 232);
+        knob = fl_rgb_color(150, 150, 150);
+        m_headerBg = COLOR_HEADER_BG;
+    }
+    
+    if (vscrollbar) {
+        vscrollbar->color(trough);
+        vscrollbar->selection_color(knob);
+        vscrollbar->redraw();
+    }
+    if (hscrollbar) {
+        hscrollbar->color(trough);
+        hscrollbar->selection_color(knob);
+        hscrollbar->redraw();
+    }
+}
+
+void TorrentListWidget::refreshThemeColors(bool darkMode) {
+    applyScrollbarTheme(darkMode);
+    redraw();
 }
 
 TorrentListWidget::~TorrentListWidget() {
@@ -58,6 +96,41 @@ void TorrentListWidget::initializeColumns() {
     // Row settings
     row_height_all(25);
     row_header(0);
+    
+    layoutColumns();
+}
+
+// Fl_Table has no proportional layout: col_width() is an absolute value that
+// only changes when we set it. So we compute the widths from the space we have,
+// giving Name whatever is left over (it is the only column that benefits from
+// being wider) and scaling the rest relative to their base width.
+//
+// Columns the user has dragged by hand keep their width.
+void TorrentListWidget::layoutColumns() {
+    int available = w();
+    if (available <= 0) return;
+    
+    int fixedTotal = 0;
+    for (int i = 0; i < COL_COUNT; i++) {
+        if (i != COL_NAME && !m_userResizedCol[i]) {
+            fixedTotal += COLUMN_INFO[i].width;
+        }
+    }
+    
+    for (int i = 0; i < COL_COUNT; i++) {
+        if (m_userResizedCol[i]) continue;
+        
+        if (i == COL_NAME) {
+            col_width(i, available - fixedTotal);
+        } else {
+            col_width(i, COLUMN_INFO[i].width);
+        }
+    }
+}
+
+void TorrentListWidget::resize(int X, int Y, int W, int H) {
+    Fl_Table_Row::resize(X, Y, W, H);
+    layoutColumns();
 }
 
 void TorrentListWidget::setTorrents(const std::vector<TorrentItem*>& torrents) {
@@ -237,7 +310,7 @@ void TorrentListWidget::drawHeader(int col, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
     
     // Draw background
-    fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, COLOR_HEADER_BG);
+    fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, m_headerBg);
     
     // Draw text
     if (col >= 0 && col < COL_COUNT) {
@@ -278,10 +351,11 @@ void TorrentListWidget::drawCell(int row, int col, int x, int y, int w, int h) {
     std::string text;
     
     switch (col) {
-        case COL_NAME:
+        case COL_NAME: {
             text = torrent->getName();
             fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_LEFT | FL_ALIGN_CLIP);
             break;
+        }
             
         case COL_SIZE:
             text = torrent->formatSize(torrent->getTotalSize());
@@ -397,6 +471,24 @@ static std::vector<std::string> parseDroppedPaths(const char* text) {
 }
 
 int TorrentListWidget::handle(int event) {
+    // ── Mouse wheel ──────────────────────────────────────────────────────
+    // Fl_Table does not implement FL_MOUSEWHEEL at all (neither does
+    // Fl_Table_Row), so we do it here: vertical wheel scrolls rows,
+    // horizontal wheel / Shift+wheel scrolls columns.
+    if (event == FL_MOUSEWHEEL) {
+        int dy = Fl::event_dy();
+        int dx = Fl::event_dx();
+        
+        // In FLTK dy is positive when scrolling down (see Fl_x.cxx)
+        if (dy != 0) {
+            row_position(top_row() + 3 * dy);
+        } else if (dx != 0) {
+            col_position(leftcol + dx);
+        }
+        redraw();
+        return 1;
+    }
+    
     // ── Drag-and-drop events (Linux/X11 via FLTK) ─────────────────────────
     if (event == FL_DND_ENTER || event == FL_DND_DRAG) {
         if (!m_dropHighlight) {
@@ -435,13 +527,24 @@ int TorrentListWidget::handle(int event) {
     }
     // ─────────────────────────────────────────────────────────────────────
 
-    int result = Fl_Table_Row::handle(event);
-    
+int result = Fl_Table_Row::handle(event);
+
     // Handle column header clicks for sorting
     if (event == FL_RELEASE) {
         if (callback_context() == CONTEXT_COL_HEADER) {
-            // Only sort if it wasn't a resize operation (drag)
-            // Fl::event_is_click() returns true if the mouse hasn't moved "much"
+            int clickedCol = callback_col();
+            
+            // A drag that ends on the header border resized that column: stop
+            // treating it as automatic layout from now on.
+            if (clickedCol >= 0 && clickedCol < COL_COUNT) {
+                for (int i = 0; i < COL_COUNT; i++) {
+                    if (col_width(i) != COLUMN_INFO[i].width) {
+                        m_userResizedCol[i] = true;
+                    }
+                }
+            }
+            
+            // Check it's a click, not a column-resize drag
             if (Fl::event_is_click()) {
                 int col = callback_col();
                 if (col >= 0 && col < COL_COUNT) {

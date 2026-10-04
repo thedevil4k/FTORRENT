@@ -71,6 +71,16 @@ protected:
     int handle(int event) override;
     void draw() override;
     
+    // Colors the scrollbars (trough + knob) and the header for the active theme
+    void applyScrollbarTheme(bool darkMode);
+    
+public:
+    // Public because MainWindow drives the layout from outside
+    void resize(int X, int Y, int W, int H) override;
+    
+    // Re-applies the scrollbar/header colors (called when the theme changes)
+    void refreshThemeColors(bool darkMode);
+    
 private:
     std::vector<TorrentItem*> m_torrents;
     std::vector<int> m_sortedIndices;
@@ -80,6 +90,7 @@ private:
     
     // Drag-and-drop state
     bool m_dropHighlight;
+    bool m_userResizedCol[COL_COUNT];
     std::function<void(const std::string&)> m_onDropCallback;
     
     // Column info
@@ -93,6 +104,7 @@ private:
     
     // Helper methods
     void initializeColumns();
+    void layoutColumns();
     void updateSortedIndices();
     TorrentItem* getTorrentAt(int row) const;
     int findTorrentRow(const std::string& hash) const;
@@ -108,6 +120,10 @@ private:
     
     // Colors
     static constexpr Fl_Color COLOR_HEADER_BG = FL_LIGHT2;
+    Fl_Color m_headerBg;
+    
+    // Columns the user has dragged manually: their width is left alone when
+    // the table is resized, so a custom layout is not thrown away.
     Fl_Color getRowColor(int row) const;
     Fl_Color getTextColor(int row) const;
     Fl_Color getProgressBgColor() const;

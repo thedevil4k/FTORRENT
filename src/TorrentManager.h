@@ -92,6 +92,7 @@ private:
     std::string m_publicIp;
     std::string m_countryCode;
     mutable std::mutex m_ipMutex;
+
     std::chrono::steady_clock::time_point m_lastIpCheck;
 
     // Thread synchronization

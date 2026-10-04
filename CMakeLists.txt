@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(FTorrent VERSION 0.4.1 LANGUAGES CXX)
+project(FTorrent VERSION 0.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -67,6 +67,12 @@ set(SOURCES
     src/PathUtils.cpp
     src/RemoveConfirmDialog.cpp
     src/SystemUtils.cpp
+    src/HttpClient.cpp
+    src/SearchEngine.cpp
+    src/SearchManager.cpp
+    src/SearchResultsWidget.cpp
+    src/TorrentFileList.cpp
+    src/FileListService.cpp
 )
 
 if(WIN32)
@@ -89,6 +95,12 @@ set(HEADERS
     src/PathUtils.h
     src/RemoveConfirmDialog.h
     src/SystemUtils.h
+    src/HttpClient.h
+    src/SearchEngine.h
+    src/SearchManager.h
+    src/SearchResultsWidget.h
+    src/TorrentFileList.h
+    src/FileListService.h
 )
 
 # Add executable
@@ -120,6 +132,10 @@ else()
     # On Linux, we might need pthread
     find_package(Threads REQUIRED)
     target_link_libraries(FTorrent PRIVATE Threads::Threads)
+
+    # HTTP client for the torrent search (Windows uses WinInet instead)
+    find_package(CURL REQUIRED)
+    target_link_libraries(FTorrent PRIVATE CURL::libcurl)
 endif()
 # Installation Rules
 include(GNUInstallDirs)

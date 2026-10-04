@@ -7,6 +7,7 @@
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Check_Browser.H>
+#include <FL/Fl_Box.H>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,10 @@ private:
     
     // Magnet-specific widgets
     Fl_Input* m_magnetInput;
+    // Green dot drawn at the right end of the magnet field while this import
+    // is the one going through a magnet link. Shown or hidden as the fields
+    // change; it carries no state of its own.
+    Fl_Box* m_magnetOriginDot;
     
     // Files display
     Fl_Check_Browser* m_fileBrowser;
@@ -90,10 +95,15 @@ private:
     static void onBrowseSavePath(Fl_Widget* w, void* data);
     static void onOK(Fl_Widget* w, void* data);
     static void onCancel(Fl_Widget* w, void* data);
+    static void onMagnetFieldChanged(Fl_Widget* w, void* data);
     
     // Helper
     void loadDefaults();
     void updateFileList(const std::string& torrentPath);
+    // Shows or hides the green dot, following the same precedence validate()
+    // uses: a .torrent file wins over a magnet, so the dot only shows while
+    // the magnet is what would actually be imported.
+    void updateOriginDot();
 };
 
 #endif // ADDTORRENTDIALOG_H

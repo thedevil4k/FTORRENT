@@ -39,8 +39,13 @@ void TorrentItem::update() {
         m_name = status.name;
         
         m_savePath = status.save_path;
-        // libtorrent 2.0 uses info_hashes. v1 is sha1_hash
-        m_hash = toHex(status.info_hashes.v1);
+        // The hash must come from the handle, not from torrent_status:
+        // status.info_hashes.v1 comes back with its first 16 bytes zeroed in
+        // this libtorrent build, so every torrent ended up with a bogus
+        // identity. That broke TorrentManager's duplicate detection (it matches
+        // on this hash), which threw the whole list away and rebuilt it on
+        // every sync. handle.info_hashes() returns the real value.
+        m_hash = toHex(m_handle.info_hashes().v1);
         
         // Size info
         m_totalSize = status.total_wanted;

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <filesystem>
 #include "SystemUtils.h"
+#include "SettingsManager.h"
 
 TorrentManager::TorrentManager()
     : m_initialized(false)
@@ -306,8 +307,11 @@ void TorrentManager::update() {
     }
 
     // IP Address Check (every 15 minutes)
+    // Skipped entirely when the public IP display is disabled in Preferences,
+    // so we never contact the external service at all.
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::minutes>(now - m_lastIpCheck).count() >= 15) {
+    if (std::chrono::duration_cast<std::chrono::minutes>(now - m_lastIpCheck).count() >= 15
+        && SettingsManager::instance().getShowPublicIp()) {
         m_lastIpCheck = now;
         SystemUtils::fetchPublicIpAndCountry([this](std::string ip, std::string country) {
             {

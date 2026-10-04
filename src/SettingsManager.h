@@ -72,14 +72,14 @@ public:
     bool getWindowMaximized() const;
     void setWindowMaximized(bool maximized);
     
-    bool getDarkMode() const;
-    void setDarkMode(bool enabled);
-    
     int getRamMode() const; // 0=Low, 1=Normal, 2=Turbo
     void setRamMode(int mode);
     
     bool getIpCensored() const;
     void setIpCensored(bool censored);
+    
+    bool getShowPublicIp() const;
+    void setShowPublicIp(bool show);
     
     // Advanced settings
     std::string getUserAgent() const;
@@ -98,6 +98,9 @@ public:
 private:
     SettingsManager();
     ~SettingsManager();
+    
+    // Replaces a stored user agent from an older naming scheme with the current one
+    void migrateUserAgent();
     
     // Prevent copying
     SettingsManager(const SettingsManager&) = delete;
