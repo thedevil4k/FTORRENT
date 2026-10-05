@@ -44,7 +44,7 @@
         {
             "name": "fltk",
             "buildsystem": "cmake-ninja",
-            "configure-options": [
+            "config-opts": [
                 "-DOPTION_BUILD_SHARED_LIBS=ON"
             ],
             "sources": [
