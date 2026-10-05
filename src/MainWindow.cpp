@@ -5,6 +5,8 @@
 #include "Resources.h"
 #include "SystemUtils.h"
 #include "PathUtils.h"
+#include "AssetLoader.h"
+#include "ToolbarLayout.h"
 #include "SearchManager.h"
 #include "HttpClient.h"
 #include <FL/Fl.H>
@@ -13,7 +15,6 @@
 #include <FL/Fl_Input.H>
 #include <FL/fl_ask.H>   // fl_choice, fl_input, fl_alert, fl_message all live here
 #include <FL/Fl_Shared_Image.H>
-#include <FL/Fl_PNG_Image.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Window.H>
 #include <FL/x.H>
@@ -25,6 +26,7 @@
 #include <iomanip>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <algorithm>
 #include <filesystem>
 #include <system_error>
@@ -56,6 +58,8 @@ std::atomic<bool> MainWindow::s_alive{true};
 MainWindow::MainWindow(int w, int h, const char* title)
     : Fl_Double_Window(w, h, title)
     , m_toolbar(nullptr)
+    , m_leadSpacer(nullptr)
+    , m_trailSpacer(nullptr)
     , m_statusGroup(nullptr)
     , m_darkModeBtn(nullptr)
     , m_torrentList(nullptr)
@@ -82,10 +86,14 @@ MainWindow::MainWindow(int w, int h, const char* title)
     ,m_turboIcon(nullptr)
     ,m_eyeOpenedIcon(nullptr)
     ,m_eyeClosedIcon(nullptr)
+    ,m_findIcon(nullptr)
+    ,m_limitIcon(nullptr)
     ,m_limitModerate(false)
-    ,m_censored(false)    , m_showPublicIp(true)
+    ,m_limitIdleColor(FL_BACKGROUND_COLOR)
+    ,m_censored(false)    , m_showPublicIp(false)
     , m_darkMode(true)
-    , m_toolbarLevel(0)
+    , m_toolbarLevel(ToolbarLayout::ICONS)
+    , m_toolbarSlack(-1)
 {
     // Initialize image support
     fl_register_images();
@@ -95,94 +103,26 @@ MainWindow::MainWindow(int w, int h, const char* title)
         icon((const Fl_RGB_Image*)Resources::getLogoImage());
     }
     
-    // Create UI components
-    // Load theme icons
-    std::string appDir = PathUtils::getAppDirPath();
-    std::string assetsDir = appDir + "/assets/";
-    // Normalize slashes for FLTK image loader
-    std::replace(assetsDir.begin(), assetsDir.end(), '\\', '/');
+    // Every icon in the window comes from AssetLoader, which owns where the
+    // assets live and how a missing one is reported. A nullptr here just means
+    // the PNG is not installed: the widget keeps the fallback it already had.
+    m_brightIcon     = AssetLoader::load("bright.png", ToolbarLayout::kIconSize);
+    m_darkIcon       = AssetLoader::load("dark.png", ToolbarLayout::kIconSize);
+    m_addIcon        = AssetLoader::load("addtorrent.png", ToolbarLayout::kIconSize);
+    m_createIcon     = AssetLoader::load("createtorrent.png", ToolbarLayout::kIconSize);
+    m_ecoIcon        = AssetLoader::load("eco.png", ToolbarLayout::kIconSize);
+    m_normalIcon     = AssetLoader::load("default.png", ToolbarLayout::kIconSize);
+    m_turboIcon      = AssetLoader::load("turbo.png", ToolbarLayout::kIconSize);
+    m_findIcon       = AssetLoader::load("find.png", ToolbarLayout::kIconSize);
+    // The bolt gets a bigger box than the magnifier: it is the one icon in the
+    // bar that is a bare silhouette, so it needs the extra pixels to read.
+    m_limitIcon      = AssetLoader::load("limit_network_speed.png", ToolbarLayout::kIconSize);
 
-    Fl_PNG_Image* imgTemp;
-    
-    imgTemp = new Fl_PNG_Image((assetsDir + "bright.png").c_str());
-    if (imgTemp->d() == 0) { // Failed
-        delete imgTemp;
-    } else {
-        m_brightIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-    
-    imgTemp = new Fl_PNG_Image((assetsDir + "dark.png").c_str());
-    if (imgTemp->d() == 0) { // Failed
-        delete imgTemp;
-    } else {
-        m_darkIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-    
-    imgTemp = new Fl_PNG_Image((assetsDir + "addtorrent.png").c_str());
-    if (imgTemp->d() == 0) { // Failed
-        delete imgTemp;
-    } else {
-        m_addIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-
-    imgTemp = new Fl_PNG_Image((assetsDir + "createtorrent.png").c_str());
-    if (imgTemp->d() == 0) { // Failed
-        delete imgTemp;
-    } else {
-        m_createIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-
-    imgTemp = new Fl_PNG_Image((assetsDir + "eco.png").c_str());
-    if (imgTemp->d() == 0) { // Failed
-        delete imgTemp;
-    } else {
-        m_ecoIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-
-    imgTemp = new Fl_PNG_Image((assetsDir + "default.png").c_str());
-    if (imgTemp->d() == 0) { // Failed
-        delete imgTemp;
-    } else {
-        m_normalIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-
-    imgTemp = new Fl_PNG_Image((assetsDir + "turbo.png").c_str());
-    if (imgTemp->d() == 0) { // Failed
-        delete imgTemp;
-    } else {
-        m_turboIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-
-    // Load eye icons
+    // Censorship state is the persisted setting; the eye icons are the only
+    // images that change with the theme, so they get their own reload.
     m_censored = SettingsManager::instance().getIpCensored();
     m_showPublicIp = SettingsManager::instance().getShowPublicIp();
-    bool darkMode = m_darkMode;
-    
-    std::string openedFile = darkMode ? "eye_opened_bright.png" : "eye_opened_dark.png";
-    std::string closedFile = darkMode ? "eye_closed_bright.png" : "eye_closed_dark.png";
-
-    imgTemp = new Fl_PNG_Image((assetsDir + openedFile).c_str());
-    if (imgTemp->d() == 0) {
-        delete imgTemp;
-    } else {
-        m_eyeOpenedIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
-
-    imgTemp = new Fl_PNG_Image((assetsDir + closedFile).c_str());
-    if (imgTemp->d() == 0) {
-        delete imgTemp;
-    } else {
-        m_eyeClosedIcon = imgTemp->copy(20, 20);
-        delete imgTemp;
-    }
+    reloadEyeIcons();
 
     createToolbar();
     createTorrentList();
@@ -226,6 +166,8 @@ MainWindow::~MainWindow() {
     delete m_turboIcon;
     delete m_eyeOpenedIcon;
     delete m_eyeClosedIcon;
+    delete m_findIcon;
+    delete m_limitIcon;
     saveWindowState();
     Fl::remove_timeout(updateTimerCallback, this);
 }
@@ -234,13 +176,26 @@ MainWindow::~MainWindow() {
 
 void MainWindow::createToolbar() {
     int y = MENU_HEIGHT;
-    m_toolbar = new Fl_Pack(0, y, w(), TOOLBAR_HEIGHT);
-    m_toolbar->type(Fl_Pack::HORIZONTAL);
-    m_toolbar->spacing(5);
+    // The strip and the row of buttons are two widgets. Fl_Pack stretches every
+    // child to its own height, so giving the pack the BUTTON height is what
+    // leaves room above and below the buttons inside the taller bar; making the
+    // pack the bar height instead would pin the buttons to the edges again.
+    m_toolbar = new Fl_Group(0, y, w(), TOOLBAR_HEIGHT);
+    m_toolbar->box(FL_NO_BOX);
     m_toolbar->begin();
+    m_toolbarPack = new Fl_Pack(0, y + ToolbarLayout::kBarPadding,
+                                w(), ToolbarLayout::kButtonHeight);
+    m_toolbarPack->type(Fl_Pack::HORIZONTAL);
+    m_toolbarPack->spacing(5);
+    m_toolbarPack->begin();
+    
+    // First child, so everything after it is pushed right and the block ends up
+    // centred. Its width is recomputed on every layoutToolbar() call.
+    m_leadSpacer = new Fl_Box(0, 0, 0, ToolbarLayout::kButtonHeight);
+    m_leadSpacer->box(FL_NO_BOX);
     
     // Add torrent button
-    m_btnAdd = new Fl_Button(0, 0, 130, 30, " Add Torrent");
+    m_btnAdd = new Fl_Button(0, 0, 130, ToolbarLayout::kButtonHeight, " Add Torrent");
     m_btnAdd->box(FL_FLAT_BOX);
     m_btnAdd->callback(onAddTorrent, this);
     m_btnAdd->tooltip("Add Torrent");
@@ -250,7 +205,7 @@ void MainWindow::createToolbar() {
     }
     
     // Create torrent button
-    m_btnCreate = new Fl_Button(0, 0, 130, 30, " Create Torrent");
+    m_btnCreate = new Fl_Button(0, 0, 130, ToolbarLayout::kButtonHeight, " Create Torrent");
     m_btnCreate->box(FL_FLAT_BOX);
     m_btnCreate->callback(onCreateTorrent, this);
     m_btnCreate->tooltip("Create Torrent");
@@ -260,11 +215,11 @@ void MainWindow::createToolbar() {
     }
     
     // Spacer
-    m_spacer1 = new Fl_Box(0, 0, 20, 30);
+    m_spacer1 = new Fl_Box(0, 0, 20, ToolbarLayout::kButtonHeight);
     m_spacer1->box(FL_NO_BOX);
     
     // Toggle Pause/Resume button
-    m_btnTogglePause = new Fl_Button(0, 0, 40, 30);
+    m_btnTogglePause = new Fl_Button(0, 0, ToolbarLayout::kIconButton, ToolbarLayout::kButtonHeight);
     m_btnTogglePause->box(FL_FLAT_BOX);
     m_btnTogglePause->tooltip("Pause/Resume");
     m_btnTogglePause->callback(onTogglePause, this);
@@ -273,7 +228,7 @@ void MainWindow::createToolbar() {
     }
     
     // Remove button
-    m_btnRemove = new Fl_Button(0, 0, 40, 30);
+    m_btnRemove = new Fl_Button(0, 0, ToolbarLayout::kIconButton, ToolbarLayout::kButtonHeight);
     m_btnRemove->box(FL_FLAT_BOX);
     m_btnRemove->tooltip("Remove Torrent");
     m_btnRemove->callback(onRemove, this);
@@ -282,11 +237,11 @@ void MainWindow::createToolbar() {
     }
     
     // Spacer
-    m_spacer2 = new Fl_Box(0, 0, 20, 30);
+    m_spacer2 = new Fl_Box(0, 0, 20, ToolbarLayout::kButtonHeight);
     m_spacer2->box(FL_NO_BOX);
     
     // Preferences button
-    m_btnPrefs = new Fl_Button(0, 0, 120, 30, "Preferences");
+    m_btnPrefs = new Fl_Button(0, 0, 120, ToolbarLayout::kButtonHeight, "Preferences");
     m_btnPrefs->box(FL_FLAT_BOX);
     m_btnPrefs->callback(onPreferences, this);
     m_btnPrefs->tooltip("Preferences");
@@ -296,13 +251,13 @@ void MainWindow::createToolbar() {
     }
     
     // Theme button
-    m_darkModeBtn = new Fl_Button(0, 0, 30, 30);
+    m_darkModeBtn = new Fl_Button(0, 0, ToolbarLayout::kThemeButton, ToolbarLayout::kButtonHeight);
     m_darkModeBtn->box(FL_FLAT_BOX);
     m_darkModeBtn->tooltip("Switch Theme");
     m_darkModeBtn->callback(onToggleTheme, this);
 
     // Dynamic RAM Mode Selector
-    m_choiceRamMode = new Fl_Choice(0, 0, 50, 30);
+    m_choiceRamMode = new Fl_Choice(0, 0, ToolbarLayout::kRamChoice, ToolbarLayout::kButtonHeight);
     // Add items with icons if available
     int idx;
     
@@ -330,24 +285,59 @@ void MainWindow::createToolbar() {
     m_choiceRamMode->callback(onRamModeChanged, this);
     m_choiceRamMode->value(SettingsManager::instance().getRamMode());
 
-    // Toggle Network Limit button
-    m_btnLimit = new Fl_Button(0, 0, 150, 30, "LIMIT NET SPEED: OFF");
+    // Toggle Network Limit button. Icon only, at every toolbar level: the bolt
+    // is the whole affordance and the state is carried by the magenta colour.
+    m_btnLimit = new Fl_Button(0, 0, ToolbarLayout::kIconButton, ToolbarLayout::kButtonHeight);
     m_btnLimit->box(FL_FLAT_BOX);
-    m_btnLimit->tooltip("Limit network speed");
+    m_btnLimit->tooltip("Limit network speed 50%");
     m_btnLimit->callback(onToggleLimit, this);
+    if (m_limitIcon) m_btnLimit->image(m_limitIcon);
+    // Whatever FLTK handed this button at creation is what its neighbours in
+    // the bar still use, so it is the background to go back to when the limit
+    // is switched off: hard-coding a grey here is what made this button look
+    // lighter than the rest of the toolbar.
+    m_limitIdleColor = m_btnLimit->color();
     
     // Search toggle, last on the right. Fl_Pack lays children out in creation
     // order, so creating it here puts it at the far right of the toolbar.
-    m_btnSearch = new Fl_Button(0, 0, 40, 30);
+    m_btnSearch = new Fl_Button(0, 0, ToolbarLayout::kIconButton, ToolbarLayout::kButtonHeight);
     m_btnSearch->box(FL_FLAT_BOX);
     m_btnSearch->tooltip("Search torrents");
     m_btnSearch->callback(onSearchToggle, this);
-    if (Resources::getSearchIcon()) {
+    // Prefer the supplied PNG, falling back to the built-in magnifier so a
+    // missing asset never leaves the button blank.
+    if (m_findIcon) {
+        m_btnSearch->image(m_findIcon);
+    } else if (Resources::getSearchIcon()) {
         m_btnSearch->image(Resources::getSearchIcon());
     }
     
+    // Last child, mirroring the leading spacer, so the bar keeps the full window
+    // width instead of shrinking to its content.
+    m_trailSpacer = new Fl_Box(0, 0, 0, ToolbarLayout::kButtonHeight);
+    m_trailSpacer->box(FL_NO_BOX);
+
+    m_toolbarPack->end();
     m_toolbar->end();
-    
+
+    // kChildCount is derived from the table, but the pack is built out of
+    // individual `new` calls, so nothing in the types ties the two together: add
+    // a fourteenth widget here and every gap count in ToolbarLayout is one too
+    // small, with no compile error and nothing visibly wrong except a bar that
+    // is a few pixels out of centre. This is the one place that can see both
+    // numbers, so it is where the disagreement is caught. Fl::error() alone
+    // only prints, so this aborts rather than carrying on with a wrong bar.
+    if (m_toolbarPack->children() != ToolbarLayout::kChildCount) {
+        char msg[256];
+        snprintf(msg, sizeof msg,
+                 "toolbar pack holds %d children but ToolbarLayout::kChildCount "
+                 "is %d: a widget was added or removed without updating the "
+                 "table, and every gap count will now be wrong",
+                 m_toolbarPack->children(), ToolbarLayout::kChildCount);
+        Fl::error("%s", msg);
+        std::abort();
+    }
+
     // Start from the widest layout and let resize() narrow it down if needed
     layoutToolbar(w());
 }
@@ -516,101 +506,96 @@ void MainWindow::layoutSearchViewContents(int available) {
     }
 }
 
-// The toolbar has no layout manager that shrinks widgets for us: Fl_Pack lays
+// The toolbar has no layout manager that shrinks widgets for us: the pack lays
 // every child out at the width it was constructed with, and if they add up to
-// more than the window it grows past the window edge instead. So we pick a
-// level of detail from the space available and set the widths ourselves.
+// more than the window it grows past the window edge instead. So we ask
+// ToolbarLayout which level of detail fits and apply it.
 //
-//   2 = full text, 1 = short text, 0 = icons only
+// The pack also stretches every child to its own height, which is why it is
+// sized to kButtonHeight rather than to the bar height: the bar is the strip,
+// the pack is the row of buttons inside it.
+//
+// The numbers live in ToolbarLayout; this function only moves widgets.
 void MainWindow::layoutToolbar(int available) {
-    if (!m_toolbar) return;
-    
-    // Widths needed by each level, including Fl_Pack's 5px spacing (gaps between
-    // the 11 children, so 10 gaps).
-    //   770+50 = 820px -> full text
-    //   586+50 = 636px -> short text
-    //   360+50 = 410px -> icons only (safety net, below the 720px minimum)
-    const int FULL  = 130 + 130 + 20 + 40 + 40 + 20 + 120 + 30 + 50 + 40 + 150;
-    const int SHORT =  90 +  95 +  8 + 40 + 40 +  8 +  75 + 30 + 50 + 40 + 110;
-    const int ICONS =  40 +  40 +  0 + 40 + 40 +  0 +  40 + 30 + 50 + 40 +  40;
-    const int SPACING = 5;
-    const int GAPS = 10;   // 11 children
-    
-    int level;
-    if (available >= FULL + SPACING * GAPS) {
-        level = 2;
-    } else if (available >= SHORT + SPACING * GAPS) {
-        level = 1;
-    } else {
-        level = 0;
-    }
-    
-    if (level == m_toolbarLevel) return; // Nothing changed, don't churn the UI
+    if (!m_toolbar || !m_toolbarPack) return;
+
+    // The numbers come from ToolbarLayout; this function only moves widgets.
+    ToolbarLayout::Level level = ToolbarLayout::forWidth(available);
+    const ToolbarLayout::Spec& s = ToolbarLayout::spec(level);
+    int slack = available - ToolbarLayout::requiredWidth(level);
+    if (slack < 0) slack = 0;
+
+    // Both parts have to match before we skip the work. Comparing the level
+    // alone would leave the bar uncentred when the window is widened without
+    // changing level, which is the common case on a wide screen.
+    if (level == m_toolbarLevel && slack == m_toolbarSlack) return;
     m_toolbarLevel = level;
-    
-    switch (level) {
-        case 2:
-            m_btnAdd->label(" Add Torrent");
-            m_btnAdd->resize(m_btnAdd->x(), m_btnAdd->y(), 130, m_btnAdd->h());
-            m_btnCreate->label(" Create Torrent");
-            m_btnCreate->resize(m_btnCreate->x(), m_btnCreate->y(), 130, m_btnCreate->h());
-            m_spacer1->show(); m_spacer1->resize(m_spacer1->x(), m_spacer1->y(), 20, m_spacer1->h());
-            m_btnPrefs->label("Preferences");
-            m_btnPrefs->resize(m_btnPrefs->x(), m_btnPrefs->y(), 120, m_btnPrefs->h());
-            m_spacer2->show(); m_spacer2->resize(m_spacer2->x(), m_spacer2->y(), 20, m_spacer2->h());
-            break;
-            
-        case 1:
-            m_btnAdd->label(" Add");
-            m_btnAdd->resize(m_btnAdd->x(), m_btnAdd->y(), 90, m_btnAdd->h());
-            m_btnCreate->label(" Create");
-            m_btnCreate->resize(m_btnCreate->x(), m_btnCreate->y(), 95, m_btnCreate->h());
-            m_spacer1->show(); m_spacer1->resize(m_spacer1->x(), m_spacer1->y(), 8, m_spacer1->h());
-            m_btnPrefs->label("Prefs");
-            m_btnPrefs->resize(m_btnPrefs->x(), m_btnPrefs->y(), 75, m_btnPrefs->h());
-            m_spacer2->show(); m_spacer2->resize(m_spacer2->x(), m_spacer2->y(), 8, m_spacer2->h());
-            break;
-            
-        default:
-            // Icons only: no room for any text
-            m_btnAdd->label(nullptr);
-            m_btnAdd->resize(m_btnAdd->x(), m_btnAdd->y(), 40, m_btnAdd->h());
-            m_btnCreate->label(nullptr);
-            m_btnCreate->resize(m_btnCreate->x(), m_btnCreate->y(), 40, m_btnCreate->h());
-            m_spacer1->hide(); m_spacer1->resize(m_spacer1->x(), m_spacer1->y(), 0, m_spacer1->h());
-            m_btnPrefs->label(nullptr);
-            m_btnPrefs->resize(m_btnPrefs->x(), m_btnPrefs->y(), 40, m_btnPrefs->h());
-            m_spacer2->hide(); m_spacer2->resize(m_spacer2->x(), m_spacer2->y(), 0, m_spacer2->h());
-            break;
-    }
-    
-    // Fixed-size buttons never change
-    m_btnTogglePause->resize(m_btnTogglePause->x(), m_btnTogglePause->y(), 40, m_btnTogglePause->h());
-    m_btnRemove->resize(m_btnRemove->x(), m_btnRemove->y(), 40, m_btnRemove->h());
-    m_darkModeBtn->resize(m_darkModeBtn->x(), m_darkModeBtn->y(), 30, m_darkModeBtn->h());
-    m_choiceRamMode->resize(m_choiceRamMode->x(), m_choiceRamMode->y(), 50, m_choiceRamMode->h());
-    m_btnSearch->resize(m_btnSearch->x(), m_btnSearch->y(), 40, m_btnSearch->h());
-    
-    // The limit button keeps some text even at the narrowest level
-    m_btnLimit->resize(m_btnLimit->x(), m_btnLimit->y(),
-                        level == 2 ? 150 : (level == 1 ? 110 : 40),
-                        m_btnLimit->h());
-    applyLimitLabel();
-    
+    m_toolbarSlack = slack;
+
+    const int grow = ToolbarLayout::growPerButton(slack);
+
+    auto setButton = [](Fl_Button* b, const char* label, int width) {
+        b->label(label);
+        b->resize(b->x(), b->y(), width, b->h());
+    };
+    // Visibility is ToolbarLayout's rule to answer, not this function's: the
+    // pack drops a hidden child and the gap on either side of it, which is why
+    // requiredWidth() counts the gap anyway. A zero-width spacer draws nothing,
+    // so it is in the pack purely to hold those two gaps.
+    auto setSpacer = [](Fl_Box* spacer, int width) {
+        if (ToolbarLayout::spacerStaysVisible(width)) spacer->show();
+        else spacer->hide();
+        spacer->resize(spacer->x(), spacer->y(), width, spacer->h());
+    };
+    auto setWidth = [](Fl_Widget* w, int width) {
+        w->resize(w->x(), w->y(), width, w->h());
+    };
+
+    // Half the slack the buttons did not take, on the left. Fl_Pack leaves the
+    // rest as the margin on the right, so the block sits in the middle.
+    const int margin = ToolbarLayout::margin(slack);
+    setSpacer(m_leadSpacer, margin);
+    setSpacer(m_trailSpacer, margin);
+
+    // The labelled buttons widen to use some of the spare room, up to the cap.
+    setButton(m_btnAdd, s.addLabel, s.addWidth + grow);
+    setButton(m_btnCreate, s.createLabel, s.createWidth + grow);
+    setButton(m_btnPrefs, s.prefsLabel, s.prefsWidth + grow);
+    setSpacer(m_spacer1, s.spacerWidth);
+    setSpacer(m_spacer2, s.spacerWidth);
+
+    // Fixed-size widgets. The limit button is one of them: it carries an icon
+    // only, so it never follows the level and never widens.
+    setWidth(m_btnTogglePause, ToolbarLayout::kIconButton);
+    setWidth(m_btnRemove, ToolbarLayout::kIconButton);
+    setWidth(m_darkModeBtn, ToolbarLayout::kThemeButton);
+    setWidth(m_choiceRamMode, ToolbarLayout::kRamChoice);
+    setWidth(m_btnSearch, ToolbarLayout::kIconButton);
+    setWidth(m_btnLimit, ToolbarLayout::kIconButton);
+
+    // The row of buttons keeps the pack's height policy on every pass, so a
+    // resize cannot leave it stretched from the previous layout. The pack
+    // stretches its children to its own height, so this is also what keeps the
+    // buttons at kButtonHeight instead of the bar's.
+    const int pad = ToolbarLayout::kBarPadding;
+    m_toolbarPack->resize(m_toolbar->x(), m_toolbar->y() + pad,
+                          available, ToolbarLayout::kButtonHeight);
+
+    applyLimitStyle();
     m_toolbar->redraw();
 }
 
-// Kept in its own function because both the layout and the toggle need it,
-// and the wording depends on how much room the toolbar currently has.
-void MainWindow::applyLimitLabel() {
+// Kept in its own function because both the theme and the toggle need it. The
+// button carries no text, so the limit state is shown by the bolt's colour
+// alone: magenta while the limit is on, the toolbar's own background while it
+// is off.
+void MainWindow::applyLimitStyle() {
     if (!m_btnLimit) return;
-    
-    if (m_toolbarLevel == 0) {
-        m_btnLimit->label(nullptr);   // Icon-only level
-    } else if (m_toolbarLevel == 1) {
-        m_btnLimit->label(m_limitModerate ? " NET: 50%" : " NET: OFF");
+
+    if (m_limitModerate) {
+        m_btnLimit->color(fl_rgb_color(255, 0, 255));
     } else {
-        m_btnLimit->label(m_limitModerate ? "LIMIT NET SPEED: 50%" : "LIMIT NET SPEED: OFF");
+        m_btnLimit->color(m_limitIdleColor);
     }
     m_btnLimit->redraw();
 }
@@ -777,6 +762,18 @@ void MainWindow::updateToolbar() {
     if (m_btnRemove) hasSelection ? m_btnRemove->activate() : m_btnRemove->deactivate();
 }
 
+// The censoring eye icons are the only images that follow the theme, so they
+// are loaded again whenever it changes. Owning both halves here is what keeps
+// the constructor and applyTheme() from drifting apart.
+void MainWindow::reloadEyeIcons() {
+    const bool dark = m_darkMode;
+
+    delete m_eyeOpenedIcon;
+    delete m_eyeClosedIcon;
+    m_eyeOpenedIcon = AssetLoader::load(dark ? "eye_opened_bright.png" : "eye_opened_dark.png", ToolbarLayout::kIconSize);
+    m_eyeClosedIcon = AssetLoader::load(dark ? "eye_closed_bright.png" : "eye_closed_dark.png", ToolbarLayout::kIconSize);
+}
+
 void MainWindow::applyTheme() {
     bool darkMode = m_darkMode;
     
@@ -815,31 +812,8 @@ void MainWindow::applyTheme() {
         }
     }
 
-    // Refresh eye icons for the new theme
-    std::string appDir = PathUtils::getAppDirPath();
-    std::string assetsDir = appDir + "/assets/";
-    std::replace(assetsDir.begin(), assetsDir.end(), '\\', '/');
-
-    delete m_eyeOpenedIcon;
-    delete m_eyeClosedIcon;
-    m_eyeOpenedIcon = nullptr;
-    m_eyeClosedIcon = nullptr;
-
-    std::string openedFile = darkMode ? "eye_opened_bright.png" : "eye_opened_dark.png";
-    std::string closedFile = darkMode ? "eye_closed_bright.png" : "eye_closed_dark.png";
-
-    Fl_PNG_Image* imgTemp;
-    imgTemp = new Fl_PNG_Image((assetsDir + openedFile).c_str());
-    if (imgTemp->d() > 0) {
-        m_eyeOpenedIcon = imgTemp->copy(20, 20);
-    }
-    delete imgTemp;
-
-    imgTemp = new Fl_PNG_Image((assetsDir + closedFile).c_str());
-    if (imgTemp->d() > 0) {
-        m_eyeClosedIcon = imgTemp->copy(20, 20);
-    }
-    delete imgTemp;
+    // The eye icons are the only images that follow the theme.
+    reloadEyeIcons();
 
     if (m_btnCensor) {
         if (darkMode) {
@@ -864,15 +838,9 @@ void MainWindow::applyTheme() {
         m_searchResults->applyTheme(darkMode);
     }
     
-    if (m_btnLimit) {
-        if (darkMode) {
-            m_btnLimit->color(fl_rgb_color(30, 30, 30));
-            m_btnLimit->labelcolor(FL_WHITE);
-        } else {
-            m_btnLimit->color(fl_rgb_color(220, 220, 220));
-            m_btnLimit->labelcolor(FL_BLACK);
-        }
-    }
+    // The limit button keeps its magenta while the limit is on, so its colour
+    // is owned by applyLimitStyle(), which the toggle also goes through.
+    if (m_btnLimit) applyLimitStyle();
 
     if (m_choiceRamMode) {
         if (darkMode) {
@@ -900,7 +868,7 @@ void MainWindow::toggleNetworkLimit() {
     m_limitModerate = !m_limitModerate;
     
     if (m_btnLimit) {
-        applyLimitLabel();
+        applyLimitStyle();
     }
     
     if (m_manager) {

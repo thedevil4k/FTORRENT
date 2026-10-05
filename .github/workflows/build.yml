@@ -157,6 +157,32 @@ jobs:
         name: FTorrent-rpm-${{ matrix.arch }}
         path: build_linux_${{ matrix.arch }}/*.rpm
 
+  test:
+    # The toolbar suite runs the real MainWindow headless and asserts the drawn
+    # geometry, so a change to the centring, the spacing or the child count fails
+    # here rather than being noticed by eye. `flows` needs the network for its
+    # search and torrent steps, so it carries the `network` label and is excluded
+    # from this run.
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y xvfb
+        bash scripts/linux/setup/setup-linux.sh
+
+    - name: Build the tests
+      run: |
+        cmake -S . -B build_tests -DCMAKE_BUILD_TYPE=Release -DFTORRENT_BUILD_TESTS=ON
+        cmake --build build_tests -j"$(nproc)"
+
+    - name: Run the tests
+      # xvfb-run gives the tests a display: every assertion is made against
+      # widget state or offscreen pixels, but FLTK still opens a window.
+      run: xvfb-run -a ctest --test-dir build_tests --output-on-failure -LE network
+
   build-arch:
     runs-on: ubuntu-24.04
     steps:

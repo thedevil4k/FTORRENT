@@ -6,6 +6,7 @@
 #include <FL/Fl_Pack.H>
 #include <FL/Fl_Box.H>
 #include <memory>
+#include "ToolbarLayout.h"
 #include "TorrentManager.h"
 #include "TorrentListWidget.h"
 #include "PreferencesDialog.h"
@@ -73,8 +74,18 @@ public:    MainWindow(int w, int h, const char* title);
     
 private:
     // UI Components
-    Fl_Pack* m_toolbar;
+    // The bar and the row of buttons are separate widgets. The group is the
+    // 44px strip; the pack inside it is 34px, because Fl_Pack stretches its
+    // children to ITS OWN height and the buttons have to be the ones that get
+    // padding, not the strip.
+    Fl_Group* m_toolbar;
+    Fl_Pack* m_toolbarPack;
     Fl_Group* m_statusGroup;
+    // Elastic spacers at both ends of the pack: their widths are the margins
+    // that centre the rest of the bar in the window. Fl_Pack shrinks to its
+    // children, so both ends are needed for the block to land in the middle.
+    Fl_Box* m_leadSpacer;
+    Fl_Box* m_trailSpacer;
     Fl_Button* m_btnAdd;
     Fl_Button* m_btnCreate;
     Fl_Box* m_spacer1;
@@ -111,6 +122,9 @@ private:
     Fl_Button* m_btnLimit;
     Fl_Choice* m_choiceRamMode;
     bool m_limitModerate;
+    // The background the limit button had before it ever turned magenta, i.e.
+    // the one every other button in the toolbar uses.
+    Fl_Color m_limitIdleColor;
     bool m_censored;
     bool m_showPublicIp;
     
@@ -119,9 +133,13 @@ private:
     // settings.ini can hand the light theme over to the next launch.
     bool m_darkMode;
     
-    // How much room the toolbar had when it was last laid out, so that
-    // toggleNetworkLimit() can reapply its label with the right detail level.
-    int m_toolbarLevel;
+    // How much room the toolbar had when it was last laid out, as a level of
+    // detail. The policy behind the number lives in ToolbarLayout.
+    ToolbarLayout::Level m_toolbarLevel;
+    // How much spare width the bar was last laid out for. The level alone is
+    // not enough to tell whether the layout needs redoing: widening the window
+    // inside the same level still has to move the block and re-centre it.
+    int m_toolbarSlack;
     
     // False once the window is destroyed: worker threads check it before
     // handing results back, so a search in flight cannot touch freed memory.
@@ -173,6 +191,10 @@ private:
     Fl_Image* m_turboIcon;
     Fl_Image* m_eyeOpenedIcon;
     Fl_Image* m_eyeClosedIcon;
+    // Supplied as PNGs. Unlike the eye icons these never change with the
+    // theme, so they are loaded once and never reloaded.
+    Fl_Image* m_findIcon;
+    Fl_Image* m_limitIcon;
     
     // Latency measurement
     int m_latency = -1;
@@ -180,7 +202,7 @@ private:
     
     // Layout constants
     static constexpr int MENU_HEIGHT = 0;
-    static constexpr int TOOLBAR_HEIGHT = 40;
+    static constexpr int TOOLBAR_HEIGHT = ToolbarLayout::kBarHeight;
     static constexpr int STATUS_HEIGHT = 25;
     // Search bar sits right under the toolbar; the status line under it
     static constexpr int SEARCH_BAR_HEIGHT = 35;
@@ -207,7 +229,8 @@ private:
     
     // Responsive layout
     void layoutToolbar(int available);
-    void applyLimitLabel();
+    void reloadEyeIcons();
+    void applyLimitStyle();
     
     // Menu callbacks
     static void menuCallback(Fl_Widget* w, void* data);

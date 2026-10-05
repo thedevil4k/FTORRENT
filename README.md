@@ -1,6 +1,6 @@
-# 🌪️ FTorrent | Best uTorrent Alternative & qBittorrent Rival 2026
+# FTorrent
 
-**The Ultra-Lightweight, High-Performance, and Ad-Free BitTorrent Client for Power Users. Built with C++20.**
+A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++20** on top of **FLTK** and **libtorrent-rasterbar**. No Electron, no bundled browser, no telemetry.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/thedevil4k/FTORRENT)](https://github.com/thedevil4k/FTORRENT/releases)
@@ -8,97 +8,121 @@
 [![GitHub stars](https://img.shields.io/github/stars/thedevil4k/FTORRENT?style=social)](https://github.com/thedevil4k/FTORRENT/stargazers)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/thedevil4k/FTORRENT/releases)
 
-A modern, minimalist, and ultra-lightweight BitTorrent client designed for Windows and Linux. Built with **C++20**, **FLTK**, and **libtorrent-rasterbar**. Experience extreme performance with zero ads, total privacy, and a tiny memory footprint. The #1 alternative to uTorrent web and qBittorrent.
-
----
-
-## ⚡ Quick Start: Download Now
-
-Get the latest version of FTorrent for your platform. No installation required for portable versions!
+![FTorrent main window](docs/img/app-screenshot.png)
 
 > [!TIP]
-> ### [🚀 Download Latest Release](https://github.com/thedevil4k/FTORRENT/releases)
-> *Secure, ad-free, and open-source torrenting.*
+> ### [Download the latest release](https://github.com/thedevil4k/FTORRENT/releases)
+> Windows releases ship as a ZIP, Linux as Arch, Debian and RPM packages.
 
 ---
 
-### 🚀 Why Choose FTorrent?
+## What it does
 
-| Feature | **FTORRENT** | qBittorrent | uTorrent |
-| :--- | :---: | :---: | :---: |
-| **Ads & Bloat** | ❌ None | ❌ None | ✅ Heavy Ads |
-| **Memory Usage** | 💎 **<20MB** | 🐢 100MB+ | 🐌 80MB+ |
-| **Engine** | Native C++20 | Qt Framework | Proprietary |
-| **Speed** | ⚡ Ultra-High | ✅ Standard | ⚠️ Throttled |
+**Torrents**
+- Add a `.torrent` file, a folder or a magnet link — or drop them onto the list window
+- Create a `.torrent` from a folder
+- Pause and resume per torrent, remove with confirmation
+- Sortable list with name, size, progress, status, down speed, up speed, ETA, ratio and peers
 
----
+**Speed and resource control**
+- One-click **50 % rate limit** for the session (magenta when active), released back to your configured limits
+- RAM usage mode: **ECO** (zero buffer), **NORMAL** (balanced), **TURBO** (max buffer)
+- Global up/down rate limits, connection limits and listen port in Preferences
 
-## ✨ Key Features
+**Search**
+- Search torrents from the toolbar across Nyaa.si, The Pirate Bay (HTML and its apibay API), BTDig, SolidTorrents and BitSearch, each with a proxy/mirror fallback when the direct address is blocked
+- Per-site categories and result pages, shown in a dedicated view with a **Back to my torrents** return
 
--   🚀 **Native Performance:** No Electron, no heavy frameworks—just pure, high-performance C++20.
--   💪 **Elite P2P Engine:** Powered by `libtorrent-rasterbar`, the industry standard for speed and stability.
--   🔒 **Privacy Focused:** Built-in IP censorship/privacy mode to protect your identity in UI and screenshots.
--   ⚡ **Multi-Core Optimized:** Modern multi-threaded architecture ensures zero UI lag.
--   🎨 **Modern Classic UI:** A clean, intuitive design inspired by the best of uTorrent but built for today.
--   📦 **Ultra-Portable:** Tiny executable with no external dependencies required.
--   🔧 **Advanced Control:** Granular settings for DHT, PEX, LSD, and encryption.
--   📉 **Real-time Limits:** Change bandwidth limits instantly without interruptions.
--   📊 **Resource Efficient:** Built-in CPU and RAM monitor to keep track of performance.
+**Preferences** — four tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode).
 
----
-
-## 📚 Documentation
-
--   📖 **[User Guide](USER-GUIDE.md)**: Optimize your downloads and network settings.
--   🏗️ **[Architecture Overview](ARCHITECTURE.md)**: Explore the system design and project structure.
--   ⚡ **[Multithreading System](MULTITHREADING-ARCHITECTURE.md)**: Deep dive into the asynchronous core.
--   🖥️ **[UI Design](UI-DESIGN.md)**: Details on the interface and layout.
+**Interface**
+- Dark and light themes; dark is the default and theme choice is per session
+- Censorship toggle in the status bar, to hide sensitive fields from screenshots
+- Status bar with torrent counts, RAM, version, connection latency and — only if you ask for it — your public IP
 
 ---
 
-## 🛠️ For Developers & Technical Users
+## Building from source
 
-FTorrent is designed to be easily extensible and compilable from source.
+Requires **CMake 3.15+**, a C++20 compiler (GCC 11+, Clang 14+ or VS 2022), **FLTK**, **libtorrent-rasterbar**, **OpenSSL**, zlib, libpng and libjpeg.
 
-### 🚀 Compilation Guide
-If you want to build FTorrent yourself, please follow our detailed guides:
+```bash
+# Linux — installs every build and test dependency first
+./scripts/linux/setup/setup-linux.sh
 
--   **[Complete Compilation Guide](COMPILE-GUIDE.md)**: Step-by-step instructions for all platforms.
--   **[Building & Packaging](scripts/BUILDING.md)**: How we create our installers and portable packages.
-
-### Windows Setup
-```powershell
-.\scripts\windows\setup-windows.bat
-.\scripts\windows\compilation\build-win.ps1
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j"$(nproc)"
+./build/FTorrent
 ```
 
-### System Requirements
--   **OS:** Windows 10/11 or modern Linux (Ubuntu 24.04+ recommended).
--   **Compiler:** Visual Studio 2022 (Win) / GCC 11+ / Clang 14+ (Linux) for C++20 support.
--   **Tools:** CMake 3.15+ and vcpkg.
+```powershell
+# Windows — installs vcpkg dependencies first
+.\scripts\windows\setup-windows.bat
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+The app resolves its `assets/` folder next to the executable, so run the binary from the build tree or copy `src/assets/` beside it.
+
+Full step-by-step instructions: **[COMPILE-GUIDE.md](COMPILE-GUIDE.md)**. Packaging and installers: **[scripts/BUILDING.md](scripts/BUILDING.md)**.
+
+## Tests
+
+The suite is CTest-based and off by default, so a normal build stays a plain app build with no test-only dependencies.
+
+```bash
+cmake -S . -B build -DFTORRENT_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+| test | what it covers |
+| :--- | :--- |
+| `toolbar_layout` | toolbar geometry and the level thresholds across every width from 400 to 1920 px |
+| `toolbar_clicks` | every toolbar button hit-testable and clickable at the narrowest supported width |
+| `icons_full` / `icons_missing` | icon rendering, toolbar levels and spacing, with and without the on-disk assets |
+| `flows` | preferences, add, remove, rate limit, search, pause/resume end to end |
+
+`flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
+
+CI builds and runs the offline subset on pushes and pull requests that touch code; see [.github/workflows/build.yml](.github/workflows/build.yml).
 
 ---
 
-## 🤝 Contributing & Community
+## Repository layout
 
-Contributions are what make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+| path | contents |
+| :--- | :--- |
+| `src/` | the application: `MainWindow`, `TorrentSession`/`TorrentManager`, `SearchEngine`, `PreferencesDialog`, `AssetLoader`, `Resources`, `ToolbarLayout` |
+| `tests/` | the CTest suite |
+| `scripts/` | dependency setup, compilation and packaging scripts per platform |
+| `docs/` | the public site sources (`index.html`) and its assets |
+| `packaging/` | Arch, deb and rpm packaging |
 
-1. Fork the Project
-2. Create your Feature Branch
-3. Open a Pull Request
-
-Check our **[Technical Reference](TECHNICAL-REFERENCE.md)** for developer-focused documentation.
-
----
-
-## 📝 License
-
-Distributed under the **MIT License**. See `LICENSE` for more information.
-
----
----
-*Made with ❤️ by the community, for the BitTorrent community.*
+Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
 
-**Keywords:** uTorrent alternative, qBittorrent rival, best torrent client 2026, lightweight bittorrent client, open source torrent downloader, fast torrenting, no ads torrent client, windows 11 torrent client, linux torrent client, fastest bittorrent software, secure p2p downloader, privacy focused torrenting.
+## Documentation
+
+- **[USER-GUIDE.md](USER-GUIDE.md)** — using the client
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the code is put together
+- **[UI-DESIGN.md](UI-DESIGN.md)** — interface and layout rules
+- **[MULTITHREADING-ARCHITECTURE.md](MULTITHREADING-ARCHITECTURE.md)** — the asynchronous core
+- **[TECHNICAL-REFERENCE.md](TECHNICAL-REFERENCE.md)** — developer reference
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — releases and packaging
+
+---
+
+## What changed recently
+
+- **Toolbar rebuilt around one owner.** Bar and button sizes, spacing, the three toolbar levels and the centring arithmetic all live in [`src/ToolbarLayout`](src/ToolbarLayout.h), a policy module with no FLTK dependency. The bar is centred at every width from the 720 px minimum upwards, and the child count that `requiredWidth()` multiplies by the gap is derived from the same table that sizes the widgets, with a startup check that aborts if the pack ever disagrees.
+- **Assets load from disk with a compiled-in fallback.** [`AssetLoader`](src/AssetLoader.h) provides the toolbar PNGs at the right size; if one is missing, the built-in glyph is used instead, so a button is never blank. The XPM glyphs are resampled to 26 px at startup rather than scaled by the widget.
+- **Public IP in the status bar is off by default.** A new installation does not look its address up online until you tick the box; an existing `ShowPublicIp=true` is left alone.
+- **The 50 % rate limit button says so.** Its tooltip now reads `Limit network speed 50%`.
+- **A test suite in the repository.** Five CTest programs, 378 checks, built from the same objects the app ships.
+
+## License
+
+Distributed under the MIT License.

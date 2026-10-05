@@ -51,12 +51,18 @@ if(NOT LibtorrentRasterbar_FOUND)
 endif()
 
 # Add source files
+#
+# main.cpp is kept out of this list on purpose: it is the app's entry point, and
+# the tests supply their own. Everything else is a library both link, so a test
+# exercises the same objects the shipping binary is built from rather than a
+# second copy that can drift.
 set(SOURCES
-    src/main.cpp
     src/TorrentSession.cpp
     src/TorrentItem.cpp
     src/TorrentManager.cpp
     src/SettingsManager.cpp
+    src/AssetLoader.cpp
+    src/ToolbarLayout.cpp
     src/MainWindow.cpp
     src/TorrentListWidget.cpp
     src/PreferencesDialog.cpp
@@ -79,11 +85,15 @@ if(WIN32)
     list(APPEND SOURCES src/resources.rc)
 endif()
 
+set(APP_SOURCES src/main.cpp)
+
 set(HEADERS
     src/TorrentSession.h
     src/TorrentItem.h
     src/TorrentManager.h
     src/SettingsManager.h
+    src/AssetLoader.h
+    src/ToolbarLayout.h
     src/MainWindow.h
     src/TorrentListWidget.h
     src/PreferencesDialog.h
@@ -103,17 +113,17 @@ set(HEADERS
     src/FileListService.h
 )
 
-# Add executable
-add_executable(FTorrent ${SOURCES} ${HEADERS})
+# The shared body of the app: everything except main(). An OBJECT library, so
+# the executable and every test compile each translation unit once and link the
+# same code, and a change to a source file is one rebuild rather than N.
+add_library(ftorrent_core OBJECT ${SOURCES} ${HEADERS})
 
-# Include directories
-target_include_directories(FTorrent PRIVATE 
+target_include_directories(ftorrent_core PUBLIC
     ${FLTK_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Link libraries
-target_link_libraries(FTorrent PRIVATE 
+target_link_libraries(ftorrent_core PUBLIC
     ${FLTK_LIBRARIES}
     PNG::PNG
     JPEG::JPEG
@@ -121,22 +131,47 @@ target_link_libraries(FTorrent PRIVATE
     LibtorrentRasterbar::torrent-rasterbar
 )
 
+# Add executable
+add_executable(FTorrent ${APP_SOURCES})
+target_link_libraries(FTorrent PRIVATE ftorrent_core)
+
 # Platform-specific settings
 if(WIN32)
-    target_link_libraries(FTorrent PRIVATE ws2_32 wsock32 comctl32 wininet)
+    target_link_libraries(ftorrent_core PUBLIC ws2_32 wsock32 comctl32 wininet)
     # Use standard windowed app (no console)
     set_target_properties(FTorrent PROPERTIES WIN32_EXECUTABLE ON)
     # Define Windows version
-    target_compile_definitions(FTorrent PRIVATE _WIN32_WINNT=0x0A00)
+    target_compile_definitions(ftorrent_core PUBLIC _WIN32_WINNT=0x0A00)
 else()
     # On Linux, we might need pthread
     find_package(Threads REQUIRED)
-    target_link_libraries(FTorrent PRIVATE Threads::Threads)
+    target_link_libraries(ftorrent_core PUBLIC Threads::Threads)
 
     # HTTP client for the torrent search (Windows uses WinInet instead)
     find_package(CURL REQUIRED)
-    target_link_libraries(FTorrent PRIVATE CURL::libcurl)
+    target_link_libraries(ftorrent_core PUBLIC CURL::libcurl)
 endif()
+# --- Tests ---
+#
+# Off by default: a normal build should be a plain application build, and the
+# tests link the whole libtorrent stack, which is not something a packager needs
+# just to produce a binary.
+#
+#   cmake -S . -B build -DFTORRENT_BUILD_TESTS=ON
+#   cmake --build build
+#   ctest --test-dir build --output-on-failure
+#
+# They run headless and need no display, but on a Wayland-only session FLTK will
+# still try to reach a compositor, so FTORRENT_TEST_ENV carries the same overrides
+# the probes were run with. `flows` needs the network for its search and torrent
+# steps and is labelled accordingly, so it can be excluded where there is none.
+option(FTORRENT_BUILD_TESTS "Build the FTorrent test programs" OFF)
+
+if(FTORRENT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
 # Installation Rules
 include(GNUInstallDirs)
 install(TARGETS FTorrent

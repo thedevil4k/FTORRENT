@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <cctype>
 #include <algorithm>
 
 // User agent reported to trackers. Bump it together with the project version.
@@ -39,9 +40,13 @@ bool SettingsManager::load() {
     // The theme is not a setting any more, but parseLine() keeps every key it
     // reads, so a DarkMode left by an older build would be written back on
     // every save and the file would keep advertising something the app ignores.
-    // Dropping it here, next to the other post-parse fixup, is enough: the next
-    // save rewrites the file without it and no other key is affected.
-    m_settings.erase("DarkMode");
+    // Match the key case-insensitively: the retired name survives in any
+    // spelling, so an exact erase only removed the one spelling this app wrote.
+    for (auto it = m_settings.begin(); it != m_settings.end();) {
+        std::string key = it->first;
+        for (char& c : key) c = (char)std::tolower((unsigned char)c);
+        if (key == "darkmode") it = m_settings.erase(it); else ++it;
+    }
     
     migrateUserAgent();
     return true;
@@ -106,7 +111,11 @@ void SettingsManager::setDefaults() {
     setWindowMaximized(false);
     setRamMode(1); // Normal (Default)
     setIpCensored(false);
-    setShowPublicIp(true);
+    // Off by default: showing the IP makes the app look it up on an external
+    // service (see TorrentManager's periodic check), so a fresh install should
+    // not contact anything until the user asks for it. The checkbox in
+    // Preferences turns it on.
+    setShowPublicIp(false);
     
     // Advanced
     setUserAgent(DEFAULT_USER_AGENT);
@@ -328,7 +337,9 @@ void SettingsManager::setIpCensored(bool censored) {
 }
 
 bool SettingsManager::getShowPublicIp() const {
-    return getBool("ShowPublicIp", true);
+    // The fallback has to match setDefaults(), or a settings file missing the
+    // key would come up with a different answer than a fresh one.
+    return getBool("ShowPublicIp", false);
 }
 
 void SettingsManager::setShowPublicIp(bool show) {
