@@ -81,7 +81,7 @@ HttpClient::Response HttpClient::get(const std::string& url,
     
     DWORD statusCode = 0;
     DWORD len = sizeof(statusCode);
-    if (InternetQueryInfoA(hConnect, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+    if (HttpQueryInfoA(hConnect, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
                             &statusCode, &len, NULL))
     {
         res.httpStatus = statusCode;

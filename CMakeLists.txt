@@ -255,6 +255,13 @@ if(UNIX AND NOT APPLE)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
         RENAME "io.github.thedevil4k.FTorrent.desktop"
     )
+
+    # Appstream metadata: software centers read it on the desktop, and
+    # Flathub rejects submissions that ship without it.
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/io.github.thedevil4k.FTorrent.appdata.xml"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo"
+        RENAME "io.github.thedevil4k.FTorrent.appdata.xml"
+    )
     
     # Icons (various sizes if available, but for now we use the one we have)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ftorrent.png"

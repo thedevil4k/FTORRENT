@@ -17,7 +17,7 @@ on:
 
 jobs:
   release:
-    needs: [build-windows, build-linux, build-arch]
+    needs: [build-windows, build-linux, build-arch, build-flatpak]
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
@@ -39,6 +39,7 @@ jobs:
             ./artifacts/*.deb
             ./artifacts/*.rpm
             ./artifacts/*.pkg.tar.zst
+            ./artifacts/*.flatpak
           generate_release_notes: true
           draft: false
           prerelease: false
@@ -55,6 +56,7 @@ jobs:
             ./artifacts/*.deb
             ./artifacts/*.rpm
             ./artifacts/*.pkg.tar.zst
+            ./artifacts/*.flatpak
           generate_release_notes: false
           draft: false
           prerelease: true
@@ -169,8 +171,8 @@ jobs:
 
     - name: Install dependencies
       run: |
-        apt-get update
-        apt-get install -y xvfb
+        sudo apt-get update
+        sudo apt-get install -y xvfb
         bash scripts/linux/setup/setup-linux.sh
 
     - name: Build the tests
@@ -205,3 +207,28 @@ jobs:
         name: FTorrent-arch-x86_64
         path: build_linux_x86_64/*.pkg.tar.zst
 
+  build-flatpak:
+    runs-on: ubuntu-24.04
+    # flatpak-builder needs a real flatpak installation with the target
+    # runtime preinstalled, so the job must run inside the action's own
+    # image; --privileged lets that container set up flatpak itself.
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build Flatpak Bundle
+      uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        bundle: io.github.thedevil4k.FTorrent.flatpak
+        manifest-path: io.github.thedevil4k.FTorrent.json
+        # The action uploads the bundle itself under the app id; disable
+        # that so the explicit step below keeps the FTorrent-* naming.
+        upload-artifact: false
+
+    - name: Upload Flatpak Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: FTorrent-flatpak
+        path: io.github.thedevil4k.FTorrent.flatpak

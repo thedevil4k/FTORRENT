@@ -38,9 +38,16 @@ TorrentListWidget::TorrentListWidget(int x, int y, int w, int h, const char* lab
     type(SELECT_MULTI);
     when(FL_WHEN_RELEASE);
     
-    // Scrollbar width for this table only (avoid the global Fl::scrollbar_size,
-    // which would resize every scrollbar in the app and is applied lazily).
+    // Scrollbar width. Fl_Table::scrollbar_size() only exists when FLTK is
+    // built with the extended 1.3 ABI (>= 10301); distro, vcpkg and
+    // Flatpak builds all use the default ABI 10300, where the global
+    // setter is the only way to size scrollbars. FLTK 1.4 does not define
+    // FLTK_ABI_VERSION, so it takes the global branch too.
+#if defined(FLTK_ABI_VERSION) && FLTK_ABI_VERSION >= 10301
     scrollbar_size(12);
+#else
+    Fl::scrollbar_size(12);
+#endif
     vscrollbar->box(FL_FLAT_BOX);
     hscrollbar->box(FL_FLAT_BOX);
     applyScrollbarTheme(false);

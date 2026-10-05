@@ -42,7 +42,13 @@ SearchResultsWidget::SearchResultsWidget(int x, int y, int w, int h, const char*
     type(SELECT_SINGLE);
     when(FL_WHEN_RELEASE);
     
+    // See TorrentListWidget: the per-widget scrollbar_size() needs the
+    // extended FLTK 1.3 ABI, so fall back to the global setter there.
+#if defined(FLTK_ABI_VERSION) && FLTK_ABI_VERSION >= 10301
     scrollbar_size(12);
+#else
+    Fl::scrollbar_size(12);
+#endif
     vscrollbar->box(FL_FLAT_BOX);
     hscrollbar->box(FL_FLAT_BOX);
     

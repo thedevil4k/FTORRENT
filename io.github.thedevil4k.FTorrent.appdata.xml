@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.thedevil4k.FTorrent</id>
+  <name>FTorrent</name>
+  <summary>A lightweight and fast BitTorrent client</summary>
+  <description>
+    <p>FTorrent is a lightweight, ad-free BitTorrent client written in C++ on FLTK and libtorrent-rasterbar. No Electron, no bundled browser, no telemetry.</p>
+    <ul>
+      <li>Add a .torrent file, a folder or a magnet link — or drop them onto the list window</li>
+      <li>Create a .torrent from a folder</li>
+      <li>Pause and resume per torrent, remove with confirmation</li>
+      <li>Sortable list with name, size, progress, status, down speed, up speed, ETA, ratio and peers</li>
+      <li>One-click 50 % rate limit for the session and ECO/NORMAL/TURBO RAM usage modes</li>
+      <li>Search torrents across Nyaa.si, The Pirate Bay, BTDig, SolidTorrents and BitSearch, with mirror fallbacks</li>
+      <li>Dark and light themes, a censorship toggle for screenshots, and a status bar with torrent counts, RAM and latency</li>
+    </ul>
+  </description>
+  <project_license>MIT</project_license>
+  <metadata_license>CC0-1.0</metadata_license>
+  <launchable type="desktop-id">io.github.thedevil4k.FTorrent.desktop</launchable>
+  <url type="homepage">https://github.com/thedevil4k/FTORRENT</url>
+  <url type="bugtracker">https://github.com/thedevil4k/FTORRENT/issues</url>
+  <content_rating type="oars-1.1"/>
+</component>
