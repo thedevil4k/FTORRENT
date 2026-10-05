@@ -36,15 +36,25 @@ die() { echo "Error: $*" >&2; exit 1; }
 command -v flatpak >/dev/null 2>&1 || die "flatpak is not installed"
 [ -f "$BUNDLE" ] || die "bundle not found: $BUNDLE (build it with scripts/flatpak/build-flatpak.sh)"
 
-# Uninstall on the way out even when a check fails, so a failed smoke test
-# does not leave a copy installed that would shadow the user's own.
-installed=0
-cleanup() {
-    if [ "$installed" = 1 ]; then
-        flatpak uninstall --user --noninteractive "$APP_ID" >/dev/null 2>&1 || true
+# Take the app out again, whatever happened, so a failed smoke test leaves
+# nothing installed that would shadow the user's own copy. --assumeyes is what
+# makes it work unattended: without it flatpak waits for an answer to its
+# confirmation prompt, and the trap looks like it ran when it did not.
+#
+# It runs before the install as well, because flatpak can leave the deployment
+# directory behind -- its own uninstall then fails with "directory not empty"
+# while removing the reference, and the next install refuses to run over what
+# is left. The leftover is ours and nothing is registered at that point, so it
+# is removed directly; the guard keeps this from ever touching a working
+# installation.
+clean_app() {
+    flatpak uninstall --user --noninteractive --assumeyes --delete-data --force-remove "$APP_ID" >/dev/null 2>&1 || true
+    if ! flatpak list --user --app --columns=application 2>/dev/null | grep -qx "$APP_ID"; then
+        rm -rf "$HOME/.local/share/flatpak/app/$APP_ID" "$HOME/.var/app/$APP_ID"
     fi
 }
-trap cleanup EXIT
+trap clean_app EXIT
+clean_app
 
 echo "--- FTorrent Flatpak Bundle Smoke Test ---"
 echo "Bundle: $BUNDLE"
