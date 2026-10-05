@@ -94,7 +94,9 @@ Before uploading that bundle to Flathub, check it the way a user would receive i
 bash ./scripts/flatpak/test-flatpak.sh            # installs it, checks the sandbox, uninstalls it
 bash ./scripts/flatpak/test-flatpak.sh --launch   # also starts the app for 10 seconds
 ```
-*`--launch` needs a display; on a headless machine wrap it in `xvfb-run -a`.*
+*`--launch` needs a display; on a headless machine wrap it in `xvfb-run -a`. Add
+`--system` where the app should go into the system-wide installation rather than
+this user's -- that is what the CI job uses, running as root inside a container.*
 
 Anything flatpak-builder accepts can be passed through, which is what the one
 known environment quirk needs: where FUSE mounts are not permitted -- inside a

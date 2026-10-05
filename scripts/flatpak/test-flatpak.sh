@@ -8,7 +8,12 @@
 # uninstalled again either way, so a failing run leaves nothing behind.
 #
 # Usage:
-#   bash scripts/flatpak/test-flatpak.sh [bundle] [--launch]
+#   bash scripts/flatpak/test-flatpak.sh [bundle] [--launch] [--system]
+#
+# The app is installed for this user by default. --system installs it
+# system-wide instead, which is what a CI container running as root wants:
+# the runtime is already there, so nothing has to be downloaded into a second
+# installation before the app can be tried.
 #
 # --launch also starts the app for a few seconds. It is the only check that
 # catches a library the linker resolved but the sandbox cannot load, and it
@@ -23,13 +28,21 @@ BASE_DIR="$( cd "$SCRIPT_DIR/../.." &> /dev/null && pwd )"
 APP_ID=io.github.thedevil4k.FTorrent
 BUNDLE="$BASE_DIR/$APP_ID.flatpak"
 LAUNCH=0
+INSTALLATION=--user
 for arg in "$@"; do
     case "$arg" in
         --launch) LAUNCH=1 ;;
+        --system) INSTALLATION=--system ;;
         -*) echo "Unknown option: $arg" >&2; exit 2 ;;
         *)  BUNDLE="$arg" ;;
     esac
 done
+
+# --no-deps keeps this to the bundle itself. What it would otherwise pull in --
+# the platform's GL and VAAPI extensions -- is hundreds of megabytes that say
+# nothing about whether this bundle is complete, and the launch check below
+# still fails when a runtime the app needs is missing.
+INSTALL_OPTIONS="--bundle --noninteractive --assumeyes --no-deps"
 
 die() { echo "Error: $*" >&2; exit 1; }
 
@@ -48,9 +61,16 @@ command -v flatpak >/dev/null 2>&1 || die "flatpak is not installed"
 # is removed directly; the guard keeps this from ever touching a working
 # installation.
 clean_app() {
-    flatpak uninstall --user --noninteractive --assumeyes --delete-data --force-remove "$APP_ID" >/dev/null 2>&1 || true
-    if ! flatpak list --user --app --columns=application 2>/dev/null | grep -qx "$APP_ID"; then
-        rm -rf "$HOME/.local/share/flatpak/app/$APP_ID" "$HOME/.var/app/$APP_ID"
+    flatpak uninstall $INSTALLATION --noninteractive --assumeyes --delete-data --force-remove "$APP_ID" >/dev/null 2>&1 || true
+    if ! flatpak list $INSTALLATION --app --columns=application 2>/dev/null | grep -qx "$APP_ID"; then
+        if [ "$INSTALLATION" = --system ]; then
+            deploy="/var/lib/flatpak/app/$APP_ID"
+        else
+            deploy="$HOME/.local/share/flatpak/app/$APP_ID"
+        fi
+        # The app's data directory is per-user whichever installation holds
+        # the app itself.
+        rm -rf "$deploy" "$HOME/.var/app/$APP_ID"
     fi
 }
 trap clean_app EXIT
@@ -60,26 +80,31 @@ echo "--- FTorrent Flatpak Bundle Smoke Test ---"
 echo "Bundle: $BUNDLE"
 echo
 
-flatpak install --user --bundle --noninteractive --assumeyes "$BUNDLE"
-installed=1
+flatpak install $INSTALLATION $INSTALL_OPTIONS "$BUNDLE"
 
 echo
 echo "== metadata =="
-flatpak info --user "$APP_ID" | sed -n '1,9p'
+flatpak info $INSTALLATION "$APP_ID" | sed -n '1,9p'
 
 echo
 echo "== every shared library resolves inside the sandbox =="
-missing="$(flatpak run --user --command=sh "$APP_ID" -c 'ldd /app/bin/FTorrent' 2>/dev/null |
-           grep 'not found' || true)"
+# stderr is captured rather than discarded: if the sandbox cannot start at all
+# -- a runtime that is not installed, say -- there is no ldd output to search,
+# and a check that only greps that output would call the sandbox healthy.
+if ! ldd_out="$(flatpak run $INSTALLATION --command=sh "$APP_ID" -c 'ldd /app/bin/FTorrent' 2>&1)"; then
+    printf '%s\n' "$ldd_out"
+    die "could not run a command in the app's sandbox"
+fi
+missing="$(printf '%s\n' "$ldd_out" | grep 'not found' || true)"
 if [ -n "$missing" ]; then
-    echo "$missing"
+    printf '%s\n' "$missing"
     die "the sandbox cannot load every library FTorrent needs"
 fi
 echo "  all libraries resolved"
 
 echo
 echo "== the desktop integration files are where Flathub expects them =="
-flatpak run --user --command=sh "$APP_ID" -c '
+flatpak run $INSTALLATION --command=sh "$APP_ID" -c '
     for f in \
         /app/bin/assets/ftorrent.png \
         /app/share/applications/io.github.thedevil4k.FTorrent.desktop \
@@ -118,7 +143,7 @@ if [ "$LAUNCH" = 1 ]; then
         die "--launch needs a display; on a headless machine run: xvfb-run -a $0 --launch"
     log="$(mktemp)"
     set +e
-    timeout 10 flatpak run --user "$APP_ID" >"$log" 2>&1
+    timeout 10 flatpak run $INSTALLATION "$APP_ID" >"$log" 2>&1
     status=$?
     set -e
     if [ "$status" = 124 ]; then

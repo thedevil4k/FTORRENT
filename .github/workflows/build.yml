@@ -227,6 +227,15 @@ jobs:
         # that so the explicit step below keeps the FTorrent-* naming.
         upload-artifact: false
 
+    - name: Smoke Test the Bundle
+      # A link that succeeded says nothing about whether the sandbox can load
+      # what it produced. Installing and starting the bundle here means a
+      # runtime the app cannot find fails this job instead of being discovered
+      # by whoever installs it from Flathub; the checks live in the same script
+      # a workstation runs. The container is root and already carries Xvfb and
+      # the runtime, so the app is installed system-wide.
+      run: xvfb-run -a bash scripts/flatpak/test-flatpak.sh --system --launch
+
     - name: Upload Flatpak Artifact
       uses: actions/upload-artifact@v4
       with:
