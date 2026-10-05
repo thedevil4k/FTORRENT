@@ -74,6 +74,40 @@ sudo pacman -U build_linux/ftorrent-*.pkg.tar.zst
 
 ---
 
+## 📦 3. Building the Flatpak Bundle
+
+The Flathub manifest lives at the repo root (`io.github.thedevil4k.FTorrent.json`),
+and the bundle CI publishes is built straight from it. Both can be reproduced
+locally with flatpak-builder; the runtime and SDK the manifest names must be
+installed first, and the script says so if they are missing.
+
+```bash
+bash ./scripts/flatpak/build-flatpak.sh
+```
+*Takes a while -- boost, libtorrent, FLTK and the app are all built from source --
+but it caches in `build_flatpak/` (git-ignored), so later runs only rebuild what
+changed. The bundle is written to `io.github.thedevil4k.FTorrent.flatpak`.*
+
+Before uploading that bundle to Flathub, check it the way a user would receive it:
+
+```bash
+bash ./scripts/flatpak/test-flatpak.sh            # installs it, checks the sandbox, uninstalls it
+bash ./scripts/flatpak/test-flatpak.sh --launch   # also starts the app for 10 seconds
+```
+*`--launch` needs a display; on a headless machine wrap it in `xvfb-run -a`.*
+
+Anything flatpak-builder accepts can be passed through, which is what the one
+known environment quirk needs: where FUSE mounts are not permitted -- inside a
+container, or a sandboxed terminal -- the build stops with
+`Failure spawning rofiles-fuse` before it compiles anything, and asking for the
+plain cache checkout fixes it:
+
+```bash
+bash ./scripts/flatpak/build-flatpak.sh --disable-rofiles-fuse
+```
+
+---
+
 ## 💡 Troubleshooting
 - **Missing Dependencies on Linux**: Run `bash ./scripts/linux/setup/setup-linux.sh` to ensure all libraries are installed.
 - **CMake Cache Issues**: If you experience errors after updating code or dependencies, delete the `build_windows/` or `build_linux/` folders and run the scripts again.

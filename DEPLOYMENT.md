@@ -84,8 +84,15 @@ This will generate:
 - `FTorrent-0.1.0-Linux.rpm`
 - `FTorrent-0.1.0-Linux.tar.gz`
 
-### 3. Flatpak (Work in Progress)
-A flatpak manifest `org.ftorrent.FTorrent.yml` is provided for building on Flathub.
+### 3. Flatpak
+The Flathub manifest is `io.github.thedevil4k.FTorrent.json` at the repo root, and
+CI builds `io.github.thedevil4k.FTorrent.flatpak` from it. Both are reproducible
+locally, and the bundle can be checked before it is uploaded:
+
+```bash
+bash ./scripts/flatpak/build-flatpak.sh
+bash ./scripts/flatpak/test-flatpak.sh
+```
 
 ---
 

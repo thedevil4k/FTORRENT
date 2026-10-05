@@ -62,6 +62,10 @@ packaging/arch/src/
 packaging/arch/pkg/
 packaging/arch/*.pkg.tar*
 
+# Flatpak build output
+.flatpak-builder/
+*.flatpak
+
 # Project specific
 *.torrent
 downloads/
