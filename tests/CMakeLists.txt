@@ -19,11 +19,20 @@
 # FLTK opens a window per test, so on a Wayland-only session it needs to be told
 # there is no compositor to reach. Kept in one place so every test is run the
 # same way, and so it can be overridden where a display genuinely exists.
+#
+# The fake WAYLAND_DISPLAY is what keeps FLTK on the X11 path, but the X display
+# itself is never invented: hardcoding DISPLAY=:0 pointed the tests at a server
+# that only exists on a desktop, and left the CI run -- where ctest is wrapped in
+# xvfb-run and its server lands on :99 -- with no display at all. So the display
+# is forwarded when this configure step can see one, and otherwise left to the
+# test process to inherit, which is where xvfb-run's DISPLAY comes from.
 if(UNIX AND NOT APPLE AND NOT DEFINED ENV{WAYLAND_DISPLAY})
     set(FTORRENT_TEST_ENV
         "XDG_RUNTIME_DIR=/tmp/ftorrent-test-runtime"
-        "WAYLAND_DISPLAY=wayland-fortorrent-tests"
-        "DISPLAY=:0")
+        "WAYLAND_DISPLAY=wayland-fortorrent-tests")
+    if(DEFINED ENV{DISPLAY} AND NOT "$ENV{DISPLAY}" STREQUAL "")
+        list(APPEND FTORRENT_TEST_ENV "DISPLAY=$ENV{DISPLAY}")
+    endif()
 else()
     set(FTORRENT_TEST_ENV "")
 endif()
@@ -50,12 +59,18 @@ ftorrent_add_test(icons icons.cpp)
 # by hand; here the build stages it, so a fresh checkout needs no setup step.
 # icons_full asserts those PNGs are the ones on the buttons, so without this it
 # would fail on a clean tree and pass only on a machine that had been set up.
+#
+# One target rather than a command per test, because they all copy into the SAME
+# directory and `cmake -E copy_directory` recreates that directory while it
+# copies: under -j the copies deleted each other's half-written tree and the
+# build died with "No such file or directory". One command, one destination.
+add_custom_target(ftorrent_test_assets ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/src/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
+    COMMENT "Staging src/assets beside the test binaries for AssetLoader"
+)
 foreach(stage icons toolbar_layout toolbar_clicks flows)
-    add_custom_command(TARGET ${stage} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${CMAKE_SOURCE_DIR}/src/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
-        COMMENT "Staging src/assets beside ${stage} for AssetLoader"
-    )
+    add_dependencies(${stage} ftorrent_test_assets)
 endforeach()
 
 add_test(NAME toolbar_layout COMMAND toolbar_layout)

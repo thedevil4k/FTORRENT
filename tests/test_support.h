@@ -123,13 +123,39 @@ inline void removeScratchConfig(const char* name) {
     std::filesystem::remove_all(scratchConfigDir(name), ec);
 }
 
+// Draw into `surf`, and put the previous surface back when this scope ends.
+//
+// FLTK 1.4 renamed this pair of calls to Fl_Surface_Device::push_current() and
+// pop_current(). FLTK 1.3 -- which is what Ubuntu 24.04, Debian and the Flatpak
+// SDK all ship -- has no such members: its Fl_Surface_Device (declared in
+// FL/Fl_Device.H) offers only the static surface() accessor and the virtual
+// set_current(), and its own documentation describes the save/restore dance in
+// exactly those terms. 1.4 kept them for back-compatibility, so this is the one
+// spelling that compiles against both series -- which matters because the CI
+// test job builds against 1.3 while a desktop build may be against 1.4.
+class SurfaceScope {
+public:
+    explicit SurfaceScope(Fl_Surface_Device* surf)
+        : previous_(Fl_Surface_Device::surface()) {
+        surf->set_current();
+    }
+    ~SurfaceScope() {
+        // 1.3 reports no surface until one exists; 1.4 creates one instead.
+        if (previous_) previous_->set_current();
+    }
+    SurfaceScope(const SurfaceScope&) = delete;
+    SurfaceScope& operator=(const SurfaceScope&) = delete;
+
+private:
+    Fl_Surface_Device* previous_;
+};
+
 // Let a container place its children the way the window does, by drawing it.
 inline void forceLayout(Fl_Widget* w) {
     Fl_Image_Surface surf(w->w(), w->h());
-    Fl_Surface_Device::push_current(&surf);
+    SurfaceScope here(&surf);
     w->draw();
     Fl_RGB_Image* img = surf.image();
-    Fl_Surface_Device::pop_current();
     delete img;
 }
 

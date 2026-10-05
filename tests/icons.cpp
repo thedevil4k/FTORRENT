@@ -55,10 +55,9 @@ static Fl_Widget* byTooltip(Fl_Widget* w, const char* tip) {
 // offscreen surface is the same code path the window runs on every frame.
 static void forceLayout(Fl_Widget* g) {
     Fl_Image_Surface surf(g->w(), g->h());
-    Fl_Surface_Device::push_current(&surf);
+    testsupport::SurfaceScope here(&surf);
     g->draw();
     Fl_RGB_Image* img = surf.image();
-    Fl_Surface_Device::pop_current();
     delete img;
 }
 
@@ -103,12 +102,14 @@ static bool samePixels(Fl_Image* a, Fl_Image* b) {
     Fl_Image_Surface surf(w, h);
     std::vector<unsigned char> pa, pb;
     for (int pass = 0; pass < 2; pass++) {
-        Fl_Surface_Device::push_current(&surf);
-        fl_color(FL_BLACK);                       // same backdrop for both
-        fl_rectf(0, 0, w, h);
-        (pass == 0 ? a : b)->draw(0, 0);
-        Fl_RGB_Image* out = surf.image();
-        Fl_Surface_Device::pop_current();
+        Fl_RGB_Image* out = nullptr;
+        {
+            testsupport::SurfaceScope here(&surf);
+            fl_color(FL_BLACK);                       // same backdrop for both
+            fl_rectf(0, 0, w, h);
+            (pass == 0 ? a : b)->draw(0, 0);
+            out = surf.image();
+        }
         if (!out || out->d() != 3 || out->w() != w || out->h() != h) {
             if (out) delete out;
             return false;
@@ -134,10 +135,9 @@ static Rendered renderWidget(Fl_Widget* w) {
     Rendered r{};
     r.ok = false; r.x0 = r.y0 = r.x1 = r.y1 = -1; r.ink = 0;
     Fl_Image_Surface surf(w->w(), w->h());
-    Fl_Surface_Device::push_current(&surf);
+    testsupport::SurfaceScope here(&surf);
     surf.draw(w);
     Fl_RGB_Image* img = surf.image();
-    Fl_Surface_Device::pop_current();
     if (!img || !img->array || img->d() != 3 || img->w() != w->w() || img->h() != w->h()) {
         if (img) delete img;
         return r;
@@ -572,12 +572,14 @@ int main(int argc, char** argv) {
         };
         for (auto& g : both) {
             Fl_Image_Surface surf(ToolbarLayout::kIconSize, ToolbarLayout::kIconSize);
-            Fl_Surface_Device::push_current(&surf);
-            fl_color(FL_BLUE);            // sentinel: anything not blue was drawn
-            fl_rectf(0, 0, ToolbarLayout::kIconSize, ToolbarLayout::kIconSize);
-            g.img->draw(0, 0);
-            Fl_RGB_Image* shot = surf.image();
-            Fl_Surface_Device::pop_current();
+            Fl_RGB_Image* shot = nullptr;
+            {
+                testsupport::SurfaceScope here(&surf);
+                fl_color(FL_BLUE);            // sentinel: anything not blue was drawn
+                fl_rectf(0, 0, ToolbarLayout::kIconSize, ToolbarLayout::kIconSize);
+                g.img->draw(0, 0);
+                shot = surf.image();
+            }
             if (!shot || shot->d() != 3) { if (shot) delete shot; ok(false, "glyph rendered"); continue; }
             // Painted pixels are anything that is not the sentinel. Partial ones
             // mean the edge was blended rather than stepped.
