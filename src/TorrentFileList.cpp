@@ -2,6 +2,7 @@
 #include "HttpClient.h"
 #include "PathUtils.h"
 
+#include <libtorrent/version.hpp>
 #include <libtorrent/load_torrent.hpp>
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/file_storage.hpp>
@@ -42,7 +43,12 @@ std::string scratchPath() {
 
 // Fills 'out' from an already-parsed torrent_info.
 void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out) {
+#if LIBTORRENT_VERSION_NUM >= 20100
+    // torrent_info::files() was removed in libtorrent 2.1, use layout() instead.
     const lt::file_storage& fs = ti.layout();
+#else
+    const lt::file_storage& fs = ti.files();
+#endif
     out.clear();
     out.reserve(static_cast<size_t>(std::max(1, fs.num_files())));
     for (int i = 0; i < fs.num_files(); ++i) {
@@ -189,7 +195,6 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
 bool TorrentFileList::parseTorrentFile(const std::string& body,
                                        std::vector<TorrentFileEntry>& out,
                                        std::string& error) {
-    lt::error_code ec;
     lt::load_torrent_limits limits;
     // A peer exchange protocol message is 16 bytes; anything that claims to be
     // a torrent far beyond this is not one.
@@ -198,10 +203,15 @@ bool TorrentFileList::parseTorrentFile(const std::string& body,
     limits.max_decode_depth = 100;
     limits.max_decode_tokens = 1000000;
 
-    lt::add_torrent_params atp = lt::load_torrent_buffer(
-        lt::span<char const>(body.data(), body.size()), ec, limits);
-    if (ec) {
-        error = ec.message();
+    // libtorrent 2.0 has no error_code overload of load_torrent_buffer();
+    // the throwing overload exists in both 2.0 and 2.1, so catch and
+    // translate the error instead.
+    lt::add_torrent_params atp;
+    try {
+        atp = lt::load_torrent_buffer(
+            lt::span<char const>(body.data(), body.size()), limits);
+    } catch (const std::exception& e) {
+        error = e.what();
         return false;
     }
     if (!atp.ti) {

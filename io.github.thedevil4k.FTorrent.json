@@ -22,7 +22,7 @@
                     "type": "git",
                     "url": "https://github.com/arvidn/libtorrent.git",
                     "tag": "v2.0.10",
-                    "commit": "6e330a84d41357f892a0653c30654094e99f7d2e"
+                    "commit": "74bc93a37a5e31c78f0aa02037a68fb9ac5deb41"
                 }
             ]
         },
