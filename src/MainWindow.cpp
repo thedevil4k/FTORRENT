@@ -15,6 +15,7 @@
 #include <FL/Fl_Input.H>
 #include <FL/fl_ask.H>   // fl_choice, fl_input, fl_alert, fl_message all live here
 #include <FL/Fl_Shared_Image.H>
+#include <FL/Fl_RGB_Image.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Window.H>
 #include <FL/x.H>
@@ -53,6 +54,28 @@ static std::string getFlagEmoji(std::string code) {
     return emoji;
 }
 
+namespace {
+
+// Paints a solid dot of the given color into a 12x12 RGBA buffer, transparent
+// outside the circle. Procedural so the dropdown needs no image assets and no
+// new libraries; Fl_RGB_Image renders RGBA on every FLTK backend we ship.
+void paintEngineDot(unsigned char* px, int size,
+                    unsigned char r, unsigned char g, unsigned char b) {
+    const double c = (size - 1) / 2.0;
+    const double rad = size / 2.0 - 1.0;
+    for (int y = 0; y < size; ++y) {
+        for (int x = 0; x < size; ++x) {
+            double dx = x - c;
+            double dy = y - c;
+            unsigned char a = (dx * dx + dy * dy <= rad * rad) ? 255 : 0;
+            unsigned char* p = px + static_cast<size_t>(y * size + x) * 4;
+            p[0] = r; p[1] = g; p[2] = b; p[3] = a;
+        }
+    }
+}
+
+} // namespace
+
 std::atomic<bool> MainWindow::s_alive{true};
 
 MainWindow::MainWindow(int w, int h, const char* title)
@@ -88,6 +111,10 @@ MainWindow::MainWindow(int w, int h, const char* title)
     ,m_eyeClosedIcon(nullptr)
     ,m_findIcon(nullptr)
     ,m_limitIcon(nullptr)
+    , m_dotGreen(nullptr)
+    , m_dotRed(nullptr)
+    , m_dotGray(nullptr)
+    , m_engineStatusChecked(false)
     ,m_limitModerate(false)
     ,m_limitIdleColor(FL_BACKGROUND_COLOR)
     ,m_censored(false)    , m_showPublicIp(false)
@@ -117,6 +144,15 @@ MainWindow::MainWindow(int w, int h, const char* title)
     // The bolt gets a bigger box than the magnifier: it is the one icon in the
     // bar that is a bare silhouette, so it needs the extra pixels to read.
     m_limitIcon      = AssetLoader::load("limit_network_speed.png", ToolbarLayout::kIconSize);
+
+    // Reachability dots for the engine dropdown. Same green as the magnet
+    // origin dot; red/gray chosen to read on both themes.
+    paintEngineDot(m_dotGreenPx, kEngineDotPixels, 64, 184, 80);
+    paintEngineDot(m_dotRedPx, kEngineDotPixels, 220, 70, 70);
+    paintEngineDot(m_dotGrayPx, kEngineDotPixels, 150, 150, 150);
+    m_dotGreen = new Fl_RGB_Image(m_dotGreenPx, kEngineDotPixels, kEngineDotPixels, 4);
+    m_dotRed = new Fl_RGB_Image(m_dotRedPx, kEngineDotPixels, kEngineDotPixels, 4);
+    m_dotGray = new Fl_RGB_Image(m_dotGrayPx, kEngineDotPixels, kEngineDotPixels, 4);
 
     // Censorship state is the persisted setting; the eye icons are the only
     // images that change with the theme, so they get their own reload.
@@ -157,6 +193,9 @@ MainWindow::~MainWindow() {
 #ifdef _WIN32
     removeTrayIcon();
 #endif
+    delete m_dotGreen;
+    delete m_dotRed;
+    delete m_dotGray;
     delete m_brightIcon;
     delete m_darkIcon;
     delete m_addIcon;
@@ -367,7 +406,7 @@ void MainWindow::createSearchView() {
     // --- Bar: engine chooser, category, query, buttons ---
     m_choiceSearchEngine = new Fl_Choice(10, barY, 150, barH);
     m_choiceSearchEngine->box(FL_FLAT_BOX);
-    m_choiceSearchEngine->tooltip("Search engine");
+    m_choiceSearchEngine->tooltip("Search engine (dot: green = reachable, red = unreachable, gray = not checked yet)");
     m_choiceSearchEngine->callback([](Fl_Widget* w, void* data) {
         MainWindow* win = (MainWindow*)data;
         if (win) win->updateCategoryChoice();
@@ -445,7 +484,11 @@ void MainWindow::switchView(bool showSearch) {
     if (m_btnSearch) {
         m_btnSearch->tooltip(showSearch ? "Back to my torrents" : "Search torrents");
     }
-    
+
+    // First visit to the search view: probe every engine once, in the
+    // background, so the dropdown dots reflect reality. Once per session.
+    if (showSearch && !m_engineStatusChecked) startEngineStatusCheck();
+
     // Re-run the layout: one view appeared and the other disappeared
     layoutSearchView();
     redraw();
@@ -1364,17 +1407,81 @@ void MainWindow::setSearchStatus(const std::string& text) {
 // Rebuilds the engine dropdown from SearchManager
 void MainWindow::updateEngineChoice() {
     if (!m_choiceSearchEngine) return;
-    
+
     m_choiceSearchEngine->clear();
     int index = 0;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
         m_choiceSearchEngine->add(d.name.c_str());
+        // Gray until probed; a cached green/red survives rebuilds.
+        Fl_Menu_Item* item =
+            const_cast<Fl_Menu_Item*>(m_choiceSearchEngine->menu() + index);
+        if (Fl_Image* dot = dotForEngine(d.name)) item->image(dot);
         index++;
     }
     if (index > 0) m_choiceSearchEngine->value(0);
     m_choiceSearchEngine->redraw();
     updateCategoryChoice();
+}
+
+// Menu row of an engine, following the same enabled-only order as
+// updateEngineChoice(). -1 when the engine is not listed.
+int MainWindow::engineMenuIndex(const std::string& name) const {
+    int index = 0;
+    for (const auto& d : SearchManager::instance().engines()) {
+        if (!d.enabled) continue;
+        if (d.name == name) return index;
+        index++;
+    }
+    return -1;
+}
+
+Fl_Image* MainWindow::dotForEngine(const std::string& name) const {
+    auto it = m_engineStatus.find(name);
+    if (it == m_engineStatus.end() || it->second == EngineStatus::Unknown)
+        return m_dotGray;
+    return it->second == EngineStatus::Up ? m_dotGreen : m_dotRed;
+}
+
+// One detached probe per enabled engine. Plain HttpClient GETs (the same door
+// every search uses, no new libraries), short timeouts, and the window-dead
+// check as the stop condition so closing the app aborts the probes instead of
+// delivering into a freed window. Results hop to the UI thread via Fl::awake.
+void MainWindow::startEngineStatusCheck() {
+    m_engineStatusChecked = true;
+    for (const auto& d : SearchManager::instance().engines()) {
+        if (!d.enabled) continue;
+        SearchEngine::Definition def = d;   // the worker must not read the UI
+        std::thread([this, def] {
+            if (!isAlive()) return;
+            SearchEngine engine(def);
+            HttpClient::Response resp = HttpClient::get(
+                engine.buildUrl("test"), std::string("FTORRENT ") + VERSION,
+                10, [] { return !MainWindow::isAlive(); }, nullptr, 6);
+            if (!isAlive()) return;
+            auto* delivery =
+                new EngineStatusDelivery{this, def.name, resp.ok};
+            Fl::awake(handleEngineStatus, delivery);
+        }).detach();
+    }
+}
+
+void MainWindow::handleEngineStatus(void* data) {
+    std::unique_ptr<EngineStatusDelivery> delivery(
+        static_cast<EngineStatusDelivery*>(data));
+    if (!delivery || !isAlive() || !delivery->win) return;
+    delivery->win->applyEngineStatus(delivery->name, delivery->up);
+}
+
+void MainWindow::applyEngineStatus(const std::string& name, bool up) {
+    m_engineStatus[name] = up ? EngineStatus::Up : EngineStatus::Down;
+    if (!m_choiceSearchEngine) return;
+    int index = engineMenuIndex(name);
+    if (index < 0) return;
+    Fl_Menu_Item* item =
+        const_cast<Fl_Menu_Item*>(m_choiceSearchEngine->menu() + index);
+    if (Fl_Image* dot = dotForEngine(name)) item->image(dot);
+    m_choiceSearchEngine->redraw();
 }
 
 // Rebuilds the category dropdown from the selected engine. Engines with a

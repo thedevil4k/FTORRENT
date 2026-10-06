@@ -18,6 +18,8 @@
 #include <atomic>
 #include <mutex>
 #include <deque>
+#include <map>
+#include <string>
 #ifdef _WIN32
 #include <shellapi.h>
 #define WM_TRAY_MESSAGE (WM_USER + 1)
@@ -102,6 +104,10 @@ private:
     Fl_Button* m_btnSearch;
     TorrentListWidget* m_torrentList;
     
+    // Reachability of each search engine, shown as a dot in the engine
+    // dropdown: green = answered, red = unreachable, gray = not checked yet.
+    // Green means the host answered, not that its results are good.
+    enum class EngineStatus { Unknown, Up, Down };
     // Search view (shown in place of the torrent list)
     Fl_Group* m_searchView;
     Fl_Input* m_searchInput;
@@ -186,6 +192,21 @@ private:
     // Manager
     TorrentManager* m_manager;
     
+    // Dots for the engine dropdown, painted procedurally (no assets, no new
+    // dependencies). The pixel buffers must outlive the images, hence members.
+    static constexpr int kEngineDotPixels = 12;
+    unsigned char m_dotGreenPx[kEngineDotPixels * kEngineDotPixels * 4];
+    unsigned char m_dotRedPx[kEngineDotPixels * kEngineDotPixels * 4];
+    unsigned char m_dotGrayPx[kEngineDotPixels * kEngineDotPixels * 4];
+    Fl_Image* m_dotGreen;
+    Fl_Image* m_dotRed;
+    Fl_Image* m_dotGray;
+    // Last known reachability per engine name; absent means not checked yet.
+    std::map<std::string, EngineStatus> m_engineStatus;
+    // The reachability probe runs once per session, the first time the search
+    // view is opened, so startup and the torrent list never pay for it.
+    bool m_engineStatusChecked;
+
     // Icons
     Fl_Image* m_brightIcon;
     Fl_Image* m_darkIcon;
@@ -223,6 +244,17 @@ private:
     void switchView(bool showSearch);
     void startSearch();
     void updateEngineChoice();
+    // Engine reachability dots. startEngineStatusCheck() launches one detached
+    // probe per enabled engine (HttpClient only, no new libraries) and each
+    // result comes back through Fl::awake() to applyEngineStatus(), which runs
+    // on the UI thread. engineMenuIndex() maps an engine name to its dropdown
+    // row, or -1 when it is not listed.
+    void startEngineStatusCheck();
+    void applyEngineStatus(const std::string& name, bool up);
+    int engineMenuIndex(const std::string& name) const;
+    Fl_Image* dotForEngine(const std::string& name) const;
+    struct EngineStatusDelivery { MainWindow* win; std::string name; bool up; };
+    static void handleEngineStatus(void* data);
     void updateCategoryChoice();
     void setSearchStatus(const std::string& text);
     void onSearchResults(const std::vector<SearchResult>& results,
