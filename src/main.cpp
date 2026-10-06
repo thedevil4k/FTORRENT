@@ -54,7 +54,11 @@ int main(int argc, char **argv) {
     
     // Run FLTK event loop
     int result = Fl::run();
-    
+
+    // Join the engine probe workers before the libraries they use (curl, FLTK)
+    // start going away. The window itself is intentionally not deleted here.
+    window->shutdownEngineProbes();
+
     // Cleanup
     manager->shutdown();
     settings.save();

@@ -498,6 +498,9 @@ int main() {
     }
 
     printf("  flows checks=%d failures=%d\n", checks, failures);
+    // Flow 5 opens the search view, which launches the engine reachability
+    // probes: join them before the teardown below, same as toolbar_clicks.
+    win->shutdownEngineProbes();
     manager->shutdown();
     Resources::cleanup();
     testsupport::removeScratchConfig("flows");

@@ -20,6 +20,7 @@
 #include <deque>
 #include <map>
 #include <string>
+#include <vector>
 #ifdef _WIN32
 #include <shellapi.h>
 #define WM_TRAY_MESSAGE (WM_USER + 1)
@@ -78,7 +79,13 @@ public:    MainWindow(int w, int h, const char* title);
     // Torrent actions
     void toggleSelectedTorrents();
     void removeSelectedTorrents(bool deleteFiles = false);
-    
+
+    // Waits for every engine-probe worker to finish (in-flight GETs abort at
+    // once: s_alive is already false, which is their stop condition).
+    // Idempotent: safe to call twice, and the destructor calls it too. main()
+    // and the tests call it because neither deletes the window.
+    void shutdownEngineProbes();
+
 private:
     // UI Components
     // The bar and the row of buttons are separate widgets. The group is the
@@ -206,6 +213,11 @@ private:
     // The reachability probe runs once per session, the first time the search
     // view is opened, so startup and the torrent list never pay for it.
     bool m_engineStatusChecked;
+    // Probe workers. Joinable, never detached: a detached probe doing a
+    // blocking GET outlives main() and dies inside teardown (curl/FLTK
+    // already half gone), which is a segfault at exit. Touched only on the
+    // UI thread (launch here, join in shutdownEngineStatusCheck()).
+    std::vector<std::thread> m_engineProbes;
 
     // Icons
     Fl_Image* m_brightIcon;

@@ -12,7 +12,9 @@
 // with it -- which is exactly how the block used to end up off-centre.
 #include <FL/Fl.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Choice.H>
 #include <FL/Fl_Group.H>
+#include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Widget.H>
 #include "MainWindow.h"
 #include "ToolbarLayout.h"
@@ -33,6 +35,19 @@ static Fl_Widget* byTip(Fl_Widget* w, const char* t) {
     if (Fl_Group* g = w->as_group())
         for (int i = 0; i < g->children(); i++)
             if (Fl_Widget* h = byTip(g->child(i), t)) return h;
+    return nullptr;
+}
+
+// The engine dropdown: the first Fl_Choice in the tree is the RAM mode
+// selector, so match by tooltip prefix instead of by type alone.
+static Fl_Choice* engineChoice(Fl_Widget* w) {
+    if (Fl_Choice* c = dynamic_cast<Fl_Choice*>(w)) {
+        const char* tip = c->tooltip();
+        if (tip && strncmp(tip, "Search engine", 13) == 0) return c;
+    }
+    if (Fl_Group* g = w->as_group())
+        for (int i = 0; i < g->children(); i++)
+            if (Fl_Choice* hit = engineChoice(g->child(i))) return hit;
     return nullptr;
 }
 
@@ -108,6 +123,47 @@ int main() {
         ok(left == right, msg);
     }
 
+    testsupport::section("search view opens, engine dots exist, view closes");
+    // The click sequence above ends with the Search toggle in either state, so
+    // drive it until the search view is open rather than assuming one click.
+    for (int i = 0; i < 2 && !byTip(top, "Back to my torrents"); i++) {
+        Fl_Button* t = (Fl_Button*)byTip(top, "Search torrents");
+        if (!t) break;
+        t->do_callback();
+        Fl::flush();
+    }
+    ok(byTip(top, "Back to my torrents") != nullptr,
+       "search view opened from the toggle (reachability probes launched)");
+    // The dots start gray synchronously in updateEngineChoice(); green/red
+    // arrive later from the background probes and depend on this run's
+    // network, so only the gray baseline is asserted here.
+    Fl_Choice* engines = engineChoice(top);
+    ok(engines != nullptr, "engine dropdown exists");
+    int nEngines = 0, nDotted = 0;
+    if (engines) {
+        // Fl_Menu_Item has no image getter: attaching one flips the labeltype
+        // away from FL_NORMAL_LABEL (multi image+text label), which is what is
+        // asserted here. True on FLTK 1.3 and 1.4 alike.
+        for (const Fl_Menu_Item* m = engines->menu(); m && m->label(); ++m) {
+            nEngines++;
+            if (m->labeltype() != FL_NORMAL_LABEL) nDotted++;
+        }
+    }
+    ok(nEngines > 0, "dropdown lists engines");
+    ok(nDotted == nEngines && nEngines > 0,
+       "every engine row carries a status dot");
+    // Let the probes run and deliver (Fl::awake is drained by Fl::wait); the
+    // verdict itself is network-dependent and is not asserted, but surviving
+    // the deliveries without hanging is.
+    for (int i = 0; i < 20; i++) Fl::wait(0.1);
+    Fl_Button* back = (Fl_Button*)byTip(top, "Back to my torrents");
+    if (back) { back->do_callback(); Fl::flush(); }
+    ok(byTip(top, "Search torrents") != nullptr,
+       "toggle back restores the torrent list");
+
+    // Join the probe workers before the teardown below starts destroying what
+    // they use. A detached probe outliving main() was the exit segfault.
+    win->shutdownEngineProbes();
     mgr->shutdown();
     Resources::cleanup();
     testsupport::removeScratchConfig("clicks");

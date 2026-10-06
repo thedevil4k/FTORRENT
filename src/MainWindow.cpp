@@ -190,6 +190,9 @@ size_range(720, 480);
 MainWindow::~MainWindow() {
     // Stop any worker thread from handing data back to a window that is gone
     s_alive = false;
+    // Join the engine probes before anything they could touch (curl, FLTK,
+    // this window) starts going away. Idempotent with the explicit call.
+    shutdownEngineProbes();
 #ifdef _WIN32
     removeTrayIcon();
 #endif
@@ -1443,16 +1446,20 @@ Fl_Image* MainWindow::dotForEngine(const std::string& name) const {
     return it->second == EngineStatus::Up ? m_dotGreen : m_dotRed;
 }
 
-// One detached probe per enabled engine. Plain HttpClient GETs (the same door
+// One joinable probe per enabled engine. Plain HttpClient GETs (the same door
 // every search uses, no new libraries), short timeouts, and the window-dead
 // check as the stop condition so closing the app aborts the probes instead of
 // delivering into a freed window. Results hop to the UI thread via Fl::awake.
+// Joinable rather than detached on purpose: a detached probe doing a blocking
+// GET outlives main() and segfaults inside teardown, which is exactly what the
+// toolbar_clicks suite caught. See shutdownEngineProbes().
 void MainWindow::startEngineStatusCheck() {
+    if (m_engineStatusChecked) return;   // once per session; also post-shutdown
     m_engineStatusChecked = true;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
         SearchEngine::Definition def = d;   // the worker must not read the UI
-        std::thread([this, def] {
+        m_engineProbes.emplace_back([this, def] {
             if (!isAlive()) return;
             SearchEngine engine(def);
             HttpClient::Response resp = HttpClient::get(
@@ -1462,8 +1469,18 @@ void MainWindow::startEngineStatusCheck() {
             auto* delivery =
                 new EngineStatusDelivery{this, def.name, resp.ok};
             Fl::awake(handleEngineStatus, delivery);
-        }).detach();
+        });
     }
+}
+
+void MainWindow::shutdownEngineProbes() {
+    // No new probes after this: a late switchView(true) must not resurrect
+    // workers nobody will join.
+    m_engineStatusChecked = true;
+    for (auto& t : m_engineProbes) {
+        if (t.joinable()) t.join();
+    }
+    m_engineProbes.clear();
 }
 
 void MainWindow::handleEngineStatus(void* data) {
