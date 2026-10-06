@@ -419,10 +419,12 @@ void MainWindow::createSearchView() {
     // Results go straight to the add dialog, same as a dropped .torrent file.
     // Only leaves the search view when something was actually added, so a
     // cancelled dialog does not throw the results away (notably on Windows,
-    // where the dialog is the whole download affordance).
-    m_searchResults->setOnDownloadCallback([this](const SearchResult& r) {
-        if (showAddTorrentDialog("", r.magnet)) switchView(false);
-    });
+    // where the dialog is the whole download affordance). The row's file list
+    // travels along so a multi-file magnet offers one checkbox per file.
+    m_searchResults->setOnDownloadCallback(
+        [this](const SearchResult& r, const std::vector<TorrentFileEntry>& files) {
+            if (showAddTorrentDialog("", r.magnet, files)) switchView(false);
+        });
     
     m_searchView->hide();   // Torrent list is what you see first
     
@@ -958,7 +960,8 @@ std::string MainWindow::formatStatusBar() const {
     return oss.str();
 }
 
-bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const std::string& prefilledMagnet) {
+bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const std::string& prefilledMagnet,
+                                       const std::vector<TorrentFileEntry>& prefilledFiles) {
     AddTorrentDialog* dlg = new AddTorrentDialog();
 
     if (!prefilledPath.empty()) {
@@ -966,6 +969,12 @@ bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const st
     }
     if (!prefilledMagnet.empty()) {
         dlg->setMagnetLink(prefilledMagnet);
+        // A .torrent file fills the list itself; a magnet cannot, so the
+        // search row's already-resolved list is what the checkboxes show.
+        // Empty (never expanded / fetch failed) just means "download all".
+        if (prefilledPath.empty() && !prefilledFiles.empty()) {
+            dlg->setFileList(prefilledFiles);
+        }
     }
 
     bool added = false;
@@ -979,7 +988,13 @@ bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const st
         if (!path.empty()) {
             success = m_manager->addTorrentFile(path, savePath, filePriorities);
         } else if (!magnet.empty()) {
-            success = m_manager->addMagnetLink(magnet, savePath);
+            // Honour the checkboxes only when they describe this exact magnet:
+            // the list was resolved for prefilledMagnet, so an edited field or
+            // a length mismatch falls back to "download all" rather than
+            // shifting libtorrent's file order.
+            if (magnet != prefilledMagnet) filePriorities.clear();
+            else if (filePriorities.size() != prefilledFiles.size()) filePriorities.clear();
+            success = m_manager->addMagnetLink(magnet, savePath, filePriorities);
         }
 
         if (success) {

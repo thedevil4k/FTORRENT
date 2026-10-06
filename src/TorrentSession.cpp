@@ -148,7 +148,7 @@ bool TorrentSession::addTorrentFile(const std::string& torrentFile, const std::s
     }
 }
 
-bool TorrentSession::addMagnetLink(const std::string& magnetLink, const std::string& savePath) {
+bool TorrentSession::addMagnetLink(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities) {
     if (!m_initialized || !m_session) {
         std::cerr << "Session not initialized" << std::endl;
         return false;
@@ -157,22 +157,32 @@ bool TorrentSession::addMagnetLink(const std::string& magnetLink, const std::str
     try {
         lt::add_torrent_params params;
         params.save_path = savePath;
-        
+
         lt::error_code ec;
         lt::parse_magnet_uri(magnetLink, params, ec);
-        
+
         if (ec) {
             std::cerr << "Invalid magnet link: " << ec.message() << std::endl;
             return false;
         }
-        
+
+        // Same pattern as addTorrentFile(): libtorrent holds the vector and
+        // applies it once the swarm delivers the metadata, so unchecked files
+        // are never downloaded. Empty still means "everything".
+        if (!file_priorities.empty()) {
+            params.file_priorities.reserve(file_priorities.size());
+            for (int p : file_priorities) {
+                params.file_priorities.push_back(lt::download_priority_t(static_cast<std::uint8_t>(p)));
+            }
+        }
+
         params.flags |= lt::torrent_flags::auto_managed | lt::torrent_flags::duplicate_is_error;
-        
+
         m_session->async_add_torrent(params);
-        
-        std::cout << "Added magnet link" << std::endl;
+
+        std::cout << "Added magnet link with " << file_priorities.size() << " priority overrides." << std::endl;
         return true;
-        
+
     } catch (const std::exception& e) {
         std::cerr << "Failed to add magnet link: " << e.what() << std::endl;
         return false;

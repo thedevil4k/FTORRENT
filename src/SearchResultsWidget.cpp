@@ -592,7 +592,12 @@ int SearchResultsWidget::handle(int event) {
             if (r && m_onDownload) {
                 select_row(clicked, 1);
                 SearchResult copy = *r;  // modal dialog spins Fl::wait()
-                m_onDownload(copy);
+                // Whatever this row already resolved (empty if never expanded
+                // or failed): same order the dialog and libtorrent use.
+                FileListService::Entry rf = filesForRow(clicked);
+                std::vector<TorrentFileEntry> files;
+                if (rf.state == FileListState::Loaded) files = rf.files;
+                m_onDownload(copy, files);
                 return 1;
             }
         }
@@ -609,7 +614,10 @@ int SearchResultsWidget::handle(int event) {
             const SearchResult* r = getResultAt(sel);
             if (r && m_onDownload) {
                 SearchResult copy = *r;
-                m_onDownload(copy);
+                FileListService::Entry rf = filesForRow(sel);
+                std::vector<TorrentFileEntry> files;
+                if (rf.state == FileListState::Loaded) files = rf.files;
+                m_onDownload(copy, files);
                 return 1;
             }
         }

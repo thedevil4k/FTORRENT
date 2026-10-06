@@ -312,3 +312,14 @@ void AddTorrentDialog::updateFileList(const std::string& torrentPath) {
         m_fileBrowser->add(("Error: " + std::string(e.what())).c_str(), 0);
     }
 }
+
+// Placed after the TorrentItem.h include above: formatSize is needed here,
+// and that header plus libtorrent live at the bottom of this file.
+void AddTorrentDialog::setFileList(const std::vector<TorrentFileEntry>& files) {
+    if (!m_fileBrowser) return;
+    m_fileBrowser->clear();
+    for (const auto& f : files) {
+        std::string label = f.path + " (" + TorrentItem::formatSize(f.size) + ")";
+        m_fileBrowser->add(label.c_str(), 1); // checked = download
+    }
+}

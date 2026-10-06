@@ -28,7 +28,10 @@ public:
     
     // Torrent operations
     bool addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities = {});
-    bool addMagnetLink(const std::string& magnetLink, const std::string& savePath);
+    // file_priorities is applied once the metadata arrives. It must list every
+    // file of the torrent in order (1 = download, 0 = skip); empty means all.
+    // Kept defaulted so existing callers compile unchanged on every platform.
+    bool addMagnetLink(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities = {});
     void removeTorrent(const lt::torrent_handle& handle, bool deleteFiles = false);
     void pauseTorrent(const lt::torrent_handle& handle);
     void resumeTorrent(const lt::torrent_handle& handle);

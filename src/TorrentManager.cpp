@@ -84,14 +84,14 @@ std::future<bool> TorrentManager::addTorrentFileAsync(const std::string& torrent
     return future;
 }
 
-std::future<bool> TorrentManager::addMagnetLinkAsync(const std::string& magnetLink, const std::string& savePath) {
+std::future<bool> TorrentManager::addMagnetLinkAsync(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities) {
     // For now, execute synchronously but return as future
     auto promise = std::make_shared<std::promise<bool>>();
     auto future = promise->get_future();
-    
-    bool result = addMagnetLink(magnetLink, savePath);
+
+    bool result = addMagnetLink(magnetLink, savePath, file_priorities);
     promise->set_value(result);
-    
+
     return future;
 }
 
@@ -112,13 +112,13 @@ bool TorrentManager::addTorrentFile(const std::string& torrentFile, const std::s
     return success;
 }
 
-bool TorrentManager::addMagnetLink(const std::string& magnetLink, const std::string& savePath) {
+bool TorrentManager::addMagnetLink(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities) {
     if (!m_initialized.load()) {
         notifyError("Session not initialized");
         return false;
     }
 
-    bool success = m_session->addMagnetLink(magnetLink, savePath);
+    bool success = m_session->addMagnetLink(magnetLink, savePath, file_priorities);
     
     if (success) {
         std::lock_guard<std::mutex> lock(m_torrentsMutex);

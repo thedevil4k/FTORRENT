@@ -65,8 +65,10 @@ public:    MainWindow(int w, int h, const char* title);
     // Actions
     // True when the user confirmed and the torrent was handed to the session.
     // Callers may ignore the result; search uses it to stay on the results
-    // when the dialog is cancelled.
-    bool showAddTorrentDialog(const std::string& prefilledPath = "", const std::string& prefilledMagnet = "");
+    // when the dialog is cancelled. prefilledFiles lists the magnet's files in
+    // torrent order (empty when unknown): the dialog shows one checkbox each.
+    bool showAddTorrentDialog(const std::string& prefilledPath = "", const std::string& prefilledMagnet = "",
+                              const std::vector<TorrentFileEntry>& prefilledFiles = {});
     void showCreateTorrentDialog();
     void showPreferencesDialog();
     void showAboutDialog();

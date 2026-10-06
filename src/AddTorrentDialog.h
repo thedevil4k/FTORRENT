@@ -8,6 +8,7 @@
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Check_Browser.H>
 #include <FL/Fl_Box.H>
+#include "TorrentFileList.h"   // TorrentFileEntry, for pre-filling magnets
 #include <string>
 #include <vector>
 
@@ -47,6 +48,10 @@ public:
     void setTorrentPath(const std::string& path);
     void setMagnetLink(const std::string& magnet);
     void setSavePath(const std::string& path);
+    // Shows the already-known files of a magnet (from the search row) with
+    // every box checked, so the user unchecks what to skip. Same order as
+    // getFilePriorities() returns, and as libtorrent expects them.
+    void setFileList(const std::vector<TorrentFileEntry>& files);
     
 private:
     

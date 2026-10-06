@@ -58,8 +58,12 @@ public:
     // Number of file-list fetches this table started that have not come back.
     int pendingLoads() const { return m_files.pending(); }
 
-    // Callback invoked when the user double-clicks a row or presses "Download"
-    using DownloadCallback = std::function<void(const SearchResult&)>;
+    // Callback invoked when the user double-clicks a row or presses Enter.
+    // The file list is whatever the row has loaded (empty when the row was
+    // never expanded or the fetch failed), in torrent order, so the Add
+    // dialog can offer one checkbox per file.
+    using DownloadCallback =
+        std::function<void(const SearchResult&, const std::vector<TorrentFileEntry>&)>;
     void setOnDownloadCallback(DownloadCallback cb) { m_onDownload = cb; }
 
 protected:
