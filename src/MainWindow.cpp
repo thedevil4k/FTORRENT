@@ -416,10 +416,12 @@ void MainWindow::createSearchView() {
     
     m_searchView->end();
     
-    // Results go straight to the add dialog, same as a dropped .torrent file
+    // Results go straight to the add dialog, same as a dropped .torrent file.
+    // Only leaves the search view when something was actually added, so a
+    // cancelled dialog does not throw the results away (notably on Windows,
+    // where the dialog is the whole download affordance).
     m_searchResults->setOnDownloadCallback([this](const SearchResult& r) {
-        showAddTorrentDialog("", r.magnet);
-        switchView(false);
+        if (showAddTorrentDialog("", r.magnet)) switchView(false);
     });
     
     m_searchView->hide();   // Torrent list is what you see first
@@ -956,37 +958,40 @@ std::string MainWindow::formatStatusBar() const {
     return oss.str();
 }
 
-void MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const std::string& prefilledMagnet) {
+bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const std::string& prefilledMagnet) {
     AddTorrentDialog* dlg = new AddTorrentDialog();
-    
+
     if (!prefilledPath.empty()) {
         dlg->setTorrentPath(prefilledPath);
     }
     if (!prefilledMagnet.empty()) {
         dlg->setMagnetLink(prefilledMagnet);
     }
-    
+
+    bool added = false;
     if (dlg->show_modal() && m_manager) {
         std::string path = dlg->getTorrentPath();
         std::string magnet = dlg->getMagnetLink();
         std::string savePath = dlg->getSavePath();
         auto filePriorities = dlg->getFilePriorities();
-        
+
         bool success = false;
         if (!path.empty()) {
             success = m_manager->addTorrentFile(path, savePath, filePriorities);
         } else if (!magnet.empty()) {
             success = m_manager->addMagnetLink(magnet, savePath);
         }
-        
+
         if (success) {
             updateUI();
+            added = true;
         } else {
             fl_alert("Failed to add torrent");
         }
     }
-    
+
     delete dlg;
+    return added;
 }
 
 void MainWindow::showCreateTorrentDialog() {

@@ -63,7 +63,10 @@ public:    MainWindow(int w, int h, const char* title);
     void updateCensorButtonState();
     
     // Actions
-    void showAddTorrentDialog(const std::string& prefilledPath = "", const std::string& prefilledMagnet = "");
+    // True when the user confirmed and the torrent was handed to the session.
+    // Callers may ignore the result; search uses it to stay on the results
+    // when the dialog is cancelled.
+    bool showAddTorrentDialog(const std::string& prefilledPath = "", const std::string& prefilledMagnet = "");
     void showCreateTorrentDialog();
     void showPreferencesDialog();
     void showAboutDialog();

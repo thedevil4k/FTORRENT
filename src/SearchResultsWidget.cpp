@@ -1,4 +1,5 @@
 #include "SearchResultsWidget.h"
+#include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include "TorrentItem.h"   // formatSize, used for the size column
 
@@ -14,9 +15,49 @@ const int BASE_ROW_HEIGHT = 25;      // matches initializeColumns()
 const int FILE_LINE_HEIGHT = 16;
 // Enough to see what is inside without turning a row into a wall of text.
 const int MAX_SHOWN_FILES = 12;
-std::string elide(const std::string& text, size_t maxChars) {
-    if (text.size() <= maxChars) return text;
-    return text.substr(0, maxChars - 3) + "...";
+// Minimum pixel width the Name column is allowed to shrink to. Keeps the
+// table usable at the 720px minimum window width and avoids a zero/negative
+// col_width() when the window is at its smallest.
+const int MIN_NAME_WIDTH = 120;
+
+// Truncates back to the previous UTF-8 character boundary so an elided name
+// never ends in the middle of a multibyte sequence. Pure byte arithmetic,
+// no locale or extra dependency, identical on every platform we ship.
+size_t utf8Clip(const std::string& text, size_t pos) {
+    while (pos > 0 && (static_cast<unsigned char>(text[pos]) & 0xC0) == 0x80)
+        --pos;
+    return pos;
+}
+
+// Ellipsis by pixels, not by characters: with a proportional font 60 chars
+// can be far narrower (or wider) than the cell. The caller must have set the
+// same fl_font() it will draw with, since fl_width() measures that font.
+// Returns the full text when it fits, so a maximised window shows the
+// absolute name, and only adds "..." when the cell is really too narrow
+// (square window). Uses only fl_width(), available in FLTK 1.3 and 1.4 on
+// every backend we build (Windows x86/ARM64, Linux 32/64, Arch, Flatpak).
+std::string elideToWidth(const std::string& text, int maxPixels) {
+    if (text.empty() || maxPixels <= 0) return text.empty() ? text : std::string();
+    if (fl_width(text.c_str()) <= maxPixels) return text;
+    const char* ellipsis = "...";
+    const int ellipsisW = static_cast<int>(fl_width(ellipsis));
+    if (maxPixels <= ellipsisW) return std::string();
+    size_t lo = 0;
+    size_t hi = text.size();
+    // Binary search on bytes, then snap to a UTF-8 boundary.
+    while (lo < hi) {
+        size_t mid = (lo + hi + 1) / 2;
+        size_t cut = utf8Clip(text, mid);
+        // A cut that lands inside a multibyte char maps several mids to the
+        // same boundary: force progress so the loop always terminates.
+        if (cut <= lo) break;
+        std::string cand = text.substr(0, cut) + ellipsis;
+        if (fl_width(cand.c_str()) <= maxPixels) lo = cut;
+        else hi = cut - 1;
+    }
+    size_t finalCut = utf8Clip(text, lo);
+    if (finalCut == 0) return ellipsis;
+    return text.substr(0, finalCut) + ellipsis;
 }
 
 } // namespace
@@ -152,12 +193,16 @@ void SearchResultsWidget::initializeColumns() {
 void SearchResultsWidget::layoutColumns() {
     int available = w();
     if (available <= 0) return;
-    
+
     int others = 0;
     for (int i = 0; i < COL_COUNT; i++) {
         if (i != COL_NAME) others += COLUMN_INFO[i].width;
     }
-    col_width(COL_NAME, available - others);
+    // Name takes whatever is left, but never collapses: at the 720px minimum
+    // window this keeps every column reachable instead of going zero/negative.
+    int nameW = available - others;
+    if (nameW < MIN_NAME_WIDTH) nameW = MIN_NAME_WIDTH;
+    col_width(COL_NAME, nameW);
 }
 
 void SearchResultsWidget::resize(int X, int Y, int W, int H) {
@@ -324,34 +369,67 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
 
     int ly = y + BASE_ROW_HEIGHT;
     int limit = y + h;
+    int avail = w - 26;
+    if (avail <= 0) return;
+
+    // One-pixel separator between file lines so a torrent with several files
+    // reads as distinct rows instead of a block of text. Derived from the
+    // live background colour, so it stays subtle in both themes without
+    // storing any extra theme state.
+    uchar br = 255, bg = 255, bb = 255;
+    Fl::get_color(FL_BACKGROUND2_COLOR, br, bg, bb);
+    const bool darkBg = br < 128;
+    const Fl_Color sepColor =
+        darkBg ? fl_rgb_color(70, 70, 70) : fl_rgb_color(210, 210, 210);
 
     if (rf.state == FileListState::Loading) {
         fl_color(fl_rgb_color(140, 140, 140));
-        fl_draw("Reading the file list...", x + 24, ly, w - 26, FILE_LINE_HEIGHT, FL_ALIGN_LEFT);
+        fl_draw("Reading the file list...", x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
         return;
     }
     if (rf.state == FileListState::Failed) {
         std::string msg = rf.error.empty() ? "The file list could not be obtained"
                                            : ("File list unavailable: " + rf.error);
-        fl_draw(elide(msg, 90).c_str(), x + 24, ly, w - 26, FILE_LINE_HEIGHT, FL_ALIGN_LEFT);
+        msg = elideToWidth(msg, avail);
+        fl_color(FL_FOREGROUND_COLOR);
+        fl_draw(msg.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
         return;
     }
     if (rf.state == FileListState::NotRequested) return;
 
     int shown = static_cast<int>(rf.files.size());
     if (shown > MAX_SHOWN_FILES) shown = MAX_SHOWN_FILES;
-    for (int i = 0; i < shown && ly < limit; ++i) {
+    for (int i = 0; i < shown && ly + FILE_LINE_HEIGHT <= limit + 1; ++i) {
         const TorrentFileEntry& f = rf.files[static_cast<size_t>(i)];
+        // The size suffix is never cut: only the path is elided, measured
+        // against what is left after the "- " bullet and the suffix itself.
+        // Full path shows when the window is wide; "..." only when narrow.
+        fl_font(FL_HELVETICA, 11);
+        const std::string suffix = "  (" + TorrentItem::formatSize(f.size) + ")";
+        const int bulletW = static_cast<int>(fl_width("- "));
+        const int suffixW = static_cast<int>(fl_width(suffix.c_str()));
+        std::string path = elideToWidth(f.path, avail - bulletW - suffixW);
+        const std::string label = "- " + path + suffix;
         fl_color(FL_FOREGROUND_COLOR);
-        std::string label = elide(f.path, 90) + "  (" + TorrentItem::formatSize(f.size) + ")";
-        fl_draw(label.c_str(), x + 24, ly, w - 26, FILE_LINE_HEIGHT, FL_ALIGN_LEFT);
+        fl_draw(label.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+        // Separator under every file line: makes each file its own row.
+        int x2 = x + w - 6;
+        if (x2 < x + 24) x2 = x + 24;
+        fl_color(sepColor);
+        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2, ly + FILE_LINE_HEIGHT - 1);
         ly += FILE_LINE_HEIGHT;
     }
     if (static_cast<int>(rf.files.size()) > MAX_SHOWN_FILES && ly < limit) {
         fl_color(fl_rgb_color(140, 140, 140));
+        fl_font(FL_HELVETICA, 11);
         std::string more = "... and " +
             std::to_string(static_cast<int>(rf.files.size()) - MAX_SHOWN_FILES) + " more";
-        fl_draw(more.c_str(), x + 24, ly, w - 26, FILE_LINE_HEIGHT, FL_ALIGN_LEFT);
+        more = elideToWidth(more, avail);
+        fl_draw(more.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
     }
 }
 
@@ -382,9 +460,22 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
         case COL_SOURCE:   text = r->source; break;
         default: break;
     }
-    
-    if (text.size() > 60) text = text.substr(0, 57) + "...";
-    fl_draw(text.c_str(), x + 5, y, w - 10, h, COLUMN_INFO[col].alignment);
+
+    // Pixel-measured ellipsis: full absolute name when the maximised Name
+    // column has room, "..." only when it really overflows (square window).
+    // FL_ALIGN_CLIP is the second net, same as TorrentListWidget uses.
+    int textAvail = w - 10;
+    if (textAvail > 0 && !text.empty()) text = elideToWidth(text, textAvail);
+    // The main value always lives in the top BASE_ROW_HEIGHT slice so an
+    // expanded (taller) row keeps name/size/seeders aligned with the toggle
+    // triangle instead of sinking to the vertical centre. The file list owns
+    // everything below that slice.
+    const int topH = h < BASE_ROW_HEIGHT ? h : BASE_ROW_HEIGHT;
+    const Fl_Align align =
+        static_cast<Fl_Align>(COLUMN_INFO[col].alignment | FL_ALIGN_CLIP);
+    int tw = w - 10;
+    if (tw < 0) tw = 0;
+    fl_draw(text.c_str(), x + 5, y, tw, topH, align);
 
     if (col == COL_NAME) drawFileList(row, x, y, w, h);
     
@@ -487,16 +578,42 @@ int SearchResultsWidget::handle(int event) {
         return 1;
     }
     
-    // Double-click: download the selected result
+    // Double-click: download the clicked result.
+    // Uses callback_row(), not selectedRow(): on Windows the second PUSH of a
+    // double-click can arrive before Fl_Table_Row moves the selection, so
+    // selectedRow() still points at the old row (or -1 when nothing was
+    // selected) and the dialog never opened. callback_row() is the cell that
+    // was actually hit, on every platform.
     if (event == FL_PUSH && Fl::event_clicks() > 0) {
         if (callback_context() == CONTEXT_CELL) {
-            const SearchResult* r = getResultAt(selectedRow());
+            int clicked = callback_row();
+            if (clicked < 0 || clicked >= rows()) clicked = selectedRow();
+            const SearchResult* r = getResultAt(clicked);
             if (r && m_onDownload) {
-                m_onDownload(*r);
+                select_row(clicked, 1);
+                SearchResult copy = *r;  // modal dialog spins Fl::wait()
+                m_onDownload(copy);
                 return 1;
             }
         }
     }
-    
+
+    // Enter key: same download, for users whose double-click speed setting
+    // turns a double-click into two single clicks (then event_clicks() stays
+    // 0 and the block above never fires, notably on Windows).
+    if (event == FL_KEYBOARD) {
+        int key = Fl::event_key();
+        if (key == FL_Enter || key == FL_KP_Enter) {
+            int sel = selectedRow();
+            if (sel < 0 && rows() > 0) sel = 0;
+            const SearchResult* r = getResultAt(sel);
+            if (r && m_onDownload) {
+                SearchResult copy = *r;
+                m_onDownload(copy);
+                return 1;
+            }
+        }
+    }
+
     return result;
 }
