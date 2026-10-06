@@ -110,6 +110,22 @@ bash ./scripts/flatpak/build-flatpak.sh --disable-rofiles-fuse
 
 ---
 
+## 🧪 4. Running the Tests
+
+The test programs are off by default, so an ordinary build stays a plain app
+build. One script turns them on, compiles them and runs the suites, which is
+what CI does for the offline subset:
+
+```bash
+bash ./scripts/linux/tests/run-tests.sh
+bash ./scripts/linux/tests/run-tests.sh --all      # include the network suite
+bash ./scripts/linux/tests/run-tests.sh -R icons   # or pick suites with ctest's own options
+```
+*Without a graphical session the run is wrapped in `xvfb-run`; the script says
+so and tells you what to install when that is missing too.*
+
+---
+
 ## 💡 Troubleshooting
 - **Missing Dependencies on Linux**: Run `bash ./scripts/linux/setup/setup-linux.sh` to ensure all libraries are installed.
 - **CMake Cache Issues**: If you experience errors after updating code or dependencies, delete the `build_windows/` or `build_linux/` folders and run the scripts again.

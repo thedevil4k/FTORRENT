@@ -72,6 +72,13 @@ Full step-by-step instructions: **[COMPILE-GUIDE.md](COMPILE-GUIDE.md)**. Packag
 The suite is CTest-based and off by default, so a normal build stays a plain app build with no test-only dependencies.
 
 ```bash
+bash scripts/linux/tests/run-tests.sh        # configure, build and run the offline suites
+bash scripts/linux/tests/run-tests.sh --all  # include `flows`, which needs the network
+```
+
+That is the same three steps CI runs, and on a machine without a graphical session it wraps the run in `xvfb-run`, so the suites still have the display FLTK asks for. By hand, the same thing is:
+
+```bash
 cmake -S . -B build -DFTORRENT_BUILD_TESTS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure

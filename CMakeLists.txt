@@ -161,6 +161,9 @@ endif()
 #   cmake --build build
 #   ctest --test-dir build --output-on-failure
 #
+# scripts/linux/tests/run-tests.sh does the same in one step, and finds a
+# display for the suites when the machine has none.
+#
 # They run headless and need no display, but on a Wayland-only session FLTK will
 # still try to reach a compositor, so FTORRENT_TEST_ENV carries the same overrides
 # the probes were run with. `flows` needs the network for its search and torrent
