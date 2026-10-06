@@ -19,6 +19,11 @@
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Pack.H>
+// B0 is <termios.h>'s hangup baud rate; see test_support.h for why that
+// collides with FLTK 1.3's Page_Format enum.
+#ifdef B0
+#  undef B0
+#endif
 #include <FL/Fl_Image_Surface.H>
 #include <FL/Fl_RGB_Image.H>
 #include <FL/fl_draw.H>

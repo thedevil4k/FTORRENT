@@ -19,6 +19,15 @@
 #ifndef FTORRENT_TESTS_TEST_SUPPORT_H
 #define FTORRENT_TESTS_TEST_SUPPORT_H
 
+// <termios.h> defines B0 as the hangup baud rate, and libtorrent's headers
+// reach it through boost.asio. FLTK 1.3's Fl_Paged_Device.H -- pulled in by
+// <FL/Fl_Image_Surface.H> -- declares a Page_Format enum with B0 in it, so a
+// translation unit that includes libtorrent first sends the compiler into that
+// enum with B0 already a macro. FLTK 1.4 renamed those members, which is why
+// this only bites against 1.3. Nothing here wants the baud constant.
+#ifdef B0
+#  undef B0
+#endif
 #include <FL/Fl.H>
 #include <FL/Fl_Image_Surface.H>
 #include <FL/Fl_RGB_Image.H>
