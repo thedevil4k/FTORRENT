@@ -30,7 +30,10 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 - Global up/down rate limits, connection limits and listen port in Preferences
 
 **Search**
-- Search torrents from the toolbar across Nyaa.si, The Pirate Bay (HTML and its apibay API), BTDig, SolidTorrents and BitSearch, each with a proxy/mirror fallback when the direct address is blocked
+- Search torrents from the toolbar across SolidTorrents, BitSearch, Nyaa.si, The Pirate Bay (HTML and its apibay API), BTDig and Pirate Face — with a proxy/mirror fallback wherever the site offers one
+- A status dot next to each engine: green = reachable, red = unreachable, gray = not checked yet (checked once per session, in the background, when you first open search)
+- Expand any result to see the files it downloads before downloading anything; names are shown in full whenever the window has room
+- Double-click a result (or press Enter) to download it; multi-file magnets offer one checkbox per file, so you fetch only what you want
 - Per-site categories and result pages, shown in a dedicated view with a **Back to my torrents** return
 
 **Preferences** — four tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode).
@@ -87,9 +90,9 @@ ctest --test-dir build --output-on-failure
 | test | what it covers |
 | :--- | :--- |
 | `toolbar_layout` | toolbar geometry and the level thresholds across every width from 400 to 1920 px |
-| `toolbar_clicks` | every toolbar button hit-testable and clickable at the narrowest supported width |
+| `toolbar_clicks` | every toolbar button hit-testable and clickable at the narrowest supported width, plus opening/closing the search view, the engine status dots and a clean, segfault-free shutdown |
 | `icons_full` / `icons_missing` | icon rendering, toolbar levels and spacing, with and without the on-disk assets |
-| `flows` | preferences, add, remove, rate limit, search, pause/resume end to end |
+| `flows` | preferences, add, remove, rate limit, search, file lists, pause/resume end to end |
 
 `flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 
@@ -113,6 +116,7 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## Documentation
 
+- **[FUTURE_UPDATES_IDEAS.md](FUTURE_UPDATES_IDEAS.md)** — evaluated ideas we parked (and why), in Spanish and English
 - **[USER-GUIDE.md](USER-GUIDE.md)** — using the client
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the code is put together
 - **[UI-DESIGN.md](UI-DESIGN.md)** — interface and layout rules
@@ -128,7 +132,11 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **Assets load from disk with a compiled-in fallback.** [`AssetLoader`](src/AssetLoader.h) provides the toolbar PNGs at the right size; if one is missing, the built-in glyph is used instead, so a button is never blank. The XPM glyphs are resampled to 26 px at startup rather than scaled by the widget.
 - **Public IP in the status bar is off by default.** A new installation does not look its address up online until you tick the box; an existing `ShowPublicIp=true` is left alone.
 - **The 50 % rate limit button says so.** Its tooltip now reads `Limit network speed 50%`.
-- **A test suite in the repository.** Five CTest programs, 378 checks, built from the same objects the app ships.
+- **A test suite in the repository.** Five CTest programs, built from the same objects the app ships.
+- **Search engines report their reachability.** A green, red or gray dot next to each engine in the dropdown, probed once per session with no new dependencies.
+- **Magnets can be picked file by file.** The Add dialog lists a magnet's already-resolved files with one checkbox each; the file rows under each result are separated so multi-file torrents read clearly.
+- **Search results survive small windows and use wide ones.** Names ellipsize by pixels (full name when it fits), double-click and Enter both download, and cancelling the dialog keeps the results.
+- **Probe threads shut down cleanly.** Engine checks are joinable workers instead of detached threads, which fixes an exit segfault the suite caught; `FUTURE_UPDATES_IDEAS.md` parks what we evaluated and deferred.
 
 ## License
 
