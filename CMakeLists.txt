@@ -177,14 +177,76 @@ endif()
 
 # Installation Rules
 include(GNUInstallDirs)
-install(TARGETS FTorrent
+
+# On Windows the runtime DLLs are resolved by CMake instead of a hand-written list
+# of names.
+#
+# A whitelist of patterns cannot express this dependency graph. Every one of these
+# changes the DLLs the executable needs without touching a single line of our code:
+#
+#   * libtorrent 2.1 enables WebTorrent by default, and vcpkg's port keeps that
+#     default, so torrent-rasterbar.dll now links libdatachannel and demands
+#     datachannel.dll at load time. The Windows installer never shipped it, so the
+#     application died before main() with "datachannel.dll not found".
+#   * zlib 1.3.2 renamed the Windows DLL from zlib1.dll to z.dll (z.lib is the new
+#     import library; vcpkg's own ZLIB wrapper searches for "z"). The pattern
+#     "zlib*.dll" matched nothing, and because the install was OPTIONAL the miss
+#     was silent: no warning, no failure, just a broken package.
+#
+# RUNTIME_DEPENDENCIES walks the real import graph of FTorrent (including the
+# transitively loaded torrent-rasterbar.dll, PNG, JPEG, OpenSSL and the rest), so
+# it stays correct whatever the dependencies are called in the next release. The
+# version floor matters: RUNTIME_DEPENDENCIES needs CMake 3.21, and on an older
+# CMake the keyword is not an error but "RUNTIME" plus stray arguments, which
+# would install the binary and silently drop every DLL. Hence the hard failure.
+if(WIN32 AND CMAKE_VERSION VERSION_LESS 3.21)
+    message(FATAL_ERROR
+        "Packaging the Windows runtime DLLs requires CMake 3.21 or newer "
+        "(install(TARGETS ... RUNTIME_DEPENDENCIES)). Found ${CMAKE_VERSION}. "
+        "Without it the installer ships FTorrent.exe alone and every dependency "
+        "is missing at startup.")
+endif()
+
+# The argument order is part of the syntax, not a style choice: in
+# install(TARGETS) the RUNTIME_DEPENDENCIES clause has to appear before the
+# artifact options. Written after "RUNTIME DESTINATION" CMake rejects it with
+# install TARGETS given unknown argument "RUNTIME_DEPENDENCIES", which is how a
+# build fails at configure time rather than shipping a package with no DLLs.
+set(FTORRENT_INSTALL_ARGS
+    TARGETS FTorrent
+)
+
+if(WIN32)
+    # The API set stubs (api-ms-*, ext-ms-*) are virtual: they live in the OS and
+    # are resolved by the loader, so copying them would be wrong. Anything pulled
+    # out of System32 is part of Windows and must not be redistributed either.
+    #
+    # RUNTIME_DEPENDENCIES cannot be used while cross-compiling, because CMake
+    # would have to run the target platform's dumpbin to read the import tables.
+    if(CMAKE_CROSSCOMPILING)
+        message(WARNING
+            "Cross-compiling: skipping RUNTIME_DEPENDENCIES, so the packaged "
+            "installer will not contain the dependency DLLs.")
+    else()
+        list(APPEND FTORRENT_INSTALL_ARGS
+            RUNTIME_DEPENDENCIES
+                PRE_EXCLUDE_REGEXES  "api-ms-" "ext-ms-"
+                POST_EXCLUDE_REGEXES ".*[Ss]ystem32.*"
+        )
+    endif()
+endif()
+
+list(APPEND FTORRENT_INSTALL_ARGS
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
+install(${FTORRENT_INSTALL_ARGS})
+
 if(WIN32)
-    # Detect VCPKG installed directory if not set (crucial for GitHub Actions)
+    # Reported for diagnosing a package: the DLLs themselves are collected by the
+    # install rule above, from wherever they were actually built.
     if(NOT VCPKG_INSTALLED_DIR)
         if(DEFINED ENV{VCPKG_INSTALLATION_ROOT})
             set(VCPKG_INSTALLED_DIR "$ENV{VCPKG_INSTALLATION_ROOT}/installed")
@@ -194,30 +256,9 @@ if(WIN32)
     endif()
 
     if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
-        message(STATUS "VCPKG DLL collection enabled. Using: ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
-        # Force inclusion of critical DLLs in the installer package
-        set(DLL_PATTERNS
-            "torrent-rasterbar*.dll"
-            "libcrypto-*.dll"
-            "libssl-*.dll"
-            "libpng*.dll"
-            "jpeg*.dll"
-            "zlib*.dll"
-        )
-        
-        foreach(pattern ${DLL_PATTERNS})
-            file(GLOB FOUND_DLLS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/${pattern}")
-            foreach(dll ${FOUND_DLLS})
-                get_filename_component(DLL_NAME "${dll}" NAME)
-                message(STATUS "  Found DLL: ${DLL_NAME}")
-                install(FILES "${dll}"
-                    DESTINATION ${CMAKE_INSTALL_BINDIR}
-                    OPTIONAL
-                )
-            endforeach()
-        endforeach()
+        message(STATUS "VCPKG runtime DLLs resolved from ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
     else()
-        message(WARNING "VCPKG_INSTALLED_DIR or VCPKG_TARGET_TRIPLET not set. Skipping manual DLL collection.")
+        message(WARNING "VCPKG_INSTALLED_DIR or VCPKG_TARGET_TRIPLET not set. Cannot report the vcpkg DLL directory.")
     endif()
 endif()
 

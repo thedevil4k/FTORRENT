@@ -75,7 +75,13 @@ jobs:
         path: |
           C:/vcpkg/installed
           C:/vcpkg/archives
-        key: vcpkg-windows-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt') }}
+        # The key already carries hashFiles(CMakeLists.txt) so a change to the
+        # dependency list invalidates it, but it says nothing about the vcpkg
+        # checkout: the runner image moves between commits and the cache would keep
+        # restoring binaries built by an older vcpkg (that is how a cached zlib can
+        # still produce zlib1.dll while a fresh one produces z.dll). Bump the
+        # trailing revision by hand to force a clean rebuild.
+        key: vcpkg-windows-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt') }}-r2
         restore-keys: |
           vcpkg-windows-${{ matrix.arch }}-
 
@@ -86,7 +92,20 @@ jobs:
 
     - name: Install dependencies
       run: |
-        vcpkg install fltk libtorrent zlib libpng libjpeg-turbo --triplet ${{ matrix.arch }}-windows
+        # libtorrent is requested on its own with the special "core" feature: in
+        # classic mode that is how default features are excluded (there is no
+        # --no-default-features flag; [core] has to be written as part of the
+        # port reference). Its only default feature is webtorrent, which drags in
+        # libdatachannel, libjuice, usrsctp, plog and boost-beast. The application
+        # never calls the rtc API (no enable_webtorrent, no <rtc/rtc.hpp>, no
+        # websocket tracker anywhere in src/), so those libraries were pure
+        # payload -- and datachannel.dll was reaching the installer for exactly
+        # one release, which is what made the Windows build fail to start.
+        #
+        # [core] is not remembered by vcpkg: it belongs in the command that
+        # requests the package, or the default features come straight back.
+        vcpkg install fltk zlib libpng libjpeg-turbo --triplet ${{ matrix.arch }}-windows
+        vcpkg install "libtorrent[core]:${{ matrix.arch }}-windows"
         if ("${{ matrix.arch }}" -eq "arm64") { vcpkg install fltk --triplet x64-windows }
 
     - name: Configure CMake

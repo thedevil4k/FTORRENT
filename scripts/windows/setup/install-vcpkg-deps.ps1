@@ -80,7 +80,14 @@ Write-Host ""
 # Instalar libtorrent
 Write-Host "[2/2] Instalando libtorrent-rasterbar..." -ForegroundColor Cyan
 Write-Host "(Esto puede tardar 10-20 minutos dependiendo de tu sistema)" -ForegroundColor Yellow
-& $VcpkgExe install libtorrent:x64-windows
+# La feature especial "core" deja fuera las default features de libtorrent, y la
+# unica que tiene es webtorrent. Esa feature arrastra libdatachannel, libjuice,
+# usrsctp, plog y boost-beast: librerias que la aplicacion no usa (no hay ninguna
+# llamada a la API rtc en src/) y que ademas metian datachannel.dll en el
+# instalador. En modo clasico no existe un flag --no-default-features: hay que
+# escribir [core] dentro de la referencia del paquete, y vcpkg no lo recuerda de
+# una ejecucion a otra.
+& $VcpkgExe install "libtorrent[core]:x64-windows"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Instalación de libtorrent falló" -ForegroundColor Red
