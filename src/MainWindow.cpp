@@ -848,15 +848,10 @@ void MainWindow::applyTheme() {
     // is owned by applyLimitStyle(), which the toggle also goes through.
     if (m_btnLimit) applyLimitStyle();
 
-    if (m_btnRamMode) {
-        if (darkMode) {
-            m_btnRamMode->color(fl_rgb_color(30, 30, 30));
-            m_btnRamMode->labelcolor(FL_WHITE);
-        } else {
-            m_btnRamMode->color(fl_rgb_color(220, 220, 220));
-            m_btnRamMode->labelcolor(FL_BLACK);
-        }
-    }
+    // The RAM button deliberately owns no colours: like every other toolbar
+    // button it draws FL_BACKGROUND_COLOR with the default label color, so its
+    // box is indistinguishable from the bar in both themes. Painting a custom
+    // gray here is what left a visible box around it.
 }
 
 void MainWindow::toggleDarkMode() {
