@@ -22,9 +22,9 @@
 #include <string>
 #include <vector>
 
-// Forward declaration only; the full header is pulled in by MainWindow.cpp.
-// Keeps this header free of menu-internals includes on every platform.
-struct Fl_Multi_Label;
+// Menu rows carry no images at all: image parts of menu labels proved
+// unrenderable on some FLTK builds (blank rows), while plain text always
+// draws. Status travels as a colored "●" prefix instead.
 #ifdef _WIN32
 #include <shellapi.h>
 #define WM_TRAY_MESSAGE (WM_USER + 1)
@@ -142,7 +142,11 @@ private:
     Fl_Box* m_statusBar;
     Fl_Button* m_btnCensor;
     Fl_Button* m_btnLimit;
-    Fl_Choice* m_choiceRamMode;
+    // RAM mode is a cycling button, not a dropdown: every click moves to the
+    // next mode (NORMAL -> TURBO -> ECO -> NORMAL) and the button always shows
+    // the current icon plus its name. A dropdown hid the mode behind a popup
+    // whose rows could not be trusted to draw.
+    Fl_Button* m_btnRamMode;
     bool m_limitModerate;
     // The background the limit button had before it ever turned magenta, i.e.
     // the one every other button in the toolbar uses.
@@ -203,24 +207,11 @@ private:
     // Manager
     TorrentManager* m_manager;
     
-    // Dots for the engine dropdown, painted procedurally (no assets, no new
-    // dependencies). The pixel buffers must outlive the images, hence members.
-    // Attached through Fl_Multi_Label (dot + name), never through
-    // Fl_Menu_Item::image(): that call REPLACES the item text (verified at
-    // runtime), which is how the dropdown ended up showing dots only.
-    static constexpr int kEngineDotPixels = 12;
-    unsigned char m_dotGreenPx[kEngineDotPixels * kEngineDotPixels * 4];
-    unsigned char m_dotRedPx[kEngineDotPixels * kEngineDotPixels * 4];
-    unsigned char m_dotGrayPx[kEngineDotPixels * kEngineDotPixels * 4];
-    Fl_Image* m_dotGreen;
-    Fl_Image* m_dotRed;
-    Fl_Image* m_dotGray;
     // Last known reachability per engine name; absent means not checked yet.
+    // Shown as a colored bullet prefixing the engine name ("● X"): green =
+    // answered, red = unreachable, gray = not checked yet. Text-only by
+    // design, so every backend draws it.
     std::map<std::string, EngineStatus> m_engineStatus;
-    // One multi-label per engine menu row, in menu order. Swapping the dot on
-    // a status change only rewrites labela (the image), so the name pointer
-    // is never at risk; entries are rebuilt together with the menu itself.
-    std::vector<Fl_Multi_Label*> m_engineMultis;
     // The reachability probe runs once per session, the first time the search
     // view is opened, so startup and the torrent list never pay for it.
     bool m_engineStatusChecked;
@@ -232,6 +223,10 @@ private:
     // Tells in-flight probes to abort at once, so the join never waits out a
     // full timeout (matters for the test suite, where s_alive never falls).
     std::atomic<bool> m_probesStop;
+    // Display strings of the engine menu ("● Name"), in menu order. Owns the
+    // text the rows show, so updates never dangle whatever copy semantics a
+    // given FLTK release uses for add()/label(). Rebuilt with the menu.
+    std::vector<std::string> m_engineLabels;
 
     // Icons
     Fl_Image* m_brightIcon;
@@ -270,7 +265,7 @@ private:
     void switchView(bool showSearch);
     void startSearch();
     void updateEngineChoice();
-    // Engine reachability dots. startEngineStatusCheck() launches one detached
+    // Engine reachability dots. startEngineStatusCheck() launches one joinable
     // probe per enabled engine (HttpClient only, no new libraries) and each
     // result comes back through Fl::awake() to applyEngineStatus(), which runs
     // on the UI thread. engineMenuIndex() maps an engine name to its dropdown
@@ -278,7 +273,11 @@ private:
     void startEngineStatusCheck();
     void applyEngineStatus(const std::string& name, bool up);
     int engineMenuIndex(const std::string& name) const;
-    Fl_Image* dotForEngine(const std::string& name) const;
+    // Status of an engine plus the row color carrying it. Unknown engines
+    // render gray; the map simply has no entry for them yet.
+    EngineStatus engineStatusOf(const std::string& name) const;
+    static Fl_Color engineColor(EngineStatus status);
+    static std::string engineLabel(const std::string& name);
     struct EngineStatusDelivery { MainWindow* win; std::string name; bool up; };
     static void handleEngineStatus(void* data);
     void updateCategoryChoice();
@@ -309,7 +308,10 @@ private:
     static void onSearchGo(Fl_Widget* w, void* data);
     static void onToggleLimit(Fl_Widget* w, void* data);
     static void onToggleCensorship(Fl_Widget* w, void* data);
-    static void onRamModeChanged(Fl_Widget* w, void* data);
+    static void onRamModeCycle(Fl_Widget* w, void* data);
+    // Paints m_btnRamMode from SettingsManager: icon, label and tooltip for
+    // the current mode. Called after every change and once at creation.
+    void updateRamModeButton();
     
     // Update timer
     static void updateTimerCallback(void* data);

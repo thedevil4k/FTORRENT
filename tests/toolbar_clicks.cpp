@@ -40,8 +40,8 @@ static Fl_Widget* byTip(Fl_Widget* w, const char* t) {
     return nullptr;
 }
 
-// The engine dropdown: the first Fl_Choice in the tree is the RAM mode
-// selector, so match by tooltip prefix instead of by type alone.
+// The engine dropdown, matched by tooltip prefix instead of by type alone
+// (other Fl_Choice widgets live in the tree).
 static Fl_Choice* engineChoice(Fl_Widget* w) {
     if (Fl_Choice* c = dynamic_cast<Fl_Choice*>(w)) {
         const char* tip = c->tooltip();
@@ -176,35 +176,33 @@ int main() {
     }
     ok(byTip(top, "Back to my torrents") != nullptr,
        "search view opened from the toggle (reachability probes launched)");
-    // The dots start gray synchronously in updateEngineChoice(); green/red
-    // arrive later from the background probes and depend on this run's
-    // network, so only the gray baseline is asserted here.
+    // Rows are plain text by design ("● Name" + row color): menu-item images
+    // proved unrenderable on some FLTK builds, while text draws everywhere.
+    // Green/red arrive later from the background probes and depend on this
+    // run's network, so only the gray baseline is asserted here.
     Fl_Choice* engines = engineChoice(top);
     ok(engines != nullptr, "engine dropdown exists");
-    int nEngines = 0, nDotted = 0;
+    int nEngines = 0, nPlain = 0, nBulleted = 0, nDrawn = 0;
     if (engines) {
-        // Fl_Menu_Item has no image getter: attaching one flips the labeltype
-        // away from FL_NORMAL_LABEL (multi image+text label), which is what is
-        // asserted here. True on FLTK 1.3 and 1.4 alike.
         for (const Fl_Menu_Item* m = engines->menu(); m && m->label(); ++m) {
             nEngines++;
-            if (m->labeltype() != FL_NORMAL_LABEL) nDotted++;
-        }
-    }
-    ok(nEngines > 0, "dropdown lists engines");
-    ok(nDotted == nEngines && nEngines > 0,
-       "every engine row carries a status dot");
-    int nDrawn = 0;
-    if (engines) {
-        for (const Fl_Menu_Item* m = engines->menu(); m && m->label(); ++m) {
+            // No images, ever: a non-normal labeltype means someone rehung a
+            // picture on the rows, which is how the blank dropdowns happened.
+            if (m->labeltype() == FL_NORMAL_LABEL) nPlain++;
+            if (strncmp(m->label(), "\xE2\x97\x8F ", 4) == 0) nBulleted++;
             int ink = menuRowInk(m, engines);
             char inkMsg[160];
             snprintf(inkMsg, sizeof inkMsg,
-                     "engine row renders dot and name (%d ink px)", ink);
+                     "engine row renders bullet and name (%d ink px)", ink);
             ok(ink > 200, inkMsg);
             if (ink > 200) nDrawn++;
         }
     }
+    ok(nEngines > 0, "dropdown lists engines");
+    ok(nPlain == nEngines && nEngines > 0,
+       "every engine row is plain text (no menu images)");
+    ok(nBulleted == nEngines && nEngines > 0,
+       "every engine row carries the status bullet");
     ok(nDrawn == nEngines && nEngines > 0,
        "no engine row renders blank");
     // Let the probes run and deliver (Fl::awake is drained by Fl::wait); the

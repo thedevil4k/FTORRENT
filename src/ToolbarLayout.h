@@ -69,7 +69,9 @@ struct ToolbarLayout {
     // icon-sized button at every level.
     static constexpr int kIconButton = 46;    // add, create, pause, remove, search, limit
     static constexpr int kThemeButton = 34;
-    static constexpr int kRamChoice = 60;
+    // RAM mode button: icon plus mode text, always fully visible. Wide enough
+    // for the longest label (" NORMAL") next to a toolbar icon.
+    static constexpr int kRamButton = 110;
 
     // The bar and the button inside it are two different numbers, on purpose:
     // the bar is the strip, the buttons sit inside it with room above and below.
@@ -100,7 +102,7 @@ struct ToolbarLayout {
     //   3 labelled buttons      -- the three width fields of a Spec
     //   4 fixed icon buttons    -- pause, remove, search, limit: 4 * kIconButton
     //   2 spacers between groups-- the two spacerWidth entries of a Spec
-    //   2 other fixed widgets   -- kThemeButton and kRamChoice, one each
+    //   2 other fixed widgets   -- kThemeButton and kRamButton, one each
     //   2 elastic spacers       -- the centring pair at the two ends
     //
     // A new toolbar widget therefore has to be added to one of these groups,

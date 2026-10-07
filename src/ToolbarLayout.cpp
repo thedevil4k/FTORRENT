@@ -33,7 +33,7 @@ int ToolbarLayout::requiredWidth(Level level) {
     const Spec& s = spec(level);
     // The listed buttons and the two spacers, then the six widgets that keep
     // their width at every level: pause, remove, search and limit share
-    // kIconButton, the theme button and the RAM choice have their own.
+    // kIconButton, the theme button and the RAM button have their own.
     //
     // The gaps are kChildCount - 1 of them because every one of those children
     // is in the pack at every level: Fl_Pack skips a hidden child and the gap
@@ -41,7 +41,7 @@ int ToolbarLayout::requiredWidth(Level level) {
     // (see the header) rather than quietly shortening the row that this number
     // is measuring.
     return s.addWidth + s.createWidth + s.prefsWidth + kGroupSpacers * s.spacerWidth
-         + kIconButtons * kIconButton + kThemeButton + kRamChoice
+         + kIconButtons * kIconButton + kThemeButton + kRamButton
          + kSpacing * (kChildCount - 1);
 }
 

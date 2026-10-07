@@ -15,8 +15,6 @@
 #include <FL/Fl_Input.H>
 #include <FL/fl_ask.H>   // fl_choice, fl_input, fl_alert, fl_message all live here
 #include <FL/Fl_Shared_Image.H>
-#include <FL/Fl_RGB_Image.H>
-#include <FL/Fl_Multi_Label.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Window.H>
 #include <FL/x.H>
@@ -57,45 +55,10 @@ static std::string getFlagEmoji(std::string code) {
 
 namespace {
 
-// Paints a solid dot of the given color into a 12x12 RGBA buffer, transparent
-// outside the circle. Procedural so the dropdown needs no image assets and no
-// new libraries; Fl_RGB_Image renders RGBA on every FLTK backend we ship.
-void paintEngineDot(unsigned char* px, int size,
-                    unsigned char r, unsigned char g, unsigned char b) {
-    const double c = (size - 1) / 2.0;
-    const double rad = size / 2.0 - 1.0;
-    for (int y = 0; y < size; ++y) {
-        for (int x = 0; x < size; ++x) {
-            double dx = x - c;
-            double dy = y - c;
-            unsigned char a = (dx * dx + dy * dy <= rad * rad) ? 255 : 0;
-            unsigned char* p = px + static_cast<size_t>(y * size + x) * 4;
-            p[0] = r; p[1] = g; p[2] = b; p[3] = a;
-        }
-    }
-}
-
-// Builds the dot + name label of one dropdown row. Fl_Menu_Item::image() must
-// NOT be used here: it replaces the item text with the image (verified at
-// runtime on our FLTK builds), leaving rows that show the dot but no name.
-// A Fl_Multi_Label keeps both, with identical spelling on FLTK 1.3 and 1.4.
-// Call strictly after add(): labelb borrows the menu's own copy of the text,
-// which lives until the next clear(). Returns the multi-label so the caller
-// can swap just the dot later by rewriting labela.
-Fl_Multi_Label* attachDotName(Fl_Menu_Item* item, Fl_Image* dot) {
-    const char* text = item->label();   // still the plain add() copy here
-    Fl_Multi_Label* ml = new Fl_Multi_Label;
-    ml->labela = reinterpret_cast<char*>(dot);
-    ml->typea = _FL_IMAGE_LABEL;
-    ml->labelb = const_cast<char*>(text);
-    ml->typeb = FL_NORMAL_LABEL;
-    // Through ml->label(item), NEVER item->label(_FL_MULTI_LABEL, ...): only
-    // the method registers the multi-label draw function with the toolkit. A
-    // direct assignment leaves rows that draw absolutely nothing — blank
-    // dropdowns with neither dot nor name, as shipped once by mistake.
-    ml->label(item);
-    return ml;
-}
+// Bullet prefix marking a reachability-checked engine row. U+25CF, in the same
+// geometric-shapes block as the ▲▼ sort indicators the tables already draw,
+// so any font rendering those renders this too.
+const char* kEngineCheckedBullet = "\xE2\x97\x8F ";
 
 } // namespace
 
@@ -134,9 +97,6 @@ MainWindow::MainWindow(int w, int h, const char* title)
     ,m_eyeClosedIcon(nullptr)
     ,m_findIcon(nullptr)
     ,m_limitIcon(nullptr)
-    , m_dotGreen(nullptr)
-    , m_dotRed(nullptr)
-    , m_dotGray(nullptr)
     , m_engineStatusChecked(false)
     , m_probesStop(false)
     ,m_limitModerate(false)
@@ -169,14 +129,8 @@ MainWindow::MainWindow(int w, int h, const char* title)
     // bar that is a bare silhouette, so it needs the extra pixels to read.
     m_limitIcon      = AssetLoader::load("limit_network_speed.png", ToolbarLayout::kIconSize);
 
-    // Reachability dots for the engine dropdown. Same green as the magnet
-    // origin dot; red/gray chosen to read on both themes.
-    paintEngineDot(m_dotGreenPx, kEngineDotPixels, 64, 184, 80);
-    paintEngineDot(m_dotRedPx, kEngineDotPixels, 220, 70, 70);
-    paintEngineDot(m_dotGrayPx, kEngineDotPixels, 150, 150, 150);
-    m_dotGreen = new Fl_RGB_Image(m_dotGreenPx, kEngineDotPixels, kEngineDotPixels, 4);
-    m_dotRed = new Fl_RGB_Image(m_dotRedPx, kEngineDotPixels, kEngineDotPixels, 4);
-    m_dotGray = new Fl_RGB_Image(m_dotGrayPx, kEngineDotPixels, kEngineDotPixels, 4);
+    // Nothing to build for the engine status rows here: they are plain text
+    // ("● Name" + row color), painted on demand in updateEngineChoice().
 
     // Censorship state is the persisted setting; the eye icons are the only
     // images that change with the theme, so they get their own reload.
@@ -220,9 +174,6 @@ MainWindow::~MainWindow() {
 #ifdef _WIN32
     removeTrayIcon();
 #endif
-    delete m_dotGreen;
-    delete m_dotRed;
-    delete m_dotGray;
     delete m_brightIcon;
     delete m_darkIcon;
     delete m_addIcon;
@@ -322,35 +273,15 @@ void MainWindow::createToolbar() {
     m_darkModeBtn->tooltip("Switch Theme");
     m_darkModeBtn->callback(onToggleTheme, this);
 
-    // Dynamic RAM Mode Selector
-    m_choiceRamMode = new Fl_Choice(0, 0, ToolbarLayout::kRamChoice, ToolbarLayout::kButtonHeight);
-    // Add items with icons if available
-    int idx;
-    
-    idx = m_choiceRamMode->add("  ECO");
-    if (m_ecoIcon) {
-        // We need to access the menu item directly to set the image.
-        // attachDotName, not image(): image() would replace the "ECO" text.
-        Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
-        attachDotName(item, m_ecoIcon);
-    }
-
-    idx = m_choiceRamMode->add("  NORMAL");
-    if (m_normalIcon) {
-        Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
-        attachDotName(item, m_normalIcon);
-    }
-
-    idx = m_choiceRamMode->add("  TURBO");
-    if (m_turboIcon) {
-        Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
-        attachDotName(item, m_turboIcon);
-    }
-    
-    m_choiceRamMode->box(FL_FLAT_BOX);
-    m_choiceRamMode->tooltip("RAM Usage Mode: ECO (Zero Buffer), Normal (Balanced), TURBO (Max Buffer)");
-    m_choiceRamMode->callback(onRamModeChanged, this);
-    m_choiceRamMode->value(SettingsManager::instance().getRamMode());
+    // RAM mode button: one click cycles NORMAL -> TURBO -> ECO, and the button
+    // always shows the current mode outright (icon plus name) instead of
+    // hiding it inside a dropdown.
+    m_btnRamMode = new Fl_Button(0, 0, ToolbarLayout::kRamButton,
+                                 ToolbarLayout::kButtonHeight);
+    m_btnRamMode->box(FL_FLAT_BOX);
+    m_btnRamMode->align(FL_ALIGN_IMAGE_NEXT_TO_TEXT);
+    m_btnRamMode->callback(onRamModeCycle, this);
+    updateRamModeButton();
 
     // Toggle Network Limit button. Icon only, at every toolbar level: the bolt
     // is the whole affordance and the state is carried by the magenta colour.
@@ -434,7 +365,7 @@ void MainWindow::createSearchView() {
     // --- Bar: engine chooser, category, query, buttons ---
     m_choiceSearchEngine = new Fl_Choice(10, barY, 150, barH);
     m_choiceSearchEngine->box(FL_FLAT_BOX);
-    m_choiceSearchEngine->tooltip("Search engine (dot: green = reachable, red = unreachable, gray = not checked yet)");
+    m_choiceSearchEngine->tooltip("Search engine (green = reachable, red = unreachable, gray = not checked yet)");
     m_choiceSearchEngine->callback([](Fl_Widget* w, void* data) {
         MainWindow* win = (MainWindow*)data;
         if (win) win->updateCategoryChoice();
@@ -644,7 +575,7 @@ void MainWindow::layoutToolbar(int available) {
     setWidth(m_btnTogglePause, ToolbarLayout::kIconButton);
     setWidth(m_btnRemove, ToolbarLayout::kIconButton);
     setWidth(m_darkModeBtn, ToolbarLayout::kThemeButton);
-    setWidth(m_choiceRamMode, ToolbarLayout::kRamChoice);
+    setWidth(m_btnRamMode, ToolbarLayout::kRamButton);
     setWidth(m_btnSearch, ToolbarLayout::kIconButton);
     setWidth(m_btnLimit, ToolbarLayout::kIconButton);
 
@@ -917,15 +848,13 @@ void MainWindow::applyTheme() {
     // is owned by applyLimitStyle(), which the toggle also goes through.
     if (m_btnLimit) applyLimitStyle();
 
-    if (m_choiceRamMode) {
+    if (m_btnRamMode) {
         if (darkMode) {
-            m_choiceRamMode->color(fl_rgb_color(30, 30, 30));
-            m_choiceRamMode->labelcolor(FL_WHITE);
-            m_choiceRamMode->textcolor(FL_WHITE);
+            m_btnRamMode->color(fl_rgb_color(30, 30, 30));
+            m_btnRamMode->labelcolor(FL_WHITE);
         } else {
-            m_choiceRamMode->color(fl_rgb_color(220, 220, 220));
-            m_choiceRamMode->labelcolor(FL_BLACK);
-            m_choiceRamMode->textcolor(FL_BLACK);
+            m_btnRamMode->color(fl_rgb_color(220, 220, 220));
+            m_btnRamMode->labelcolor(FL_BLACK);
         }
     }
 }
@@ -1436,20 +1365,22 @@ void MainWindow::setSearchStatus(const std::string& text) {
 void MainWindow::updateEngineChoice() {
     if (!m_choiceSearchEngine) return;
 
+    // Drop the menu first: rows below borrow text owned here, so the menu
+    // must never outlive a rebuild of these strings, whatever copy semantics
+    // a given FLTK release uses for add()/label().
     m_choiceSearchEngine->clear();
-    // The cleared menu owned the previous multi-labels; their bytes are tiny
-    // and few, and nothing else references them.
-    m_engineMultis.clear();
+    m_engineLabels.clear();
     int index = 0;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
-        m_choiceSearchEngine->add(d.name.c_str());
-        // Gray until probed; a cached green/red survives rebuilds. The dot
-        // and the name travel in one multi-label so both stay visible.
+        // Gray bullet until probed; a cached green/red survives rebuilds.
+        // Plain text rows with a per-row color: menu-item images proved
+        // unrenderable on some FLTK builds, while text draws everywhere.
+        m_engineLabels.push_back(engineLabel(d.name));
+        m_choiceSearchEngine->add(m_engineLabels.back().c_str());
         Fl_Menu_Item* item =
             const_cast<Fl_Menu_Item*>(m_choiceSearchEngine->menu() + index);
-        if (Fl_Image* dot = dotForEngine(d.name))
-            m_engineMultis.push_back(attachDotName(item, dot));
+        item->labelcolor(engineColor(engineStatusOf(d.name)));
         index++;
     }
     if (index > 0) m_choiceSearchEngine->value(0);
@@ -1469,11 +1400,24 @@ int MainWindow::engineMenuIndex(const std::string& name) const {
     return -1;
 }
 
-Fl_Image* MainWindow::dotForEngine(const std::string& name) const {
+MainWindow::EngineStatus MainWindow::engineStatusOf(
+    const std::string& name) const {
     auto it = m_engineStatus.find(name);
-    if (it == m_engineStatus.end() || it->second == EngineStatus::Unknown)
-        return m_dotGray;
-    return it->second == EngineStatus::Up ? m_dotGreen : m_dotRed;
+    if (it == m_engineStatus.end()) return EngineStatus::Unknown;
+    return it->second;
+}
+
+Fl_Color MainWindow::engineColor(EngineStatus status) {
+    // Gray reads on both themes; green/red carry the verdict.
+    switch (status) {
+        case EngineStatus::Up:   return fl_rgb_color(70, 190, 80);
+        case EngineStatus::Down: return fl_rgb_color(220, 70, 70);
+        default:                 return fl_rgb_color(150, 150, 150);
+    }
+}
+
+std::string MainWindow::engineLabel(const std::string& name) {
+    return std::string(kEngineCheckedBullet) + name;
 }
 
 // One joinable probe per enabled engine. Plain HttpClient GETs (the same door
@@ -1530,14 +1474,13 @@ void MainWindow::applyEngineStatus(const std::string& name, bool up) {
     m_engineStatus[name] = up ? EngineStatus::Up : EngineStatus::Down;
     if (!m_choiceSearchEngine) return;
     int index = engineMenuIndex(name);
-    if (index < 0 || index >= static_cast<int>(m_engineMultis.size())) return;
-    // Swap just the dot: the name pointer inside the multi-label is untouched,
-    // so the row can never lose its text again.
-    if (Fl_Image* dot = dotForEngine(name)) {
-        m_engineMultis[static_cast<size_t>(index)]->labela =
-            reinterpret_cast<char*>(dot);
-        m_choiceSearchEngine->redraw();
-    }
+    if (index < 0) return;
+    // Recolor in place: the text ("● Name", set at build time) is untouched,
+    // so a status arrival can never blank a row.
+    Fl_Menu_Item* item =
+        const_cast<Fl_Menu_Item*>(m_choiceSearchEngine->menu() + index);
+    item->labelcolor(engineColor(engineStatusOf(name)));
+    m_choiceSearchEngine->redraw();
 }
 
 // Rebuilds the category dropdown from the selected engine. Engines with a
@@ -1817,14 +1760,42 @@ void MainWindow::onSearchResults(const std::vector<SearchResult>& results,
     }
 }
 
-void MainWindow::onRamModeChanged(Fl_Widget* w, void* data) {
-    MainWindow* win = (MainWindow*)data;
-    if (win && win->m_choiceRamMode && win->m_manager) {
-        int mode = win->m_choiceRamMode->value();
-        SettingsManager::instance().setRamMode(mode);
-        SettingsManager::instance().save();
-        win->m_manager->setRamMode(mode);
+void MainWindow::updateRamModeButton() {
+    if (!m_btnRamMode) return;
+    // SettingsManager: 0 = ECO, 1 = Normal, 2 = TURBO. Anything else falls
+    // back to Normal, which is also the fresh-install default.
+    int mode = SettingsManager::instance().getRamMode();
+    if (mode < 0 || mode > 2) mode = 1;
+    Fl_Image* icon = nullptr;
+    const char* label = " NORMAL";
+    const char* tip = "RAM Usage Mode NORMAL (Balanced) — click for TURBO";
+    if (mode == 0) {
+        icon = m_ecoIcon;
+        label = " ECO";
+        tip = "RAM Usage Mode ECO (Zero Buffer) — click for NORMAL";
+    } else if (mode == 2) {
+        icon = m_turboIcon;
+        label = " TURBO";
+        tip = "RAM Usage Mode TURBO (Max Buffer) — click for ECO";
+    } else {
+        icon = m_normalIcon;
     }
+    if (icon) m_btnRamMode->image(icon);
+    m_btnRamMode->label(label);
+    m_btnRamMode->tooltip(tip);
+    m_btnRamMode->redraw();
+}
+
+void MainWindow::onRamModeCycle(Fl_Widget* w, void* data) {
+    MainWindow* win = (MainWindow*)data;
+    if (!win || !win->m_manager) return;
+    (void)w;
+    int cur = SettingsManager::instance().getRamMode();
+    int next = (cur == 1) ? 2 : (cur == 2) ? 0 : 1;   // NORMAL->TURBO->ECO
+    SettingsManager::instance().setRamMode(next);
+    SettingsManager::instance().save();
+    win->m_manager->setRamMode(next);
+    win->updateRamModeButton();
 }
 
 void MainWindow::updateTimerCallback(void* data) {
