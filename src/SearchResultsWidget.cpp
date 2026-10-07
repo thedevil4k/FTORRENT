@@ -74,7 +74,11 @@ const SearchResultsWidget::ColumnInfo SearchResultsWidget::COLUMN_INFO[COL_COUNT
 SearchResultsWidget::SearchResultsWidget(int x, int y, int w, int h, const char* label)
     : Fl_Table_Row(x, y, w, h, label)
     , m_sortColumn(COL_SEEDERS)
-    , m_sortAscending(true)
+    // Descending: the most seeded (usable) torrents come first. Zero-seeder
+    // rows are useless for downloading, so they belong at the bottom. This
+    // matches the header-click rule below, where Seeders also defaults to
+    // descending, and the header indicator shows its ▼ from the start.
+    , m_sortAscending(false)
     , m_headerBg(FL_LIGHT2)
     , m_oddRowColor(fl_rgb_color(248, 248, 248))
 {

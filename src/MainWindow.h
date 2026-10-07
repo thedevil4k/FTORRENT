@@ -21,6 +21,10 @@
 #include <map>
 #include <string>
 #include <vector>
+
+// Forward declaration only; the full header is pulled in by MainWindow.cpp.
+// Keeps this header free of menu-internals includes on every platform.
+struct Fl_Multi_Label;
 #ifdef _WIN32
 #include <shellapi.h>
 #define WM_TRAY_MESSAGE (WM_USER + 1)
@@ -201,6 +205,9 @@ private:
     
     // Dots for the engine dropdown, painted procedurally (no assets, no new
     // dependencies). The pixel buffers must outlive the images, hence members.
+    // Attached through Fl_Multi_Label (dot + name), never through
+    // Fl_Menu_Item::image(): that call REPLACES the item text (verified at
+    // runtime), which is how the dropdown ended up showing dots only.
     static constexpr int kEngineDotPixels = 12;
     unsigned char m_dotGreenPx[kEngineDotPixels * kEngineDotPixels * 4];
     unsigned char m_dotRedPx[kEngineDotPixels * kEngineDotPixels * 4];
@@ -210,6 +217,10 @@ private:
     Fl_Image* m_dotGray;
     // Last known reachability per engine name; absent means not checked yet.
     std::map<std::string, EngineStatus> m_engineStatus;
+    // One multi-label per engine menu row, in menu order. Swapping the dot on
+    // a status change only rewrites labela (the image), so the name pointer
+    // is never at risk; entries are rebuilt together with the menu itself.
+    std::vector<Fl_Multi_Label*> m_engineMultis;
     // The reachability probe runs once per session, the first time the search
     // view is opened, so startup and the torrent list never pay for it.
     bool m_engineStatusChecked;

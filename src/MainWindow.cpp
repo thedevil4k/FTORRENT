@@ -16,6 +16,7 @@
 #include <FL/fl_ask.H>   // fl_choice, fl_input, fl_alert, fl_message all live here
 #include <FL/Fl_Shared_Image.H>
 #include <FL/Fl_RGB_Image.H>
+#include <FL/Fl_Multi_Label.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Window.H>
 #include <FL/x.H>
@@ -72,6 +73,24 @@ void paintEngineDot(unsigned char* px, int size,
             p[0] = r; p[1] = g; p[2] = b; p[3] = a;
         }
     }
+}
+
+// Builds the dot + name label of one dropdown row. Fl_Menu_Item::image() must
+// NOT be used here: it replaces the item text with the image (verified at
+// runtime on our FLTK builds), leaving rows that show the dot but no name.
+// A Fl_Multi_Label keeps both, with identical spelling on FLTK 1.3 and 1.4.
+// Call strictly after add(): labelb borrows the menu's own copy of the text,
+// which lives until the next clear(). Returns the multi-label so the caller
+// can swap just the dot later by rewriting labela.
+Fl_Multi_Label* attachDotName(Fl_Menu_Item* item, Fl_Image* dot) {
+    const char* text = item->label();   // still the plain add() copy here
+    Fl_Multi_Label* ml = new Fl_Multi_Label;
+    ml->labela = reinterpret_cast<char*>(dot);
+    ml->typea = _FL_IMAGE_LABEL;
+    ml->labelb = const_cast<char*>(text);
+    ml->typeb = FL_NORMAL_LABEL;
+    item->label(_FL_MULTI_LABEL, reinterpret_cast<const char*>(ml));
+    return ml;
 }
 
 } // namespace
@@ -305,21 +324,22 @@ void MainWindow::createToolbar() {
     
     idx = m_choiceRamMode->add("  ECO");
     if (m_ecoIcon) {
-        // We need to access the menu item directly to set the image
+        // We need to access the menu item directly to set the image.
+        // attachDotName, not image(): image() would replace the "ECO" text.
         Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
-        item->image(m_ecoIcon);
+        attachDotName(item, m_ecoIcon);
     }
-    
+
     idx = m_choiceRamMode->add("  NORMAL");
     if (m_normalIcon) {
         Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
-        item->image(m_normalIcon);
+        attachDotName(item, m_normalIcon);
     }
-    
+
     idx = m_choiceRamMode->add("  TURBO");
     if (m_turboIcon) {
         Fl_Menu_Item* item = const_cast<Fl_Menu_Item*>(m_choiceRamMode->menu() + idx);
-        item->image(m_turboIcon);
+        attachDotName(item, m_turboIcon);
     }
     
     m_choiceRamMode->box(FL_FLAT_BOX);
@@ -1412,14 +1432,19 @@ void MainWindow::updateEngineChoice() {
     if (!m_choiceSearchEngine) return;
 
     m_choiceSearchEngine->clear();
+    // The cleared menu owned the previous multi-labels; their bytes are tiny
+    // and few, and nothing else references them.
+    m_engineMultis.clear();
     int index = 0;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
         m_choiceSearchEngine->add(d.name.c_str());
-        // Gray until probed; a cached green/red survives rebuilds.
+        // Gray until probed; a cached green/red survives rebuilds. The dot
+        // and the name travel in one multi-label so both stay visible.
         Fl_Menu_Item* item =
             const_cast<Fl_Menu_Item*>(m_choiceSearchEngine->menu() + index);
-        if (Fl_Image* dot = dotForEngine(d.name)) item->image(dot);
+        if (Fl_Image* dot = dotForEngine(d.name))
+            m_engineMultis.push_back(attachDotName(item, dot));
         index++;
     }
     if (index > 0) m_choiceSearchEngine->value(0);
@@ -1494,11 +1519,14 @@ void MainWindow::applyEngineStatus(const std::string& name, bool up) {
     m_engineStatus[name] = up ? EngineStatus::Up : EngineStatus::Down;
     if (!m_choiceSearchEngine) return;
     int index = engineMenuIndex(name);
-    if (index < 0) return;
-    Fl_Menu_Item* item =
-        const_cast<Fl_Menu_Item*>(m_choiceSearchEngine->menu() + index);
-    if (Fl_Image* dot = dotForEngine(name)) item->image(dot);
-    m_choiceSearchEngine->redraw();
+    if (index < 0 || index >= static_cast<int>(m_engineMultis.size())) return;
+    // Swap just the dot: the name pointer inside the multi-label is untouched,
+    // so the row can never lose its text again.
+    if (Fl_Image* dot = dotForEngine(name)) {
+        m_engineMultis[static_cast<size_t>(index)]->labela =
+            reinterpret_cast<char*>(dot);
+        m_choiceSearchEngine->redraw();
+    }
 }
 
 // Rebuilds the category dropdown from the selected engine. Engines with a
