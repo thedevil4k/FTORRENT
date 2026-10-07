@@ -16,6 +16,7 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Widget.H>
+#include <FL/fl_draw.H>
 #include "MainWindow.h"
 #include "ToolbarLayout.h"
 #include "TorrentManager.h"
@@ -25,6 +26,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <memory>
 
 using testsupport::forceLayout;
@@ -49,6 +51,46 @@ static Fl_Choice* engineChoice(Fl_Widget* w) {
         for (int i = 0; i < g->children(); i++)
             if (Fl_Choice* hit = engineChoice(g->child(i))) return hit;
     return nullptr;
+}
+
+// Ink of one dropdown row drawn offscreen, same trick as icons.cpp: struct
+// checks proved nothing (a row can hold a perfect multi-label and still draw
+// blank when its draw function was never registered). Rendered on black AND
+// on white, keeping the max: the click sequence above leaves the theme light,
+// but nothing may assume that, and each rendering only shows the content
+// whose color differs from its backdrop. Calibrated on the reference backend:
+// a 12px dot alone is ~140px, dot + engine name ~700px, so the bar sits where
+// only a row that really draws both can reach it.
+static int menuRowInkOn(const Fl_Menu_Item* m, Fl_Choice* menu, Fl_Color bg) {
+    const int W = 260, H = 24;
+    Fl_Image_Surface surf(W, H);
+    testsupport::SurfaceScope here(&surf);
+    fl_color(bg);
+    fl_rectf(0, 0, W, H);
+    // Non-const call on purpose: Fl_Menu_Item::draw() is const on some FLTK
+    // releases and not on others; this spelling compiles against both.
+    const_cast<Fl_Menu_Item*>(m)->draw(2, 2, W - 4, H - 4, menu, 0);
+    Fl_RGB_Image* img = surf.image();
+    if (!img || !img->array || img->d() != 3) { delete img; return -1; }
+    unsigned char br = 0, bgc = 0, bb = 0;
+    Fl::get_color(bg, br, bgc, bb);
+    int ink = 0;
+    for (int y = 0; y < img->h(); y++)
+        for (int x = 0; x < img->w(); x++) {
+            const unsigned char* q = img->array + (y * img->w() + x) * 3;
+            if (abs(q[0] - br) > 20 || abs(q[1] - bgc) > 20 ||
+                abs(q[2] - bb) > 20)
+                ink++;
+        }
+    delete img;
+    return ink;
+}
+
+static int menuRowInk(const Fl_Menu_Item* m, Fl_Choice* menu) {
+    int onBlack = menuRowInkOn(m, menu, FL_BLACK);
+    int onWhite = menuRowInkOn(m, menu, FL_WHITE);
+    if (onBlack < 0 || onWhite < 0) return -1;
+    return onBlack > onWhite ? onBlack : onWhite;
 }
 
 int main() {
@@ -152,6 +194,19 @@ int main() {
     ok(nEngines > 0, "dropdown lists engines");
     ok(nDotted == nEngines && nEngines > 0,
        "every engine row carries a status dot");
+    int nDrawn = 0;
+    if (engines) {
+        for (const Fl_Menu_Item* m = engines->menu(); m && m->label(); ++m) {
+            int ink = menuRowInk(m, engines);
+            char inkMsg[160];
+            snprintf(inkMsg, sizeof inkMsg,
+                     "engine row renders dot and name (%d ink px)", ink);
+            ok(ink > 200, inkMsg);
+            if (ink > 200) nDrawn++;
+        }
+    }
+    ok(nDrawn == nEngines && nEngines > 0,
+       "no engine row renders blank");
     // Let the probes run and deliver (Fl::awake is drained by Fl::wait); the
     // verdict itself is network-dependent and is not asserted, but surviving
     // the deliveries without hanging is.

@@ -11,7 +11,7 @@
       <li>Pause and resume per torrent, remove with confirmation</li>
       <li>Sortable list with name, size, progress, status, down speed, up speed, ETA, ratio and peers</li>
       <li>One-click 50 % rate limit for the session and ECO/NORMAL/TURBO RAM usage modes</li>
-      <li>Search torrents across Nyaa.si, The Pirate Bay, BTDig, SolidTorrents and BitSearch, with mirror fallbacks</li>
+      <li>Search torrents across SolidTorrents, BitSearch, Nyaa.si, The Pirate Bay, BTDig and Pirate Face, with per-engine reachability dots and per-file download selection</li>
       <li>Dark and light themes, a censorship toggle for screenshots, and a status bar with torrent counts, RAM and latency</li>
     </ul>
   </description>

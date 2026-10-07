@@ -89,7 +89,11 @@ Fl_Multi_Label* attachDotName(Fl_Menu_Item* item, Fl_Image* dot) {
     ml->typea = _FL_IMAGE_LABEL;
     ml->labelb = const_cast<char*>(text);
     ml->typeb = FL_NORMAL_LABEL;
-    item->label(_FL_MULTI_LABEL, reinterpret_cast<const char*>(ml));
+    // Through ml->label(item), NEVER item->label(_FL_MULTI_LABEL, ...): only
+    // the method registers the multi-label draw function with the toolkit. A
+    // direct assignment leaves rows that draw absolutely nothing — blank
+    // dropdowns with neither dot nor name, as shipped once by mistake.
+    ml->label(item);
     return ml;
 }
 
@@ -134,6 +138,7 @@ MainWindow::MainWindow(int w, int h, const char* title)
     , m_dotRed(nullptr)
     , m_dotGray(nullptr)
     , m_engineStatusChecked(false)
+    , m_probesStop(false)
     ,m_limitModerate(false)
     ,m_limitIdleColor(FL_BACKGROUND_COLOR)
     ,m_censored(false)    , m_showPublicIp(false)
@@ -1485,11 +1490,15 @@ void MainWindow::startEngineStatusCheck() {
         if (!d.enabled) continue;
         SearchEngine::Definition def = d;   // the worker must not read the UI
         m_engineProbes.emplace_back([this, def] {
-            if (!isAlive()) return;
+            if (!isAlive() || m_probesStop.load()) return;
             SearchEngine engine(def);
             HttpClient::Response resp = HttpClient::get(
                 engine.buildUrl("test"), std::string("FTORRENT ") + VERSION,
-                10, [] { return !MainWindow::isAlive(); }, nullptr, 6);
+                10,
+                [this] {
+                    return !MainWindow::isAlive() || m_probesStop.load();
+                },
+                nullptr, 6);
             if (!isAlive()) return;
             auto* delivery =
                 new EngineStatusDelivery{this, def.name, resp.ok};
@@ -1500,8 +1509,10 @@ void MainWindow::startEngineStatusCheck() {
 
 void MainWindow::shutdownEngineProbes() {
     // No new probes after this: a late switchView(true) must not resurrect
-    // workers nobody will join.
+    // workers nobody will join. The flag aborts in-flight GETs at once so the
+    // join below never waits out a full timeout.
     m_engineStatusChecked = true;
+    m_probesStop.store(true);
     for (auto& t : m_engineProbes) {
         if (t.joinable()) t.join();
     }

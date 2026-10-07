@@ -225,10 +225,13 @@ private:
     // view is opened, so startup and the torrent list never pay for it.
     bool m_engineStatusChecked;
     // Probe workers. Joinable, never detached: a detached probe doing a
-    // blocking GET outlives main() and dies inside teardown (curl/FLTK
+    // blocking GET outlives main() and dies inside teardown (curl/WinInet
     // already half gone), which is a segfault at exit. Touched only on the
-    // UI thread (launch here, join in shutdownEngineStatusCheck()).
+    // UI thread (launch here, join in shutdownEngineProbes()).
     std::vector<std::thread> m_engineProbes;
+    // Tells in-flight probes to abort at once, so the join never waits out a
+    // full timeout (matters for the test suite, where s_alive never falls).
+    std::atomic<bool> m_probesStop;
 
     // Icons
     Fl_Image* m_brightIcon;
