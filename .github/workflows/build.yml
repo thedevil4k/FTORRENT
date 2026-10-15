@@ -232,7 +232,7 @@ jobs:
     # runtime preinstalled, so the job must run inside the action's own
     # image; --privileged lets that container set up flatpak itself.
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
       options: --privileged
     steps:
     - uses: actions/checkout@v4

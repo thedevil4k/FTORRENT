@@ -2,7 +2,7 @@
 Name=FTorrent
 Comment=Lightweight and fast BitTorrent client
 Exec=FTorrent
-Icon=ftorrent
+Icon=io.github.thedevil4k.FTorrent
 Terminal=false
 Type=Application
 Categories=Network;FileTransfer;P2P;

@@ -302,15 +302,17 @@ if(UNIX AND NOT APPLE)
 
     # Appstream metadata: software centers read it on the desktop, and
     # Flathub rejects submissions that ship without it.
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/io.github.thedevil4k.FTorrent.appdata.xml"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/io.github.thedevil4k.FTorrent.metainfo.xml"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo"
-        RENAME "io.github.thedevil4k.FTorrent.appdata.xml"
+        RENAME "io.github.thedevil4k.FTorrent.metainfo.xml"
     )
-    
-    # Icons (various sizes if available, but for now we use the one we have)
+
+    # Icons (various sizes if available, but for now we use the one we have).
+    # Installed under the app id: the .desktop file's Icon= key has to name a
+    # file that actually ships, which is one of Flathub's checks.
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/ftorrent.png"
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps"
-        RENAME "ftorrent.png"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
+        RENAME "io.github.thedevil4k.FTorrent.png"
     )
 
     set(CPACK_GENERATOR "DEB;RPM;TGZ")

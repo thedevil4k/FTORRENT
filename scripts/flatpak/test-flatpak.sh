@@ -108,27 +108,54 @@ flatpak run $INSTALLATION --command=sh "$APP_ID" -c '
     for f in \
         /app/bin/assets/ftorrent.png \
         /app/share/applications/io.github.thedevil4k.FTorrent.desktop \
-        /app/share/icons/hicolor/128x128/apps/ftorrent.png
+        /app/share/icons/hicolor/256x256/apps/io.github.thedevil4k.FTorrent.png
     do
         if [ -f "$f" ]; then echo "  ok       $f"; else echo "  MISSING  $f"; exit 1; fi
     done
-    # CMake installs the AppStream file as .appdata.xml, the name it has in the
-    # repo, and flatpak-builder renames it to the modern .metainfo.xml on the
-    # way into the sandbox. Either name means Flathub gets what it requires.
-    if [ -f /app/share/metainfo/io.github.thedevil4k.FTorrent.metainfo.xml ] ||
-       [ -f /app/share/metainfo/io.github.thedevil4k.FTorrent.appdata.xml ]; then
-        echo "  ok       /app/share/metainfo/io.github.thedevil4k.FTorrent.xml"
+    # The AppStream file keeps its canonical .metainfo.xml name from the repo
+    # through CMake, so what Flathub reads is exactly what was written.
+    if [ -f /app/share/metainfo/io.github.thedevil4k.FTorrent.metainfo.xml ]; then
+        echo "  ok       /app/share/metainfo/io.github.thedevil4k.FTorrent.metainfo.xml"
     else
-        echo "  MISSING  /app/share/metainfo/io.github.thedevil4k.FTorrent.{metainfo,appdata}.xml"
+        echo "  MISSING  /app/share/metainfo/io.github.thedevil4k.FTorrent.metainfo.xml"
         exit 1
     fi'
+
+# Flathub requires the licence of every module under /app/share/licenses with
+# the app id, one directory per module: recent flatpak-builder installs the
+# common file names by itself when they sit in the root of the module source.
+# The check turns a module where that did not happen into a red build here
+# rather than a review comment later.
+echo
+echo "== every module licence is installed =="
+licenses="$(flatpak run $INSTALLATION --command=sh "$APP_ID" -c '
+    ls -lR /app/share/licenses 2>/dev/null || true
+    echo
+    status=0
+    for module in boost libtorrent-rasterbar fltk ftorrent; do
+        dir="/app/share/licenses/io.github.thedevil4k.FTorrent/$module"
+        if [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ]; then
+            echo "  ok       /app/share/licenses/io.github.thedevil4k.FTorrent/$module"
+        else
+            echo "  MISSING  /app/share/licenses/io.github.thedevil4k.FTorrent/$module"
+            status=1
+        fi
+    done
+    exit $status' || true)"
+printf '%s\n' "$licenses"
+if [ -z "$licenses" ]; then
+    die "could not inspect /app/share/licenses inside the sandbox"
+fi
+if printf '%s\n' "$licenses" | grep -q 'MISSING'; then
+    die "a module licence is not installed under /app/share/licenses/$APP_ID"
+fi
 
 # Flathub rejects a submission whose AppStream metadata does not validate, and
 # that is a five-second check compared to the build it would otherwise send.
 if command -v appstreamcli >/dev/null 2>&1; then
     echo
     echo "== AppStream metadata validates =="
-    if out="$(appstreamcli validate --no-net "$BASE_DIR/$APP_ID.appdata.xml" 2>&1)"; then
+    if out="$(appstreamcli validate --no-net "$BASE_DIR/$APP_ID.metainfo.xml" 2>&1)"; then
         echo "  valid"
     else
         printf '%s\n' "$out"
