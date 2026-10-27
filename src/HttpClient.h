@@ -1,6 +1,8 @@
 #ifndef HTTPCLIENT_H
 #define HTTPCLIENT_H
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 

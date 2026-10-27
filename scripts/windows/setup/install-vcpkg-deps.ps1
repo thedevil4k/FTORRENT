@@ -66,7 +66,7 @@ Write-Host "Instalando dependencias (esto puede tardar varios minutos)..." -Fore
 Write-Host ""
 
 # Instalar FLTK
-Write-Host "[1/2] Instalando FLTK..." -ForegroundColor Cyan
+Write-Host "[1/3] Instalando FLTK..." -ForegroundColor Cyan
 & $VcpkgExe install fltk:x64-windows
 
 if ($LASTEXITCODE -ne 0) {
@@ -78,7 +78,7 @@ Write-Host "FLTK instalado correctamente!" -ForegroundColor Green
 Write-Host ""
 
 # Instalar libtorrent
-Write-Host "[2/2] Instalando libtorrent-rasterbar..." -ForegroundColor Cyan
+Write-Host "[2/3] Instalando libtorrent-rasterbar..." -ForegroundColor Cyan
 Write-Host "(Esto puede tardar 10-20 minutos dependiendo de tu sistema)" -ForegroundColor Yellow
 # La feature especial "core" deja fuera las default features de libtorrent, y la
 # unica que tiene es webtorrent. Esa feature arrastra libdatachannel, libjuice,
@@ -97,11 +97,25 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "libtorrent-rasterbar instalado correctamente!" -ForegroundColor Green
 Write-Host ""
 
+# Instalar libarchive
+Write-Host "[3/3] Instalando libarchive..." -ForegroundColor Cyan
+Write-Host "(Habilita la inspeccion de .exe dentro de RAR/ZIP sin extraerlos)" -ForegroundColor Yellow
+& $VcpkgExe install libarchive:x64-windows
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ADVERTENCIA: libarchive no se pudo instalar. FTorrent compilara igual," -ForegroundColor Yellow
+    Write-Host "pero la opcion de inspeccionar RAR/ZIP quedara deshabilitada." -ForegroundColor Yellow
+} else {
+    Write-Host "libarchive instalado correctamente!" -ForegroundColor Green
+}
+
+Write-Host ""
+
 # Verificar instalación
 Write-Host "=== Verificando instalación ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Paquetes instalados:" -ForegroundColor Yellow
-& $VcpkgExe list | Select-String -Pattern "(fltk|libtorrent)"
+& $VcpkgExe list | Select-String -Pattern "(fltk|libtorrent|libarchive)"
 
 Write-Host ""
 Write-Host "=== Instalación completada ===" -ForegroundColor Green

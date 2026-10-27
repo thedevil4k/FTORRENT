@@ -276,14 +276,23 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
     m_handle.file_progress(file_progress);
 
     for (int i = 0; i < fs.num_files(); ++i) {
+        // v2/hybrid torrents use internal pad files to align pieces. They are
+        // not content and must not appear in a list the user picks from.
+        if (fs.pad_file_at(lt::file_index_t(i))) continue;
+
         FileInfo fi;
         fi.name = std::string(fs.file_name(lt::file_index_t(i)));
+        // file_path() keeps the folders. Hashing needs the on-disk path, and
+        // two files with the same leaf name can otherwise not be told apart.
+        fi.path = std::string(fs.file_path(lt::file_index_t(i)));
         fi.size = fs.file_size(lt::file_index_t(i));
         
         if (fi.size > 0 && i < (int)file_progress.size()) {
             fi.progress = (double)file_progress[i] / fi.size;
+            fi.complete = file_progress[i] >= fi.size;
         } else {
             fi.progress = 0.0;
+            fi.complete = fi.size == 0;
         }
         
         fi.priority = (int)static_cast<std::uint8_t>(m_handle.file_priority(lt::file_index_t(i)));

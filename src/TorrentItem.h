@@ -86,8 +86,10 @@ public:
     
     struct FileInfo {
         std::string name;
+        std::string path;       // Path relative to the save path, with folders
         int64_t size;
         double progress;
+        bool complete;          // Every byte of this file is on disk
         int priority;
     };
 

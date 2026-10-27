@@ -43,6 +43,7 @@ case $OS in
             libjpeg-dev \
             zlib1g-dev \
             libcurl4-openssl-dev \
+            libarchive-dev \
             pkg-config \
             rpm \
             git \
@@ -71,6 +72,7 @@ case $OS in
             libjpeg-turbo-devel \
             zlib-devel \
             libcurl-devel \
+            libarchive-devel \
             rpm-build \
             pkgconfig \
             git
@@ -90,12 +92,14 @@ case $OS in
             libjpeg-turbo \
             zlib \
             curl \
+            libarchive \
             rpm-tools \
             git
         ;;
     *)
         echo "Unsupported OS: $OS. Please install dependencies manually."
         echo "Required: C++20 compiler, CMake, FLTK, libtorrent-rasterbar, libpng, libjpeg, zlib."
+        echo "Optional: libarchive (read-only .exe inspection inside RAR/ZIP archives)."
         exit 1
         ;;
 esac

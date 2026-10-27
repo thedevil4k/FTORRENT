@@ -104,7 +104,7 @@ jobs:
         #
         # [core] is not remembered by vcpkg: it belongs in the command that
         # requests the package, or the default features come straight back.
-        vcpkg install fltk zlib libpng libjpeg-turbo --triplet ${{ matrix.arch }}-windows
+        vcpkg install fltk zlib libpng libjpeg-turbo libarchive --triplet ${{ matrix.arch }}-windows
         vcpkg install "libtorrent[core]:${{ matrix.arch }}-windows"
         if ("${{ matrix.arch }}" -eq "arm64") { vcpkg install fltk --triplet x64-windows }
 
@@ -215,7 +215,7 @@ jobs:
         # because Arch's fltk is built with Cairo support (FLTK_HAVE_CAIRO).
         docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace archlinux:latest bash -c " \
           pacman -Syu --noconfirm && \
-          pacman -S --noconfirm --needed base-devel cmake boost fltk libtorrent-rasterbar libpng libjpeg-turbo zlib cairo curl && \
+          pacman -S --noconfirm --needed base-devel cmake boost fltk libtorrent-rasterbar libpng libjpeg-turbo zlib cairo curl libarchive && \
           BUILD_DIR=build_linux_x86_64 bash scripts/linux/installers/create-linux-arch.sh && \
           chmod -R 777 build_linux_x86_64 \
         "

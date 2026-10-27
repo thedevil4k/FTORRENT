@@ -38,6 +38,11 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 **Preferences** — four tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode).
 
+**Security checks before running anything**
+- **Open in VirusTotal** for a completed `.exe`: FTorrent computes SHA-256 locally and opens the report; the file is never uploaded
+- **Inspect Archive** for a completed RAR/ZIP: lists the `.exe` files inside and hashes one in memory, with no extraction, no temporary files and no execution
+- Password-protected entries are listed but refused; archive support is optional at build time and the button explains when it is absent
+
 **Interface**
 - Dark and light themes; dark is the default and theme choice is per session
 - Censorship toggle in the status bar, to hide sensitive fields from screenshots
@@ -47,7 +52,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 ## Building from source
 
-Requires **CMake 3.15+**, a C++20 compiler (GCC 11+, Clang 14+ or VS 2022), **FLTK**, **libtorrent-rasterbar**, **OpenSSL**, zlib, libpng and libjpeg.
+Requires **CMake 3.15+**, a C++20 compiler (GCC 11+, Clang 14+ or VS 2022), **FLTK**, **libtorrent-rasterbar**, **OpenSSL**, zlib, libpng and libjpeg. **libarchive** is optional and enables read-only `.exe` inspection inside RAR/ZIP archives.
 
 ```bash
 # Linux — installs every build and test dependency first
@@ -93,6 +98,8 @@ ctest --test-dir build --output-on-failure
 | `toolbar_clicks` | every toolbar button hit-testable and clickable at the narrowest supported width, plus opening/closing the search view, the engine status dots and a clean, segfault-free shutdown |
 | `icons_full` / `icons_missing` | icon rendering, toolbar levels and spacing, with and without the on-disk assets |
 | `flows` | preferences, add, remove, rate limit, search, file lists, pause/resume end to end |
+| `file_hash` | SHA-256 vectors and VirusTotal URL validation |
+| `archive_inspector` | read-only listing and hashing inside a generated ZIP, plus its refusals for bad input (built when libarchive is found) |
 
 `flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 
@@ -132,7 +139,8 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **Assets load from disk with a compiled-in fallback.** [`AssetLoader`](src/AssetLoader.h) provides the toolbar PNGs at the right size; if one is missing, the built-in glyph is used instead, so a button is never blank. The XPM glyphs are resampled to 26 px at startup rather than scaled by the widget.
 - **Public IP in the status bar is off by default.** A new installation does not look its address up online until you tick the box; an existing `ShowPublicIp=true` is left alone.
 - **The 50 % rate limit button says so.** Its tooltip now reads `Limit network speed 50%`.
-- **A test suite in the repository.** Five CTest programs, built from the same objects the app ships.
+- **A test suite in the repository.** CTest programs built from the same objects the app ships.
+- **Executables can be checked before they run.** A manual VirusTotal lookup hashes a completed `.exe` locally, and completed RAR/ZIP archives are inspected in memory so an inner `.exe` can be hashed without extracting or executing it; libarchive is optional and the action explains when it is unavailable.
 - **Search engines report their reachability.** A green, red or gray dot next to each engine in the dropdown, probed once per session with no new dependencies.
 - **Magnets can be picked file by file.** The Add dialog lists a magnet's already-resolved files with one checkbox each; the file rows under each result are separated so multi-file torrents read clearly.
 - **Search results survive small windows and use wide ones.** Names ellipsize by pixels (full name when it fits), double-click and Enter both download, and cancelling the dialog keeps the results.

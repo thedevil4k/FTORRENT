@@ -12,6 +12,10 @@
 #   icons           the toolbar icons and the level/width/padding/centring rules,
 #                   in both the assets-present and assets-missing variants
 #   flows           the user journeys end to end; needs the network
+#   file_hash       the SHA-256 vectors and the VirusTotal URL validation
+#   archive_inspector
+#                   read-only listing and hashing inside a generated ZIP, plus
+#                   the refusals for bad input (only when libarchive is found)
 #
 # Sources are listed by hand rather than globbed, so adding a file is a decision
 # someone makes rather than something that happens.
@@ -52,6 +56,14 @@ ftorrent_add_test(toolbar_layout toolbar_layout.cpp)
 ftorrent_add_test(toolbar_clicks toolbar_clicks.cpp)
 ftorrent_add_test(flows flows.cpp)
 ftorrent_add_test(icons icons.cpp)
+ftorrent_add_test(file_hash file_hash.cpp)
+
+# The archive reader is optional, so its test is only built when the reader is.
+# FTORRENT_HAVE_LIBARCHIVE is set by the parent CMakeLists.txt and also reaches
+# this test through ftorrent_core's PUBLIC compile definition.
+if(FTORRENT_HAVE_LIBARCHIVE)
+    ftorrent_add_test(archive_inspector archive_inspector.cpp)
+endif()
 
 # The assets-present variants need src/assets/ beside the binary, because
 # AssetLoader resolves that directory from the running executable rather than
@@ -77,8 +89,15 @@ add_test(NAME toolbar_layout COMMAND toolbar_layout)
 add_test(NAME toolbar_clicks COMMAND toolbar_clicks)
 add_test(NAME icons_full COMMAND icons full)
 add_test(NAME flows COMMAND flows)
+add_test(NAME file_hash COMMAND file_hash)
 
-foreach(t toolbar_layout toolbar_clicks icons_full flows)
+set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash)
+if(FTORRENT_HAVE_LIBARCHIVE)
+    add_test(NAME archive_inspector COMMAND archive_inspector)
+    list(APPEND FTORRENT_TESTS archive_inspector)
+endif()
+
+foreach(t ${FTORRENT_TESTS})
     set_tests_properties(${t} PROPERTIES
         ENVIRONMENT "${FTORRENT_TEST_ENV}"
         # A test that opens a session and talks to a tracker is slower than a
@@ -95,10 +114,10 @@ set(NOASSETS_DIR ${CMAKE_CURRENT_BINARY_DIR}/noassets)
 file(MAKE_DIRECTORY ${NOASSETS_DIR})
 add_custom_command(TARGET icons POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-            $<TARGET_FILE:icons> ${NOASSETS_DIR}/icons
+            $<TARGET_FILE:icons> ${NOASSETS_DIR}/icons${CMAKE_EXECUTABLE_SUFFIX}
     COMMENT "Copying icons to a directory with no assets/ for the fallback variant"
 )
-add_test(NAME icons_missing COMMAND ${NOASSETS_DIR}/icons missing)
+add_test(NAME icons_missing COMMAND ${NOASSETS_DIR}/icons${CMAKE_EXECUTABLE_SUFFIX} missing)
 set_tests_properties(icons_missing PROPERTIES
     ENVIRONMENT "${FTORRENT_TEST_ENV}"
     TIMEOUT 600

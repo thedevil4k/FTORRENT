@@ -154,7 +154,7 @@ In `compile.ps1`, you can use the `-OutputDir` parameter:
 ```powershell
 # Reinstall dependencies
 cd C:\vcpkg
-.\vcpkg install fltk:x64-windows libtorrent:x64-windows
+.\vcpkg install fltk:x64-windows libtorrent:x64-windows libarchive:x64-windows
 ```
 
 ### Error: "Build failed"
@@ -206,9 +206,13 @@ sudo apt-get install -y \
     libpng-dev \
     libjpeg-dev \
     zlib1g-dev \
-    rpm \ # Required for packaging
+    libarchive-dev \
+    rpm \
     git
 ```
+
+`libarchive-dev` is optional (it enables read-only `.exe` inspection inside RAR/ZIP
+archives); `rpm` is required for packaging.
 
 > [!NOTE]
 > For **32-bit (i386)** builds, we recommend and use **Debian Bookworm** in our CI, as it provides the most stable environment with all necessary dependencies (libtorrent 2.0+) for that architecture.

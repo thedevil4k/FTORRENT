@@ -67,6 +67,14 @@ if (Test-Path "C:\vcpkg\vcpkg.exe") {
             $AllOk = $false
         }
     }
+
+    Write-Host "      - libarchive (opcional): " -NoNewline
+    if ($packages -match "libarchive") {
+        Write-Host "INSTALADO" -ForegroundColor Green
+    }
+    else {
+        Write-Host "NO INSTALADO (inspeccion RAR/ZIP deshabilitada)" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""

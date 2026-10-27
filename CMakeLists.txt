@@ -42,6 +42,38 @@ find_package(ZLIB REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
 
+# libarchive is optional. It backs read-only inspection of .exe files inside
+# RAR/ZIP archives: entries are streamed through SHA-256 in memory and are never
+# extracted or executed. Without it the application still builds and the archive
+# action explains that the reader is unavailable; it never falls back to running
+# an external unrar/7z tool.
+find_package(LibArchive QUIET)
+if(NOT CMAKE_DISABLE_FIND_PACKAGE_LibArchive
+   AND NOT TARGET LibArchive::LibArchive
+   AND NOT LibArchive_FOUND
+   AND NOT LIBARCHIVE_FOUND)
+    # FindLibArchive was added in CMake 3.17, while this project supports 3.15.
+    # Fall back to the pkg-config file so the optional reader is still detected
+    # on an older host instead of being silently disabled.
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND OR PKG_CONFIG_FOUND)
+        pkg_check_modules(LIBARCHIVE QUIET IMPORTED_TARGET libarchive)
+    endif()
+endif()
+if(NOT CMAKE_DISABLE_FIND_PACKAGE_LibArchive
+   AND (TARGET LibArchive::LibArchive
+        OR TARGET PkgConfig::LIBARCHIVE
+        OR LibArchive_FOUND
+        OR LIBARCHIVE_FOUND))
+    set(FTORRENT_HAVE_LIBARCHIVE TRUE)
+endif()
+
+if(FTORRENT_HAVE_LIBARCHIVE)
+    message(STATUS "libarchive found: RAR/ZIP archive inspection enabled")
+else()
+    message(STATUS "libarchive not found: RAR/ZIP archive inspection disabled")
+endif()
+
 # Try to find Libtorrent via CMake config or pkg-config
 find_package(LibtorrentRasterbar QUIET)
 if(NOT LibtorrentRasterbar_FOUND)
@@ -69,6 +101,10 @@ set(SOURCES
     src/AddTorrentDialog.cpp
     src/CreateTorrentDialog.cpp
     src/TorrentDetailsDialog.cpp
+    src/ArchiveInspector.cpp
+    src/ArchiveContentsDialog.cpp
+    src/FileHash.cpp
+    src/VirusTotal.cpp
     src/Resources.cpp
     src/PathUtils.cpp
     src/RemoveConfirmDialog.cpp
@@ -100,6 +136,10 @@ set(HEADERS
     src/AddTorrentDialog.h
     src/CreateTorrentDialog.h
     src/TorrentDetailsDialog.h
+    src/ArchiveInspector.h
+    src/ArchiveContentsDialog.h
+    src/FileHash.h
+    src/VirusTotal.h
     src/Resources.h
     src/Icons.h
     src/PathUtils.h
@@ -130,6 +170,28 @@ target_link_libraries(ftorrent_core PUBLIC
     ZLIB::ZLIB
     LibtorrentRasterbar::torrent-rasterbar
 )
+
+# LibArchive::LibArchive exists from CMake 3.17. The project's floor is 3.15, so
+# keep the plain variable fallback for an older host toolchain.
+if(FTORRENT_HAVE_LIBARCHIVE)
+    target_compile_definitions(ftorrent_core PUBLIC FTORRENT_HAVE_LIBARCHIVE)
+    if(TARGET LibArchive::LibArchive)
+        target_link_libraries(ftorrent_core PUBLIC LibArchive::LibArchive)
+    elseif(TARGET PkgConfig::LIBARCHIVE)
+        target_link_libraries(ftorrent_core PUBLIC PkgConfig::LIBARCHIVE)
+    else()
+        set(FTORRENT_LIBARCHIVE_INCLUDE_DIRS
+            ${LibArchive_INCLUDE_DIRS} ${LIBARCHIVE_INCLUDE_DIRS})
+        set(FTORRENT_LIBARCHIVE_LIBRARIES
+            ${LibArchive_LIBRARIES} ${LIBARCHIVE_LIBRARIES})
+        if(FTORRENT_LIBARCHIVE_INCLUDE_DIRS)
+            target_include_directories(ftorrent_core PUBLIC
+                ${FTORRENT_LIBARCHIVE_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(ftorrent_core PUBLIC
+            ${FTORRENT_LIBARCHIVE_LIBRARIES})
+    endif()
+endif()
 
 # Add executable
 add_executable(FTorrent ${APP_SOURCES})
