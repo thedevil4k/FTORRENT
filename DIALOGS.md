@@ -98,8 +98,7 @@ Shows full torrent information:
 
 #### Files Tab:
 - Selectable file list with name, size, and progress
-- **Open in VirusTotal** for a completed `.exe`: computes SHA-256 locally and opens the report
-- **Inspect Archive** for a completed `.rar`/`.zip`: lists inner `.exe` entries and hashes one in memory without extracting or executing it
+- Informational only: security checks run before the download starts, so this tab has no post-download VirusTotal or archive actions
 
 **Features:**
 - ✅ Automatic update every 2 seconds

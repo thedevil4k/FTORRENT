@@ -9,8 +9,6 @@
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Browser.H>
 #include <FL/Fl_Button.H>
-#include <atomic>
-#include <memory>
 #include <vector>
 #include "TorrentItem.h"
 
@@ -21,9 +19,11 @@
  * - General: Información básica del torrent
  * - Trackers: Lista de trackers
  * - Peers: Peers conectados
- * - Files: Archivos del torrent (si está disponible), con un botón para
- *   abrir el informe de VirusTotal del SHA-256 de un .exe completo, o para
- *   inspeccionar los .exe dentro de un RAR/ZIP sin extraerlos
+ * - Files: Archivos del torrent (si está disponible)
+ *
+ * La comprobación de seguridad vive ahora en el análisis previo a la
+ * descarga; este diálogo ya no ofrece botones que actúen sobre archivos
+ * completos.
  */
 class TorrentDetailsDialog : public Fl_Window {
 public:
@@ -68,14 +68,8 @@ private:
     // Files tab
     Fl_Group* m_filesTab;
     Fl_Browser* m_filesBrowser;
-    Fl_Button* m_virusTotalButton;
-    Fl_Box* m_virusTotalStatus;
     std::vector<TorrentItem::FileInfo> m_files;
     bool m_filesLoaded = false;
-    bool m_rebuildingFiles = false;
-    bool m_hashRunning = false;
-    bool m_statusSticky = false;
-    std::shared_ptr<std::atomic<bool>> m_hashCancel;
 
     // Buttons
     Fl_Button* m_refreshButton;
@@ -93,21 +87,10 @@ private:
     void updateTrackers();
     void updatePeers();
     void updateFiles();
-    void updateVirusTotalControls();
-    std::string resolveLocalPath(const std::string& relativePath) const;
-    void startVirusTotalCheck(int fileIndex);
-    void openArchiveContents(int fileIndex);
-    void handleHashFinished(bool ok,
-                            const std::string& path,
-                            const std::string& hash,
-                            const std::string& error);
     
     // Callbacks
     static void onRefresh(Fl_Widget* w, void* data);
     static void onClose(Fl_Widget* w, void* data);
-    static void onFileSelected(Fl_Widget* w, void* data);
-    static void onVirusTotal(Fl_Widget* w, void* data);
-    static void deliverHash(void* data);
     static void updateTimerCallback(void* data);
     
     // Helper

@@ -52,15 +52,9 @@ FTorrent includes built-in features to protect your sensitive information:
     -   ⏸️ **Pause:** Temporarily stops the download.
     -   🗑️ **Remove:** Removes the torrent (you can choose to also delete the downloaded files).
 
-## 🛡️ Checking Files Before Running Them
+## 🛡️ Security Analysis
 
-FTorrent can look up a file on [VirusTotal](https://www.virustotal.com/) without uploading it:
-
-1.  Open a torrent's **Details** window and select the **Files** tab.
-2.  Select a **completed `.exe`** and click **Open in VirusTotal**.
-3.  FTorrent computes the file's SHA-256 locally and opens the report in your browser. Only the hash is sent to VirusTotal; the file itself is never uploaded, and FTorrent does not read or display the verdict.
-
-For **RAR and ZIP archives** that are fully downloaded, the button becomes **Inspect Archive**. It lists the `.exe` files inside and hashes the one you select. The archive is read in memory by libarchive: nothing is extracted to disk, executed, or allowed to use its own path as a filesystem path. Password-protected entries are listed but cannot be hashed, and FTorrent never asks for archive passwords. If the build has no libarchive support, this action stays disabled and explains why.
+FTorrent is replacing post-download checks with analysis that runs before the file is downloaded. The Details window no longer offers **Open in VirusTotal** or **Inspect Archive**; the hash, archive and VirusTotal engines remain internal to the pre-download analysis. FTorrent never uploads files and does not send telemetry.
 
 ## ❓ Frequently Asked Questions
 

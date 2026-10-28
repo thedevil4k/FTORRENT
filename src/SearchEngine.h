@@ -9,7 +9,7 @@
 
 // Kept in sync with the version in CMakeLists.txt and MainWindow.h, but
 // duplicated here so the search engine does not have to include the GUI.
-#define FTP_VERSION "0.5.0"
+#define FTP_VERSION "0.6.0"
 
 /**
  * @brief Declarative torrent search engine, plus the built-in engine list.

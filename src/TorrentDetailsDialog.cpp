@@ -1,17 +1,11 @@
 #include "TorrentDetailsDialog.h"
-#include "ArchiveContentsDialog.h"
 #include "ArchiveInspector.h"
-#include "FileHash.h"
-#include "SystemUtils.h"
-#include "VirusTotal.h"
 #include <FL/Fl.H>
 #include <algorithm>
 #include <cctype>
-#include <exception>
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
-#include <thread>
 
 namespace {
 
@@ -42,19 +36,6 @@ std::string displayText(std::string text) {
     }
     return text;
 }
-
-// A worker's result. The dialog can be closed while a large file is still
-// being hashed, so the delivery carries the cancellation flag shared with the
-// dialog rather than trusting a raw pointer. deliverHash() only dereferences
-// the target when that flag is still false, on the UI thread.
-struct HashDelivery {
-    std::shared_ptr<std::atomic<bool>> cancel;
-    TorrentDetailsDialog* target = nullptr;
-    bool ok = false;
-    std::string path;
-    std::string hash;
-    std::string error;
-};
 
 } // namespace
 
@@ -90,12 +71,6 @@ TorrentDetailsDialog::TorrentDetailsDialog(TorrentItem* torrent)
 
 TorrentDetailsDialog::~TorrentDetailsDialog() {
     Fl::remove_timeout(updateTimerCallback, this);
-
-    // A hashing worker may still be reading a large file. Ask it to stop and
-    // make sure any result it later posts is dropped by deliverHash().
-    if (m_hashCancel) {
-        m_hashCancel->store(true);
-    }
     
     delete m_trackersBuffer;
     delete m_peersBuffer;
@@ -197,27 +172,13 @@ void TorrentDetailsDialog::createFilesTab() {
     m_filesTab->hide();
     m_filesTab->begin();
     
-    // A list, not a text blob: a file has to be selectable before its hash can
-    // be computed. The extra text (size and progress) is still in each row.
-    m_filesBrowser = new Fl_Browser(20, 50, 560, 320);
+    // The file list is informational here. Security checks run before the
+    // download starts, so this tab no longer offers post-download actions.
+    m_filesBrowser = new Fl_Browser(20, 50, 560, 380);
     m_filesBrowser->type(FL_HOLD_BROWSER);
     m_filesBrowser->when(FL_WHEN_CHANGED | FL_WHEN_RELEASE);
     m_filesBrowser->textfont(FL_COURIER);
     m_filesBrowser->textsize(11);
-    m_filesBrowser->callback(onFileSelected, this);
-
-    m_virusTotalButton = new Fl_Button(20, 378, 170, 30, "Open in VirusTotal");
-    m_virusTotalButton->callback(onVirusTotal, this);
-    m_virusTotalButton->tooltip(
-        "Compute the selected file's SHA-256 locally and open its VirusTotal report. "
-        "The file is not uploaded; the hash is sent to VirusTotal when the report opens.");
-    m_virusTotalButton->deactivate();
-
-    m_virusTotalStatus = new Fl_Box(198, 378, 382, 54);
-    m_virusTotalStatus->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
-    m_virusTotalStatus->labelsize(11);
-    m_virusTotalStatus->copy_label(
-        "Select a completed .exe file, or a RAR/ZIP archive to inspect.");
     
     m_filesTab->end();
 }
@@ -368,7 +329,6 @@ void TorrentDetailsDialog::updateFiles() {
         }
     }
 
-    m_rebuildingFiles = true;
     if (sameRows) {
         m_files = files;
         for (size_t i = 0; i < m_files.size(); ++i) {
@@ -400,9 +360,7 @@ void TorrentDetailsDialog::updateFiles() {
             m_filesBrowser->value(newValue);
         }
     }
-    m_rebuildingFiles = false;
     m_filesLoaded = true;
-    updateVirusTotalControls();
 }
 
 std::string TorrentDetailsDialog::extensionLower(const std::string& path) {
@@ -414,267 +372,6 @@ std::string TorrentDetailsDialog::extensionLower(const std::string& path) {
 
 bool TorrentDetailsDialog::isExecutablePath(const std::string& path) {
     return extensionLower(path) == ".exe";
-}
-
-std::string TorrentDetailsDialog::resolveLocalPath(const std::string& relativePath) const {
-    const std::filesystem::path relative = pathFromUtf8(relativePath);
-    if (relative.is_absolute()) {
-        return pathToUtf8(relative);
-    }
-
-    const std::filesystem::path base = pathFromUtf8(m_torrent->getSavePath());
-    std::error_code ec;
-    const std::filesystem::path candidate = base / relative;
-    if (std::filesystem::is_regular_file(candidate, ec)) {
-        return pathToUtf8(candidate);
-    }
-
-    // libtorrent normally includes the torrent's root directory in
-    // file_path(). Older layouts did not, so try the documented on-disk shape
-    // as a fallback rather than refusing to hash a file that is right there.
-    const std::filesystem::path withName =
-        base / pathFromUtf8(m_torrent->getName()) / relative;
-    if (std::filesystem::is_regular_file(withName, ec)) {
-        return pathToUtf8(withName);
-    }
-    return pathToUtf8(candidate);
-}
-
-void TorrentDetailsDialog::updateVirusTotalControls() {
-    if (!m_virusTotalButton || !m_virusTotalStatus) {
-        return;
-    }
-
-    const auto setStatus = [this](const char* text) {
-        if (!m_statusSticky) {
-            m_virusTotalStatus->copy_label(text);
-        }
-    };
-
-    if (m_hashRunning) {
-        m_virusTotalButton->deactivate();
-        return;
-    }
-
-    const int value = m_filesBrowser->value();
-    if (value <= 0 || value > static_cast<int>(m_files.size())) {
-        m_virusTotalButton->label("Open in VirusTotal");
-        m_virusTotalButton->deactivate();
-        setStatus(
-            "Select a completed .exe file, or a RAR/ZIP archive to inspect.");
-        return;
-    }
-
-    const TorrentItem::FileInfo& file = m_files[value - 1];
-    const std::string extension = extensionLower(file.path);
-    const bool archive = ArchiveInspector::isArchivePath(file.path);
-
-    m_virusTotalButton->label(archive ? "Inspect Archive" : "Open in VirusTotal");
-    if (archive) {
-        m_virusTotalButton->tooltip(
-            "List the .exe files inside this archive and open the VirusTotal report "
-            "for one. Nothing is extracted or executed.");
-    } else {
-        m_virusTotalButton->tooltip(
-            "Compute the selected file's SHA-256 locally and open its VirusTotal report. "
-            "The file is not uploaded; the hash is sent to VirusTotal when the report opens.");
-    }
-
-    if (!archive && extension != ".exe") {
-        m_virusTotalButton->deactivate();
-        if (extension == ".7z") {
-            setStatus("Only .exe files and RAR/ZIP archives can be checked. .7z is not supported.");
-        } else {
-            setStatus("Only .exe files and RAR/ZIP archives can be checked.");
-        }
-        return;
-    }
-
-    if (!file.complete) {
-        m_virusTotalButton->deactivate();
-        if (archive) {
-            setStatus(
-                "Wait until this archive finishes downloading. A partial archive cannot be read safely.");
-        } else {
-            setStatus(
-                "Wait until this file finishes downloading. A partial file has no useful SHA-256.");
-        }
-        return;
-    }
-
-    std::error_code ec;
-    if (!std::filesystem::is_regular_file(
-            pathFromUtf8(resolveLocalPath(file.path)), ec)) {
-        m_virusTotalButton->deactivate();
-        setStatus("The file is marked complete but cannot be read from its save path.");
-        return;
-    }
-
-    if (archive) {
-        if (!ArchiveInspector::isAvailable()) {
-            m_virusTotalButton->deactivate();
-            setStatus(
-                "This build has no RAR/ZIP reader. Rebuild with libarchive to inspect this archive.");
-            return;
-        }
-
-        m_virusTotalButton->activate();
-        setStatus(
-            "Open the archive to choose an .exe inside it. The archive is read-only; nothing is extracted or executed.");
-        return;
-    }
-
-    m_virusTotalButton->activate();
-    setStatus(
-        "SHA-256 is computed locally. Opening the report sends the hash to VirusTotal; the file is not uploaded.");
-}
-
-void TorrentDetailsDialog::openArchiveContents(int fileIndex) {
-    if (m_hashRunning) {
-        return;
-    }
-    if (fileIndex <= 0 || fileIndex > static_cast<int>(m_files.size())) {
-        m_virusTotalStatus->copy_label("Select an archive first.");
-        return;
-    }
-
-    const TorrentItem::FileInfo file = m_files[fileIndex - 1];
-    if (!ArchiveInspector::isArchivePath(file.path)) {
-        m_virusTotalStatus->copy_label("Select a RAR or ZIP archive to inspect.");
-        return;
-    }
-    if (!file.complete) {
-        m_virusTotalStatus->copy_label(
-            "Wait until the archive finishes downloading before inspecting it.");
-        return;
-    }
-    if (!ArchiveInspector::isAvailable()) {
-        m_virusTotalStatus->copy_label(
-            "This build has no RAR/ZIP reader. Rebuild with libarchive to inspect this archive.");
-        return;
-    }
-
-    const std::string localPath = resolveLocalPath(file.path);
-    std::error_code ec;
-    if (!std::filesystem::is_regular_file(pathFromUtf8(localPath), ec)) {
-        m_virusTotalStatus->copy_label(
-            "The downloaded archive is missing or is not a regular file. Check the save path.");
-        return;
-    }
-
-    const std::string displayPath = file.path.empty() ? file.name : file.path;
-    auto* dialog = new ArchiveContentsDialog(localPath, displayPath);
-    dialog->show_modal();
-    delete dialog;
-}
-
-void TorrentDetailsDialog::startVirusTotalCheck(int fileIndex) {
-    if (m_hashRunning) {
-        return;
-    }
-    if (fileIndex <= 0 || fileIndex > static_cast<int>(m_files.size())) {
-        m_virusTotalStatus->copy_label("Select a file first.");
-        return;
-    }
-
-    const TorrentItem::FileInfo file = m_files[fileIndex - 1];
-    if (ArchiveInspector::isArchivePath(file.path)) {
-        m_virusTotalStatus->copy_label(
-            "Use Inspect Archive to choose an .exe inside this archive.");
-        return;
-    }
-    if (!isExecutablePath(file.path)) {
-        m_virusTotalStatus->copy_label("Only .exe files can be checked.");
-        return;
-    }
-    if (!file.complete) {
-        m_virusTotalStatus->copy_label(
-            "Wait until this file finishes downloading before hashing it.");
-        return;
-    }
-
-    const std::string localPath = resolveLocalPath(file.path);
-    std::error_code ec;
-    if (!std::filesystem::is_regular_file(pathFromUtf8(localPath), ec)) {
-        m_virusTotalStatus->copy_label(
-            "The downloaded file is missing or is not a regular file. Check the save path.");
-        return;
-    }
-
-    m_hashRunning = true;
-    m_statusSticky = false;
-    m_virusTotalButton->deactivate();
-    m_virusTotalStatus->copy_label("Computing SHA-256...");
-    m_virusTotalStatus->tooltip(nullptr);
-
-    auto cancel = std::make_shared<std::atomic<bool>>(false);
-    m_hashCancel = cancel;
-    const std::string displayPath = file.path.empty() ? file.name : file.path;
-
-    try {
-        std::thread([cancel, this, localPath, displayPath]() {
-            std::string hash;
-            std::string error;
-            bool ok = false;
-            try {
-                ok = FileHash::sha256File(localPath, hash, error, cancel.get());
-            } catch (const std::exception& e) {
-                error = e.what();
-            } catch (...) {
-                error = "unexpected error";
-            }
-
-            // Closing the dialog is a cancellation: do not open a browser after
-            // the user has moved on.
-            if (cancel->load()) {
-                return;
-            }
-
-            auto* delivery = new HashDelivery;
-            delivery->cancel = cancel;
-            delivery->target = this;
-            delivery->ok = ok;
-            delivery->path = displayPath;
-            delivery->hash = hash;
-            delivery->error = error;
-            Fl::awake(&TorrentDetailsDialog::deliverHash, delivery);
-        }).detach();
-    } catch (const std::exception& e) {
-        m_hashRunning = false;
-        m_statusSticky = true;
-        m_virusTotalStatus->copy_label(
-            (std::string("Could not start the hash worker: ") +
-             displayText(e.what())).c_str());
-        updateVirusTotalControls();
-    }
-}
-
-void TorrentDetailsDialog::handleHashFinished(bool ok,
-                                               const std::string& path,
-                                               const std::string& hash,
-                                               const std::string& error) {
-    m_hashRunning = false;
-    updateVirusTotalControls();
-
-    if (!ok) {
-        m_statusSticky = true;
-        m_virusTotalStatus->copy_label(
-            (std::string("Could not read ") + displayText(path) + ": " +
-             displayText(error)).c_str());
-        return;
-    }
-
-    const std::string url = VirusTotal::fileReportUrl(hash);
-    if (url.empty()) {
-        m_statusSticky = true;
-        m_virusTotalStatus->copy_label("Could not build a valid VirusTotal link.");
-        return;
-    }
-
-    m_virusTotalStatus->copy_label(
-        "SHA-256 computed. Opening the VirusTotal report; FTorrent does not read the verdict.");
-    m_virusTotalStatus->copy_tooltip(hash.c_str());
-    SystemUtils::openUrl(url);
 }
 
 std::string TorrentDetailsDialog::formatLabel(const std::string& label, const std::string& value) {
@@ -700,37 +397,6 @@ void TorrentDetailsDialog::onClose(Fl_Widget* w, void* data) {
     (void)w;
     TorrentDetailsDialog* dlg = (TorrentDetailsDialog*)data;
     dlg->hide();
-}
-
-void TorrentDetailsDialog::onFileSelected(Fl_Widget* w, void* data) {
-    (void)w;
-    TorrentDetailsDialog* dlg = (TorrentDetailsDialog*)data;
-    if (dlg->m_rebuildingFiles) {
-        return;
-    }
-    dlg->m_statusSticky = false;
-    dlg->updateVirusTotalControls();
-}
-
-void TorrentDetailsDialog::onVirusTotal(Fl_Widget* w, void* data) {
-    (void)w;
-    TorrentDetailsDialog* dlg = (TorrentDetailsDialog*)data;
-    const int value = dlg->m_filesBrowser->value();
-    if (value > 0 && value <= static_cast<int>(dlg->m_files.size()) &&
-        ArchiveInspector::isArchivePath(dlg->m_files[value - 1].path)) {
-        dlg->openArchiveContents(value);
-    } else {
-        dlg->startVirusTotalCheck(value);
-    }
-}
-
-void TorrentDetailsDialog::deliverHash(void* data) {
-    std::unique_ptr<HashDelivery> delivery(static_cast<HashDelivery*>(data));
-    if (!delivery || !delivery->cancel || delivery->cancel->load() || !delivery->target) {
-        return;
-    }
-    delivery->target->handleHashFinished(
-        delivery->ok, delivery->path, delivery->hash, delivery->error);
 }
 
 void TorrentDetailsDialog::updateTimerCallback(void* data) {

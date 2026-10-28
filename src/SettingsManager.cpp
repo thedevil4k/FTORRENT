@@ -7,7 +7,7 @@
 #include <algorithm>
 
 // User agent reported to trackers. Bump it together with the project version.
-static const char* DEFAULT_USER_AGENT = "FTORRENT 0.5.0";
+static const char* DEFAULT_USER_AGENT = "FTORRENT 0.6.0";
 
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;

@@ -38,10 +38,10 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 **Preferences** — four tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode).
 
-**Security checks before running anything**
-- **Open in VirusTotal** for a completed `.exe`: FTorrent computes SHA-256 locally and opens the report; the file is never uploaded
-- **Inspect Archive** for a completed RAR/ZIP: lists the `.exe` files inside and hashes one in memory, with no extraction, no temporary files and no execution
-- Password-protected entries are listed but refused; archive support is optional at build time and the button explains when it is absent
+**Security analysis before downloading**
+- The former post-download VirusTotal and RAR/ZIP inspection actions have been retired; the security analysis now belongs before the download starts
+- `FileHash`, `ArchiveInspector` and `VirusTotal` remain internal engines for that analysis; nothing is uploaded and no telemetry is sent
+- Archive support is optional at build time
 
 **Interface**
 - Dark and light themes; dark is the default and theme choice is per session
@@ -52,7 +52,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 ## Building from source
 
-Requires **CMake 3.15+**, a C++20 compiler (GCC 11+, Clang 14+ or VS 2022), **FLTK**, **libtorrent-rasterbar**, **OpenSSL**, zlib, libpng and libjpeg. **libarchive** is optional and enables read-only `.exe` inspection inside RAR/ZIP archives.
+Requires **CMake 3.15+**, a C++20 compiler (GCC 11+, Clang 14+ or VS 2022), **FLTK**, **libtorrent-rasterbar**, **OpenSSL**, zlib, libpng and libjpeg. **libarchive** is optional and backs the internal read-only RAR/ZIP engine.
 
 ```bash
 # Linux — installs every build and test dependency first
@@ -99,7 +99,7 @@ ctest --test-dir build --output-on-failure
 | `icons_full` / `icons_missing` | icon rendering, toolbar levels and spacing, with and without the on-disk assets |
 | `flows` | preferences, add, remove, rate limit, search, file lists, pause/resume end to end |
 | `file_hash` | SHA-256 vectors and VirusTotal URL validation |
-| `archive_inspector` | read-only listing and hashing inside a generated ZIP, plus its refusals for bad input (built when libarchive is found) |
+| `archive_inspector` | read-only listing and hashing inside a generated ZIP and the RAR5/ZIP fixtures, plus its refusals for bad input (built when libarchive is found) |
 
 `flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 
@@ -140,7 +140,7 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **Public IP in the status bar is off by default.** A new installation does not look its address up online until you tick the box; an existing `ShowPublicIp=true` is left alone.
 - **The 50 % rate limit button says so.** Its tooltip now reads `Limit network speed 50%`.
 - **A test suite in the repository.** CTest programs built from the same objects the app ships.
-- **Executables can be checked before they run.** A manual VirusTotal lookup hashes a completed `.exe` locally, and completed RAR/ZIP archives are inspected in memory so an inner `.exe` can be hashed without extracting or executing it; libarchive is optional and the action explains when it is unavailable.
+- **Post-download security UI retired.** The Details window no longer offers “Open in VirusTotal” or “Inspect Archive”. `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for the pre-download analysis; no file is uploaded and no telemetry is sent.
 - **Search engines report their reachability.** A green, red or gray dot next to each engine in the dropdown, probed once per session with no new dependencies.
 - **Magnets can be picked file by file.** The Add dialog lists a magnet's already-resolved files with one checkbox each; the file rows under each result are separated so multi-file torrents read clearly.
 - **Search results survive small windows and use wide ones.** Names ellipsize by pixels (full name when it fits), double-click and Enter both download, and cancelling the dialog keeps the results.

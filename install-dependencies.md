@@ -43,11 +43,11 @@ cd vcpkg
 # Install libtorrent-rasterbar
 .\vcpkg install libtorrent:x64-windows
 
-# Optional: read-only .exe inspection inside RAR/ZIP archives
+# Optional: internal read-only RAR/ZIP engine
 .\vcpkg install libarchive:x64-windows
 ```
 
-**Note:** The installation process may take several minutes, especially for libtorrent. Without libarchive FTorrent still builds; only the archive-inspection action is disabled.
+**Note:** The installation process may take several minutes, especially for libtorrent. Without libarchive FTorrent still builds; the internal RAR/ZIP engine is then unavailable.
 
 ### Step 4: Configure CMake to use vcpkg
 

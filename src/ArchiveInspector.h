@@ -36,7 +36,7 @@ public:
 
     static bool isAvailable();
 
-    /** @brief True for the archive formats the UI offers to inspect. */
+    /** @brief True for the archive formats the pre-download analysis accepts. */
     static bool isArchivePath(const std::string& path);
 
     /**

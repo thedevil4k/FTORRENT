@@ -28,6 +28,7 @@
        release information as an error, and Flathub's review reads the same
        metadata. One entry per released version, newest first. -->
   <releases>
+    <release version="0.6.0" date="2026-10-28" type="development"/>
     <release version="0.5.0" date="2026-10-04" type="stable"/>
   </releases>
   <screenshots>

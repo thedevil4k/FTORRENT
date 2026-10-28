@@ -25,7 +25,7 @@ namespace lt = libtorrent;
 
 namespace {
 
-const char* USER_AGENT = "FTorrent/0.5.0";
+const char* USER_AGENT = "FTorrent/0.6.0";
 
 // .torrent files are metadata; a few hundred kB at most. Anything wildly
 // bigger is a captive-portal login page or an error page, not a torrent.

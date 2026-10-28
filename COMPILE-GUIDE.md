@@ -211,8 +211,8 @@ sudo apt-get install -y \
     git
 ```
 
-`libarchive-dev` is optional (it enables read-only `.exe` inspection inside RAR/ZIP
-archives); `rpm` is required for packaging.
+`libarchive-dev` is optional (it backs the internal read-only RAR/ZIP engine);
+`rpm` is required for packaging.
 
 > [!NOTE]
 > For **32-bit (i386)** builds, we recommend and use **Debian Bookworm** in our CI, as it provides the most stable environment with all necessary dependencies (libtorrent 2.0+) for that architecture.

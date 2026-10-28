@@ -289,6 +289,65 @@ int main() {
 
     ok(!ArchiveInspector::listExecutables("").ok, "an empty path is refused");
 
+#ifdef FTORRENT_ARCHIVE_FIXTURES
+    // Real RAR5 streams from libarchive's test suite. None of them contains an
+    // .exe, so the assertion is that the reader parses them and reports an
+    // empty executable list instead of failing.
+    const std::filesystem::path fixtures(FTORRENT_ARCHIVE_FIXTURES);
+    const char* rarFixtures[] = {
+        "test_read_format_rar5_stored.rar",
+        "test_read_format_rar5_compressed.rar",
+        "test_read_format_rar5_encrypted.rar",
+    };
+    for (const char* name : rarFixtures) {
+        const ArchiveInspector::Listing rar =
+            ArchiveInspector::listExecutables((fixtures / name).string());
+        ok(rar.ok, "a RAR5 fixture lists cleanly");
+        if (!rar.ok) std::cout << "      " << name << ": " << rar.error << '\n';
+        ok(rar.executables.empty(), "the RAR5 fixture has no .exe entries");
+    }
+
+    // A ZIP built for this suite: one plain .exe, one double-extension .exe and
+    // one name that tries to climb out of the extraction directory. The listing
+    // reports names verbatim; it never turns an archive name into a filesystem
+    // path, and hashing only reads the selected stream.
+    const ArchiveInspector::Listing setup =
+        ArchiveInspector::listExecutables((fixtures / "setup.zip").string());
+    ok(setup.ok, "the hostile-name ZIP lists cleanly");
+    if (!setup.ok) std::cout << "      setup.zip: " << setup.error << '\n';
+    ok(setup.executables.size() == 3, "the hostile-name ZIP lists three .exe files");
+
+    bool sawPlain = false;
+    bool sawDoubleExtension = false;
+    bool sawTraversal = false;
+    const ArchiveInspector::Entry* plain = nullptr;
+    for (const ArchiveInspector::Entry& entry : setup.executables) {
+        if (entry.path == "setup.exe") {
+            sawPlain = true;
+            plain = &entry;
+        } else if (entry.path == "invoice.pdf.exe") {
+            sawDoubleExtension = true;
+        } else if (entry.path == "../escape.exe") {
+            sawTraversal = true;
+        }
+    }
+    ok(sawPlain, "the plain .exe is listed");
+    ok(sawDoubleExtension, "the double-extension .exe is listed");
+    ok(sawTraversal, "the traversal name is reported verbatim");
+
+    if (plain) {
+        std::string digest;
+        std::string error;
+        ok(ArchiveInspector::hashExecutable(
+               (fixtures / "setup.zip").string(), plain->index, nullptr,
+               digest, error),
+           "the fixture's plain .exe can be hashed");
+        ok(digest ==
+               "be1307d1e38db0d22f03095558630f1c748ca3451b48d0f252dce4ac2226b97d",
+           "the fixture's plain .exe matches its published SHA-256");
+    }
+#endif
+
     std::filesystem::remove_all(dir, ec);
     std::cout << "  checks=" << checks << " failures=" << failures << '\n';
     return failures == 0 ? 0 : 1;

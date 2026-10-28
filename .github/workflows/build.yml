@@ -2,14 +2,14 @@ name: Build FTorrent
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, experimental, 'security/**' ]
     tags: [ 'v*' ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
       - 'trackersadd.txt'
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, experimental, 'security/**' ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -203,6 +203,39 @@ jobs:
       # xvfb-run gives the tests a display: every assertion is made against
       # widget state or offscreen pixels, but FLTK still opens a window.
       run: xvfb-run -a ctest --test-dir build_tests --output-on-failure -LE network
+
+  test-windows:
+    # The offline `unit` label keeps this job to file_hash and archive_inspector:
+    # they need no display, no network and no FLTK window. The GUI suites still
+    # run on Linux under xvfb, where their geometry assertions are maintained.
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Cache vcpkg
+      uses: actions/cache@v4
+      with:
+        path: |
+          C:/vcpkg/installed
+          C:/vcpkg/archives
+        key: vcpkg-windows-tests-x64-${{ hashFiles('CMakeLists.txt') }}-r2
+        restore-keys: |
+          vcpkg-windows-tests-x64-
+
+    - name: Install dependencies
+      run: |
+        vcpkg install fltk zlib libpng libjpeg-turbo libarchive --triplet x64-windows
+        vcpkg install "libtorrent[core]:x64-windows"
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build_tests "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DFTORRENT_BUILD_TESTS=ON
+
+    - name: Build the unit tests
+      run: cmake --build build_tests --config Release --target file_hash archive_inspector
+
+    - name: Run the unit tests
+      run: ctest --test-dir build_tests -C Release --output-on-failure -L unit
 
   build-arch:
     runs-on: ubuntu-24.04

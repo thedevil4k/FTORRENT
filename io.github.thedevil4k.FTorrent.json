@@ -41,6 +41,22 @@
             ]
         },
         {
+            "name": "libarchive",
+            "buildsystem": "cmake-ninja",
+            "config-opts": [
+                "-DENABLE_TEST=OFF",
+                "-DENABLE_OPENSSL=OFF"
+            ],
+            "sources": [
+                {
+                    "type": "git",
+                    "url": "https://github.com/libarchive/libarchive.git",
+                    "tag": "v3.8.10",
+                    "commit": "0c48412be2d94afe1859a807ea7896a18d8900bd"
+                }
+            ]
+        },
+        {
             "name": "fltk",
             "buildsystem": "cmake-ninja",
             "config-opts": [

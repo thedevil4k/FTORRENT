@@ -14,8 +14,9 @@
 #   flows           the user journeys end to end; needs the network
 #   file_hash       the SHA-256 vectors and the VirusTotal URL validation
 #   archive_inspector
-#                   read-only listing and hashing inside a generated ZIP, plus
-#                   the refusals for bad input (only when libarchive is found)
+#                   read-only listing and hashing inside a generated ZIP, the
+#                   RAR5/ZIP fixtures and the refusals for bad input (only when
+#                   libarchive is found)
 #
 # Sources are listed by hand rather than globbed, so adding a file is a decision
 # someone makes rather than something that happens.
@@ -63,6 +64,10 @@ ftorrent_add_test(file_hash file_hash.cpp)
 # this test through ftorrent_core's PUBLIC compile definition.
 if(FTORRENT_HAVE_LIBARCHIVE)
     ftorrent_add_test(archive_inspector archive_inspector.cpp)
+    # Real RAR5 and hostile-name ZIP fixtures. The path is compiled in so the
+    # test can run from any working directory, including a multi-config IDE.
+    target_compile_definitions(archive_inspector PRIVATE
+        FTORRENT_ARCHIVE_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/archives")
 endif()
 
 # The assets-present variants need src/assets/ beside the binary, because
@@ -106,7 +111,17 @@ foreach(t ${FTORRENT_TESTS})
     )
 endforeach()
 set_tests_properties(toolbar_layout PROPERTIES TIMEOUT 300)
+
+# Labels let CI choose a subset without naming tests one by one: `unit` is
+# headless and offline, `ui` needs FLTK but not the network, and `network`
+# covers the end-to-end journeys that talk to search engines and trackers.
+set_tests_properties(toolbar_layout toolbar_clicks icons_full
+    PROPERTIES LABELS "ui")
+set_tests_properties(file_hash PROPERTIES LABELS "unit")
 set_tests_properties(flows PROPERTIES LABELS "network")
+if(FTORRENT_HAVE_LIBARCHIVE)
+    set_tests_properties(archive_inspector PROPERTIES LABELS "unit")
+endif()
 
 # The assets-missing variant: a copy of the binary in a directory of its own, with
 # no assets/ next to it.
@@ -121,4 +136,5 @@ add_test(NAME icons_missing COMMAND ${NOASSETS_DIR}/icons${CMAKE_EXECUTABLE_SUFF
 set_tests_properties(icons_missing PROPERTIES
     ENVIRONMENT "${FTORRENT_TEST_ENV}"
     TIMEOUT 600
+    LABELS "ui"
 )

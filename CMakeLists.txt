@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(FTorrent VERSION 0.5.0 LANGUAGES CXX)
+project(FTorrent VERSION 0.6.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -42,11 +42,11 @@ find_package(ZLIB REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
 
-# libarchive is optional. It backs read-only inspection of .exe files inside
-# RAR/ZIP archives: entries are streamed through SHA-256 in memory and are never
-# extracted or executed. Without it the application still builds and the archive
-# action explains that the reader is unavailable; it never falls back to running
-# an external unrar/7z tool.
+# libarchive is optional. It backs the internal read-only RAR/ZIP engine used by
+# the pre-download analysis: entries are streamed through SHA-256 in memory and
+# are never extracted or executed. Without it the application still builds and
+# the engine reports that the reader is unavailable; it never falls back to
+# running an external unrar/7z tool.
 find_package(LibArchive QUIET)
 if(NOT CMAKE_DISABLE_FIND_PACKAGE_LibArchive
    AND NOT TARGET LibArchive::LibArchive
@@ -69,9 +69,9 @@ if(NOT CMAKE_DISABLE_FIND_PACKAGE_LibArchive
 endif()
 
 if(FTORRENT_HAVE_LIBARCHIVE)
-    message(STATUS "libarchive found: RAR/ZIP archive inspection enabled")
+    message(STATUS "libarchive found: internal RAR/ZIP engine enabled")
 else()
-    message(STATUS "libarchive not found: RAR/ZIP archive inspection disabled")
+    message(STATUS "libarchive not found: internal RAR/ZIP engine disabled")
 endif()
 
 # Try to find Libtorrent via CMake config or pkg-config
@@ -102,7 +102,6 @@ set(SOURCES
     src/CreateTorrentDialog.cpp
     src/TorrentDetailsDialog.cpp
     src/ArchiveInspector.cpp
-    src/ArchiveContentsDialog.cpp
     src/FileHash.cpp
     src/VirusTotal.cpp
     src/Resources.cpp
@@ -137,7 +136,6 @@ set(HEADERS
     src/CreateTorrentDialog.h
     src/TorrentDetailsDialog.h
     src/ArchiveInspector.h
-    src/ArchiveContentsDialog.h
     src/FileHash.h
     src/VirusTotal.h
     src/Resources.h

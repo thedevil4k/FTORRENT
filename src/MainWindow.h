@@ -41,7 +41,7 @@ class MainWindow : public Fl_Double_Window {
 public:    MainWindow(int w, int h, const char* title);
     ~MainWindow();
 
-    static constexpr const char* VERSION = "0.5.0";
+    static constexpr const char* VERSION = "0.6.0";
 
     // False once the window is destroyed: worker threads check it before
     // handing results back, so a search in flight cannot touch freed memory.
