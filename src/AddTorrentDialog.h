@@ -9,6 +9,7 @@
 #include <FL/Fl_Check_Browser.H>
 #include <FL/Fl_Box.H>
 #include "TorrentFileList.h"   // TorrentFileEntry, for pre-filling magnets
+#include "SecurityBadge.h"
 #include <string>
 #include <vector>
 
@@ -74,6 +75,12 @@ private:
     
     // Files display
     Fl_Check_Browser* m_fileBrowser;
+    Fl_Button* m_selectNonExecutables;
+    Fl_Box* m_securityPanel;
+    SecurityShieldBox* m_securityShield;
+    Fl_Box* m_securitySummary;
+    Fl_Box* m_securityDetail;
+    Fl_Box* m_securityHint;
     
     // Buttons
     Fl_Button* m_okButton;
@@ -87,6 +94,13 @@ private:
     bool m_startImmediatelyResult;
     Priority m_priority;
     bool m_okClicked;
+
+    // Files currently shown in the browser. The vector is indexed by browser
+    // row (row 1 is m_files[0]); fileIndex is the libtorrent index and may
+    // contain gaps for pad files.
+    std::vector<TorrentFileEntry> m_files;
+    int m_totalFileCount = 0;
+    SecurityReport m_selectedReport;
     
     // UI Creation
     void createUI();
@@ -101,10 +115,20 @@ private:
     static void onOK(Fl_Widget* w, void* data);
     static void onCancel(Fl_Widget* w, void* data);
     static void onMagnetFieldChanged(Fl_Widget* w, void* data);
+    static void onFileSelectionChanged(Fl_Widget* w, void* data);
+    static void onSelectNonExecutables(Fl_Widget* w, void* data);
     
     // Helper
     void loadDefaults();
     void updateFileList(const std::string& torrentPath);
+    // Fills the browser and the security panel from a resolved list. The
+    // total count includes pad files, because file priorities are indexed by
+    // the libtorrent file index, not by visible row.
+    void showFiles(const std::vector<TorrentFileEntry>& files, int totalFileCount);
+    std::vector<TorrentFileEntry> selectedFiles() const;
+    void updateSecurityPanel();
+    bool confirmRiskySelection();
+    std::string fileRowLabel(const TorrentFileEntry& file) const;
     // Shows or hides the green dot, following the same precedence validate()
     // uses: a .torrent file wins over a magnet, so the dot only shows while
     // the magnet is what would actually be imported.

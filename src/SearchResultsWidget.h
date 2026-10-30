@@ -4,6 +4,7 @@
 #include <FL/Fl_Table_Row.H>
 #include "SearchEngine.h"
 #include "FileListService.h"
+#include "SecurityTypes.h"
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -104,6 +105,11 @@ private:
     // sorts the table. It is view state, touched only on the UI thread.
     FileListService m_files;
     std::unordered_map<std::string, bool> m_expanded;
+    // Metadata risk per cache key, computed once when a file list lands. The
+    // analyzer is pure and cheap, but draw() runs every frame, so the answer
+    // is kept until the list changes.
+    std::unordered_map<std::string, SecurityReport> m_reports;
+    const SecurityReport& reportForRow(int row);
 
     // Cache key for a result: infohash, else the .torrent URL, else the row.
     static std::string cacheKey(const SearchResult& r);

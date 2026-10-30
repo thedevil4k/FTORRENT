@@ -114,6 +114,8 @@ set(SOURCES
     src/SearchResultsWidget.cpp
     src/TorrentFileList.cpp
     src/FileListService.cpp
+    src/SecurityAnalyzer.cpp
+    src/SecurityBadge.cpp
 )
 
 if(WIN32)
@@ -149,6 +151,9 @@ set(HEADERS
     src/SearchResultsWidget.h
     src/TorrentFileList.h
     src/FileListService.h
+    src/SecurityTypes.h
+    src/SecurityAnalyzer.h
+    src/SecurityBadge.h
 )
 
 # The shared body of the app: everything except main(). An OBJECT library, so

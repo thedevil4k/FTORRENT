@@ -1,4 +1,6 @@
 #include "TorrentListWidget.h"
+#include "SecurityAnalyzer.h"
+#include "SecurityBadge.h"
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
 #include <algorithm>
@@ -169,6 +171,7 @@ void TorrentListWidget::removeTorrent(const std::string& hash) {
         }
         
         m_torrents.erase(it, m_torrents.end());
+        m_reports.erase(hash);
         updateSortedIndices();
         rows(m_torrents.size());
         redraw();
@@ -183,6 +186,7 @@ void TorrentListWidget::updateTorrent(TorrentItem* torrent) {
 void TorrentListWidget::clear() {
     m_torrents.clear();
     m_sortedIndices.clear();
+    m_reports.clear();
     rows(0);
     redraw();
 }
@@ -296,6 +300,29 @@ TorrentItem* TorrentListWidget::getTorrentAt(int row) const {
     return m_torrents[idx];
 }
 
+const SecurityReport& TorrentListWidget::reportForTorrent(TorrentItem* torrent) {
+    static const SecurityReport unknown = [] {
+        SecurityReport report;
+        report.summary = "No file list available. Metadata risk is unknown.";
+        return report;
+    }();
+
+    if (!torrent) return unknown;
+
+    std::string key = torrent->getHash();
+    if (key.empty()) key = "name:" + torrent->getName();
+    auto cached = m_reports.find(key);
+    if (cached != m_reports.end()) return cached->second;
+
+    // The metadata may not be ready yet (a magnet still fetching it). Do not
+    // cache the empty answer: the next redraw will try again.
+    const std::vector<SecurityFile> files = torrent->getSecurityFiles();
+    if (files.empty()) return unknown;
+
+    auto inserted = m_reports.emplace(key, SecurityAnalyzer::analyze(files));
+    return inserted.first->second;
+}
+
 void TorrentListWidget::draw_cell(TableContext context, int row, int col,
                                   int x, int y, int w, int h)
 {
@@ -359,8 +386,15 @@ void TorrentListWidget::drawCell(int row, int col, int x, int y, int w, int h) {
     
     switch (col) {
         case COL_NAME: {
-            text = torrent->getName();
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+            // The shield sits immediately before the name, as in the search
+            // results and the Add Torrent dialog.
+            constexpr int SHIELD = 15;
+            SecurityBadge::drawShield(x + 5, y + (h - SHIELD) / 2, SHIELD, SHIELD,
+                                      reportForTorrent(torrent).level);
+            fl_color(getTextColor(row));
+            text = SecurityBadge::displayText(torrent->getName());
+            fl_draw(text.c_str(), x + 5 + SHIELD + 4, y, w - (SHIELD + 14), h,
+                    FL_ALIGN_LEFT | FL_ALIGN_CLIP);
             break;
         }
             

@@ -1,0 +1,58 @@
+#ifndef SECURITYANALYZER_H
+#define SECURITYANALYZER_H
+
+#include "SecurityTypes.h"
+
+#include <string>
+#include <vector>
+
+/**
+ * @brief Metadata-only risk analysis for the files inside a torrent.
+ *
+ * This module never opens a file, never downloads a piece, and never talks to
+ * a provider. It looks at the names and the metadata libtorrent already has:
+ * extensions, hidden/executable flags, symlink targets and the path itself.
+ * That is why it can run on the UI thread for a whole torrent in microseconds.
+ *
+ * The output is a warning, not a verdict. A clean report says "no known
+ * indicators", never "safe": a name cannot prove what a file does.
+ */
+class SecurityAnalyzer {
+public:
+    // Analyzes every non-pad file. The report includes one Finding per file
+    // plus torrent-level findings such as "many executables".
+    static SecurityReport analyze(const std::vector<SecurityFile>& files);
+
+    // Analyzes one file. Used by the per-file rows and by tests.
+    static FileAssessment assessFile(const SecurityFile& file);
+
+    // True when the file is meant to run code or open a shortcut/macro.
+    // Archives and disk images are not included: they are containers, not
+    // runnable files, and "select only non-executables" should leave them.
+    static bool isRunnable(const SecurityFile& file);
+
+    static bool isExecutablePath(const std::string& path);
+    static bool isInstallerPath(const std::string& path);
+    static bool isScriptPath(const std::string& path);
+    static bool isShortcutPath(const std::string& path);
+    static bool isMacroDocumentPath(const std::string& path);
+    static bool isArchivePath(const std::string& path);
+    static bool isDiskImagePath(const std::string& path);
+
+    // Lowercased extension including the dot, empty when there is none.
+    // Backslashes and forward slashes are both treated as separators.
+    static std::string extensionLower(const std::string& path);
+
+    // Short uppercase labels for the per-file rows, such as EXE, SCRIPT,
+    // ARCHIVE, SYMLINK, HIDDEN or DOUBLE EXT.
+    static std::vector<std::string> tagsForFile(const SecurityFile& file);
+
+    static std::string findingTitle(FindingCode code);
+    static std::string severityLabel(Severity severity);
+    static std::string describeFinding(const Finding& finding);
+
+private:
+    SecurityAnalyzer() = delete;
+};
+
+#endif // SECURITYANALYZER_H

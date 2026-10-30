@@ -39,8 +39,13 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 **Preferences** — four tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode).
 
 **Security analysis before downloading**
-- The former post-download VirusTotal and RAR/ZIP inspection actions have been retired; the security analysis now belongs before the download starts
-- `FileHash`, `ArchiveInspector` and `VirusTotal` remain internal engines for that analysis; nothing is uploaded and no telemetry is sent
+- Every surface warns before the download starts: a shield next to the torrent name in search results, Add Torrent, the torrent list and Details
+- Expanding a search row shows a risk summary and per-file tags such as `EXE`, `SCRIPT`, `ARCHIVE`, `DOUBLE EXT`, `PATH`, `SYMLINK` or `HIDDEN`
+- The Add Torrent dialog analyzes the files that are currently checked, offers **Select only non-executables**, and asks for confirmation before a High/Critical selection is accepted
+- Details gains a **Security** tab with the report and every finding; the Files tab tags each entry with the same metadata analysis
+- The analysis is metadata only: names, executable/hidden/symlink flags and symlink targets. No file contents are read, nothing is uploaded and no telemetry is sent
+- A clean report says **no known indicators**, never “safe”. When there is no file list yet, the shield stays **Unknown** instead of guessing
+- The former post-download VirusTotal and RAR/ZIP inspection actions remain retired; `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for later pre-download phases
 - Archive support is optional at build time
 
 **Interface**
@@ -100,6 +105,8 @@ ctest --test-dir build --output-on-failure
 | `flows` | preferences, add, remove, rate limit, search, file lists, pause/resume end to end |
 | `file_hash` | SHA-256 vectors and VirusTotal URL validation |
 | `archive_inspector` | read-only listing and hashing inside a generated ZIP and the RAR5/ZIP fixtures, plus its refusals for bad input (built when libarchive is found) |
+| `security_analyzer` | metadata heuristics: file families, hostile names, symlinks, torrent-level counts and the non-verdict wording |
+| `security_badge` | risk labels/palette, name sanitising and the rendered shield |
 
 `flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 
@@ -141,6 +148,7 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **The 50 % rate limit button says so.** Its tooltip now reads `Limit network speed 50%`.
 - **A test suite in the repository.** CTest programs built from the same objects the app ships.
 - **Post-download security UI retired.** The Details window no longer offers “Open in VirusTotal” or “Inspect Archive”. `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for the pre-download analysis; no file is uploaded and no telemetry is sent.
+- **Metadata risk analysis before downloading.** A shield now sits next to the torrent name in search results, Add Torrent, the torrent list and Details. Expanding a search row shows the risk summary and per-file tags; Add Torrent analyzes the checked files and can select only non-executables; Details has a Security tab. The analysis reads names and metadata only, and says “no known indicators” rather than “safe”.
 - **Search engines report their reachability.** A green, red or gray dot next to each engine in the dropdown, probed once per session with no new dependencies.
 - **Magnets can be picked file by file.** The Add dialog lists a magnet's already-resolved files with one checkbox each; the file rows under each result are separated so multi-file torrents read clearly.
 - **Search results survive small windows and use wide ones.** Names ellipsize by pixels (full name when it fits), double-click and Enter both download, and cancelling the dialog keeps the results.

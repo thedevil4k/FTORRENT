@@ -94,8 +94,9 @@ palette is the obvious next step, and it is not done yet.
 
 ## Tests
 
-`tests/` holds four programs that build the REAL `MainWindow` and assert against
-the real widgets, so nothing here reads a screenshot and all of it runs headless:
+`tests/` holds the test programs that build the REAL `MainWindow` and assert
+against the real widgets, so nothing here reads a screenshot and all of it runs
+headless:
 
 | suite | what it holds down |
 |---|---|
@@ -103,6 +104,8 @@ the real widgets, so nothing here reads a screenshot and all of it runs headless
 | `toolbar_clicks` | every toolbar button clicked at 720px, the narrowest width `size_range()` allows, and the bar still centred afterwards |
 | `icons` | the toolbar icons, the level/width/padding rules and the centring, in both the assets-present and assets-missing variants |
 | `flows` | the user journeys end to end: preferences, add, remove, the limit toggle, a live search and its cancel path, and a real torrent through pause and resume. Labelled `network` |
+| `security_analyzer` | metadata heuristics: file families, hostile names, symlinks, torrent-level counts and the non-verdict wording |
+| `security_badge` | risk labels and palette, name sanitising and the shield rendered offscreen |
 
 They link `ftorrent_core`, the same object library the app is built from, so a
 test exercises the objects that ship rather than a second copy that can drift.
@@ -129,6 +132,63 @@ Two things worth knowing if you write one:
 - **Let the container draw before reading positions.** `Fl_Pack` places its
   children while it draws, so `test_support.h`'s `forceLayout()` renders into an
   offscreen surface first. Reading coordinates without it gets you stale ones.
+
+## Security analysis before downloading
+
+The security path is deliberately split into three small pieces, none of which
+downloads a byte of content.
+
+**`SecurityTypes`** (`src/SecurityTypes.h`) is the shared plain-data model:
+`SecurityFile`, `Finding`, `FileAssessment` and `SecurityReport`. It has no
+libtorrent and no FLTK types, so the same record can be filled by
+`TorrentFileList` (search metadata), `TorrentItem` (an active torrent) or a
+test. `TorrentFileEntry` is an alias of `SecurityFile`; the old name stays
+because it is the public type of the file-list fetcher.
+
+**`SecurityAnalyzer`** (`src/SecurityAnalyzer.{h,cpp}`) is pure and takes a
+`const std::vector<SecurityFile>&`. It classifies files by extension and by the
+metadata flags libtorrent already exposes, then produces per-file findings and
+a torrent-level report:
+
+| severity | examples |
+|---|---|
+| Medium | native executables, installers, archives, disk images |
+| High | scripts, shortcuts, macro documents, reserved device names, `autorun.inf`, zero-byte executables, hidden files that can run |
+| Critical | double extensions, bidi overrides, path traversal, absolute/UNC paths, symlinks |
+
+`Unknown` is a real state: with no file list the analyzer returns it instead of
+assuming a clean result. A report with no findings says **“No known indicators
+in file names or metadata”** and never “safe”; the module has no network code
+and never opens a file.
+
+**`SecurityBadge`** (`src/SecurityBadge.{h,cpp}`) owns the presentation rules:
+the risk palette, the shield geometry, the `SecurityShieldBox` widget and the
+`displayText()` sanitiser that replaces control and bidi characters before an
+attacker-controlled name reaches a row. There is deliberately no green “safe”
+state.
+
+Where the report is consumed:
+
+- `SearchResultsWidget` fetches the file list on row expansion (through
+  `FileListService`), analyzes it once, caches the report by infohash and draws
+  the shield, the summary line and per-file tags under the expanded name.
+- `AddTorrentDialog` analyzes the files that are currently checked. Its
+  **Select only non-executables** button unchecks everything
+  `SecurityAnalyzer::isRunnable()` considers code, while leaving archives and
+  disk images checked. A High/Critical selection needs explicit confirmation.
+- `TorrentListWidget` caches the report by infohash and draws the shield next
+  to the name.
+- `TorrentDetailsDialog` has a Security tab with the full report and tags each
+  row of the Files tab with the same analysis.
+
+File priorities are indexed by libtorrent's `file_index_t`, not by visible row.
+Pad files occupy indices but have no row, so both the Add dialog and the magnet
+handoff in `MainWindow` build a full-size priority vector and leave pad gaps at
+zero. Getting this wrong shifts every later file by one.
+
+The analysis runs on the UI thread because it is pure string/flag work over a
+few thousand entries. Fetching the metadata itself still runs in the
+`FileListService` worker; no security provider is contacted in this phase.
 
 ## 📐 Overview
 

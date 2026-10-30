@@ -1,43 +1,10 @@
 #include "TorrentDetailsDialog.h"
-#include "ArchiveInspector.h"
+#include "SecurityAnalyzer.h"
+#include "SecurityBadge.h"
 #include <FL/Fl.H>
 #include <algorithm>
-#include <cctype>
-#include <filesystem>
 #include <iomanip>
 #include <sstream>
-
-namespace {
-
-std::filesystem::path pathFromUtf8(const std::string& text) {
-#if defined(__cpp_char8_t)
-    return std::filesystem::path(
-        std::u8string(reinterpret_cast<const char8_t*>(text.data()), text.size()));
-#else
-    return std::filesystem::u8path(text);
-#endif
-}
-
-std::string pathToUtf8(const std::filesystem::path& path) {
-#if defined(__cpp_char8_t)
-    const std::u8string text = path.u8string();
-    return std::string(reinterpret_cast<const char*>(text.data()), text.size());
-#else
-    return path.u8string();
-#endif
-}
-
-// Torrent entry names are attacker-controlled. Replacing control characters
-// keeps a crafted name from breaking one browser row into several.
-std::string displayText(std::string text) {
-    for (char& ch : text) {
-        const unsigned char byte = static_cast<unsigned char>(ch);
-        if (byte < 0x20 || byte == 0x7f) ch = '?';
-    }
-    return text;
-}
-
-} // namespace
 
 TorrentDetailsDialog::TorrentDetailsDialog(TorrentItem* torrent)
     : Fl_Window(600, 500, "Torrent Details")
@@ -53,6 +20,7 @@ TorrentDetailsDialog::TorrentDetailsDialog(TorrentItem* torrent)
     createGeneralTab();
     createTrackersTab();
     createPeersTab();
+    createSecurityTab();
     createFilesTab();
     
     m_tabs->end();
@@ -74,6 +42,7 @@ TorrentDetailsDialog::~TorrentDetailsDialog() {
     
     delete m_trackersBuffer;
     delete m_peersBuffer;
+    delete m_securityBuffer;
 }
 
 void TorrentDetailsDialog::createGeneralTab() {
@@ -84,7 +53,13 @@ void TorrentDetailsDialog::createGeneralTab() {
     int label_h = 20;
     int spacing = 25;
     
-    m_nameLabel = new Fl_Box(20, y, 560, label_h);
+    // The shield sits next to the torrent name, matching the search row, the
+    // Add Torrent dialog and the torrent list.
+    m_generalShield = new SecurityShieldBox(20, y + 2, 16, 16);
+    m_generalShield->setRisk(RiskLevel::Unknown,
+        "No file list available. Metadata risk is unknown.");
+
+    m_nameLabel = new Fl_Box(42, y, 538, label_h);
     m_nameLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     y += spacing;
     
@@ -135,6 +110,12 @@ void TorrentDetailsDialog::createGeneralTab() {
     m_hashLabel = new Fl_Box(20, y, 560, label_h);
     m_hashLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     m_hashLabel->labelsize(10);
+    y += label_h;
+
+    m_generalSecuritySummary = new Fl_Box(20, y, 560, 38);
+    m_generalSecuritySummary->align(
+        FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
+    m_generalSecuritySummary->labelsize(11);
     
     m_generalTab->end();
 }
@@ -165,6 +146,29 @@ void TorrentDetailsDialog::createPeersTab() {
     m_peersDisplay->textsize(11);
     
     m_peersTab->end();
+}
+
+void TorrentDetailsDialog::createSecurityTab() {
+    m_securityTab = new Fl_Group(10, 35, 580, 405, "Security");
+    m_securityTab->hide();
+    m_securityTab->begin();
+
+    m_securityShield = new SecurityShieldBox(20, 50, 24, 24);
+    m_securityShield->setRisk(RiskLevel::Unknown,
+        "No file list available. Metadata risk is unknown.");
+
+    m_securitySummary = new Fl_Box(54, 50, 526, 24);
+    m_securitySummary->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    m_securitySummary->labelfont(FL_HELVETICA_BOLD);
+
+    m_securityBuffer = new Fl_Text_Buffer();
+    m_securityDisplay = new Fl_Text_Display(20, 84, 560, 346);
+    m_securityDisplay->buffer(m_securityBuffer);
+    m_securityDisplay->textfont(FL_COURIER);
+    m_securityDisplay->textsize(11);
+    m_securityDisplay->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 0);
+
+    m_securityTab->end();
 }
 
 void TorrentDetailsDialog::createFilesTab() {
@@ -207,6 +211,7 @@ void TorrentDetailsDialog::updateInfo() {
     updateGeneralInfo();
     updateTrackers();
     updatePeers();
+    updateSecurity();
     updateFiles();
 }
 
@@ -284,6 +289,71 @@ void TorrentDetailsDialog::updatePeers() {
     m_peersBuffer->text(oss.str().c_str());
 }
 
+void TorrentDetailsDialog::updateSecurity() {
+    if (!m_securityShield || !m_securitySummary || !m_securityBuffer) return;
+
+    // The file list of a torrent does not change, so one successful analysis
+    // is final. While a magnet is still fetching metadata, retry on the next
+    // two-second tick instead of caching "unknown" forever.
+    if (m_securityLoaded) return;
+
+    const std::vector<SecurityFile> files = m_torrent->getSecurityFiles();
+    m_securityReport = SecurityAnalyzer::analyze(files);
+    if (!files.empty()) m_securityLoaded = true;
+
+    const RiskLevel level = m_securityReport.level;
+    const Fl_Color color = SecurityBadge::riskColor(level);
+    const std::string summary =
+        SecurityBadge::riskLabel(level) + "  -  " + m_securityReport.summary;
+    const std::string shown = SecurityBadge::displayText(summary);
+
+    m_generalShield->setRisk(level, shown);
+    m_securityShield->setRisk(level, shown);
+    m_securitySummary->copy_label(shown.c_str());
+    m_securitySummary->labelcolor(color);
+    if (m_generalSecuritySummary) {
+        m_generalSecuritySummary->copy_label(shown.c_str());
+        m_generalSecuritySummary->labelcolor(color);
+    }
+
+    std::ostringstream out;
+    out << "Metadata risk: " << SecurityBadge::riskLabel(level) << "\n\n";
+
+    if (!m_securityReport.hasFileList()) {
+        out << "No file list is available yet. For a magnet link the metadata\n"
+               "arrives with the torrent; this tab updates automatically when\n"
+               "it does.\n";
+    } else {
+        out << "Files: " << m_securityReport.files
+            << "  |  Executables: " << m_securityReport.executables
+            << "  |  Scripts: " << m_securityReport.scripts
+            << "  |  Archives: " << m_securityReport.archives << "\n";
+        if (m_securityReport.shortcuts > 0) {
+            out << "Shortcuts: " << m_securityReport.shortcuts << "\n";
+        }
+        if (m_securityReport.symlinks > 0) {
+            out << "Symlinks: " << m_securityReport.symlinks << "\n";
+        }
+        out << "\nNo file contents were read. A name cannot prove what a file\n"
+               "does: \"no known indicators\" is not a guarantee.\n";
+
+        if (m_securityReport.findings.empty()) {
+            out << "\nNo known indicators in file names or metadata.\n";
+        } else {
+            out << "\nFindings:\n";
+            for (const Finding& finding : m_securityReport.findings) {
+                out << "  [" << SecurityAnalyzer::severityLabel(finding.severity)
+                    << "] "
+                    << SecurityBadge::displayText(
+                           SecurityAnalyzer::describeFinding(finding))
+                    << "\n";
+            }
+        }
+    }
+
+    m_securityBuffer->text(out.str().c_str());
+}
+
 void TorrentDetailsDialog::updateFiles() {
     // Rebuilding the browser every two seconds while it is hidden would throw
     // away the user's selection for no visible benefit. Build once, then only
@@ -304,12 +374,26 @@ void TorrentDetailsDialog::updateFiles() {
     const auto rowText = [](const TorrentItem::FileInfo& f) {
         std::ostringstream row;
         const std::string& display = f.path.empty() ? f.name : f.path;
-        row << displayText(display);
-        if (isExecutablePath(display)) {
-            row << "  [EXE]";
-        } else if (ArchiveInspector::isArchivePath(display)) {
-            row << "  [ARCHIVE]";
+        row << SecurityBadge::displayText(display);
+
+        SecurityFile file;
+        file.path = display;
+        file.size = f.size;
+        file.hidden = f.hidden;
+        file.executable = f.executable;
+        file.symlink = f.symlink;
+        file.absolutePath = f.absolutePath;
+        file.symlinkPath = f.symlinkPath;
+        const std::vector<std::string> tags = SecurityAnalyzer::tagsForFile(file);
+        if (!tags.empty()) {
+            row << "  [";
+            for (std::size_t t = 0; t < tags.size() && t < 3; ++t) {
+                if (t) row << ", ";
+                row << tags[t];
+            }
+            row << "]";
         }
+
         row << "  |  " << TorrentItem::formatSize(f.size)
             << "  |  " << std::fixed << std::setprecision(1)
             << (f.progress * 100.0) << "%";
@@ -361,17 +445,6 @@ void TorrentDetailsDialog::updateFiles() {
         }
     }
     m_filesLoaded = true;
-}
-
-std::string TorrentDetailsDialog::extensionLower(const std::string& path) {
-    std::string extension = pathToUtf8(pathFromUtf8(path).extension());
-    std::transform(extension.begin(), extension.end(), extension.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return extension;
-}
-
-bool TorrentDetailsDialog::isExecutablePath(const std::string& path) {
-    return extensionLower(path) == ".exe";
 }
 
 std::string TorrentDetailsDialog::formatLabel(const std::string& label, const std::string& value) {

@@ -1,6 +1,8 @@
 #include "SearchResultsWidget.h"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
+#include "SecurityAnalyzer.h"
+#include "SecurityBadge.h"
 #include "TorrentItem.h"   // formatSize, used for the size column
 
 #include <algorithm>
@@ -116,6 +118,27 @@ FileListService::Entry SearchResultsWidget::filesForRow(int row) const {
     return r ? m_files.find(cacheKey(*r)) : FileListService::Entry{};
 }
 
+const SecurityReport& SearchResultsWidget::reportForRow(int row) {
+    static const SecurityReport unknown = [] {
+        SecurityReport report;
+        report.summary = "No file list available. Metadata risk is unknown.";
+        return report;
+    }();
+
+    const SearchResult* r = getResultAt(row);
+    if (!r) return unknown;
+
+    const std::string key = cacheKey(*r);
+    auto cached = m_reports.find(key);
+    if (cached != m_reports.end()) return cached->second;
+
+    const FileListService::Entry rf = filesForRow(row);
+    if (rf.state != FileListState::Loaded) return unknown;
+
+    auto inserted = m_reports.emplace(key, SecurityAnalyzer::analyze(rf.files));
+    return inserted.first->second;
+}
+
 bool SearchResultsWidget::isExpanded(const std::string& key) const {
     auto it = m_expanded.find(key);
     return it != m_expanded.end() && it->second;
@@ -155,6 +178,8 @@ void SearchResultsWidget::requestFiles(int row) {
 // A fetch for 'key' landed. Only the rows showing that same torrent change --
 // the same torrent can sit on several rows, and nothing else has moved.
 void SearchResultsWidget::filesArrived(const std::string& key) {
+    // The list changed, so the cached report for it is stale.
+    m_reports.erase(key);
     forEachRow([&](int row, const SearchResult& r) {
         if (cacheKey(r) == key) updateRowHeight(row);
     });
@@ -237,6 +262,7 @@ void SearchResultsWidget::clear() {
     m_sortedIndices.clear();
     m_files.clear();
     m_expanded.clear();
+    m_reports.clear();
     rows(0);
     row_height_all(BASE_ROW_HEIGHT);
     redraw();
@@ -316,10 +342,14 @@ void SearchResultsWidget::updateRowHeight(int row) {
     FileListService::Entry rf = filesForRow(row);
     int lines = 0;
     switch (rf.state) {
-        case FileListState::Loaded:
-            lines = static_cast<int>(rf.files.size());
-            if (lines > MAX_SHOWN_FILES) lines = MAX_SHOWN_FILES + 1;   // + "and N more"
+        case FileListState::Loaded: {
+            // One summary line, then the files, then an "and N more" line
+            // when the list is longer than the row shows.
+            lines = 1 + static_cast<int>(rf.files.size());
+            const int maxFiles = MAX_SHOWN_FILES + 1;
+            if (lines > 1 + maxFiles) lines = 1 + maxFiles;
             break;
+        }
         case FileListState::Loading:
         case FileListState::Failed:
             lines = 1;
@@ -403,20 +433,54 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
     }
     if (rf.state == FileListState::NotRequested) return;
 
+    // Summary line first: the user expanded the row to see what is inside,
+    // and the answer to "is any of this runnable?" belongs at the top.
+    const SecurityReport& report = reportForRow(row);
+    {
+        const std::string summary = elideToWidth(
+            SecurityBadge::riskLabel(report.level) + "  -  " + report.summary,
+            avail);
+        fl_color(SecurityBadge::riskColor(report.level));
+        fl_font(FL_HELVETICA_BOLD, 11);
+        fl_draw(summary.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+        fl_color(sepColor);
+        int x2 = x + w - 6;
+        if (x2 < x + 24) x2 = x + 24;
+        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2, ly + FILE_LINE_HEIGHT - 1);
+        ly += FILE_LINE_HEIGHT;
+    }
+
     int shown = static_cast<int>(rf.files.size());
     if (shown > MAX_SHOWN_FILES) shown = MAX_SHOWN_FILES;
     for (int i = 0; i < shown && ly + FILE_LINE_HEIGHT <= limit + 1; ++i) {
         const TorrentFileEntry& f = rf.files[static_cast<size_t>(i)];
         // The size suffix is never cut: only the path is elided, measured
-        // against what is left after the "- " bullet and the suffix itself.
-        // Full path shows when the window is wide; "..." only when narrow.
+        // against what is left after the "- " bullet, the suffix and the
+        // per-file tags. Full path shows when the window is wide; "..." only
+        // when narrow.
         fl_font(FL_HELVETICA, 11);
         const std::string suffix = "  (" + TorrentItem::formatSize(f.size) + ")";
+        std::string tagsText;
+        const std::vector<std::string> tags = SecurityAnalyzer::tagsForFile(f);
+        if (!tags.empty()) {
+            tagsText = "  [";
+            for (std::size_t t = 0; t < tags.size() && t < 2; ++t) {
+                if (t) tagsText += ", ";
+                tagsText += tags[t];
+            }
+            tagsText += "]";
+        }
         const int bulletW = static_cast<int>(fl_width("- "));
         const int suffixW = static_cast<int>(fl_width(suffix.c_str()));
-        std::string path = elideToWidth(f.path, avail - bulletW - suffixW);
-        const std::string label = "- " + path + suffix;
-        fl_color(FL_FOREGROUND_COLOR);
+        const int tagsW = static_cast<int>(fl_width(tagsText.c_str()));
+        std::string path = SecurityBadge::displayText(f.path);
+        path = elideToWidth(path, avail - bulletW - suffixW - tagsW);
+        const std::string label = "- " + path + suffix + tagsText;
+        const FileAssessment assessment = SecurityAnalyzer::assessFile(f);
+        fl_color(SecurityBadge::hasWarning(assessment.level)
+                     ? SecurityBadge::riskColor(assessment.level)
+                     : FL_FOREGROUND_COLOR);
         fl_draw(label.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
         // Separator under every file line: makes each file its own row.
@@ -468,18 +532,31 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
     // Pixel-measured ellipsis: full absolute name when the maximised Name
     // column has room, "..." only when it really overflows (square window).
     // FL_ALIGN_CLIP is the second net, same as TorrentListWidget uses.
-    int textAvail = w - 10;
-    if (textAvail > 0 && !text.empty()) text = elideToWidth(text, textAvail);
     // The main value always lives in the top BASE_ROW_HEIGHT slice so an
     // expanded (taller) row keeps name/size/seeders aligned with the toggle
     // triangle instead of sinking to the vertical centre. The file list owns
     // everything below that slice.
     const int topH = h < BASE_ROW_HEIGHT ? h : BASE_ROW_HEIGHT;
+
+    int textX = x + 5;
+    int textW = w - 10;
+    if (col == COL_NAME) {
+        // The shield sits immediately before the torrent name on every
+        // surface, so the risk is visible before the row is expanded.
+        constexpr int SHIELD = 15;
+        const int shieldY = y + (topH - SHIELD) / 2;
+        SecurityBadge::drawShield(x + 5, shieldY, SHIELD, SHIELD,
+                                  reportForRow(row).level);
+        fl_color(FL_FOREGROUND_COLOR);
+        textX = x + 5 + SHIELD + 4;
+        textW = w - (SHIELD + 14);
+    }
+    if (textW < 0) textW = 0;
+    if (textW > 0 && !text.empty()) text = elideToWidth(text, textW);
+
     const Fl_Align align =
         static_cast<Fl_Align>(COLUMN_INFO[col].alignment | FL_ALIGN_CLIP);
-    int tw = w - 10;
-    if (tw < 0) tw = 0;
-    fl_draw(text.c_str(), x + 5, y, tw, topH, align);
+    fl_draw(text.c_str(), textX, y, textW, topH, align);
 
     if (col == COL_NAME) drawFileList(row, x, y, w, h);
     

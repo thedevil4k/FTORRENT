@@ -1,6 +1,8 @@
 #ifndef TORRENTFILELIST_H
 #define TORRENTFILELIST_H
 
+#include "SecurityTypes.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -8,13 +10,11 @@
 /**
  * @brief One file inside a torrent, as the user sees it in the results table.
  *
- * The point of this list is to let the user read the extensions before
- * downloading anything, which is the cheapest malware check there is.
+ * The fields are the shared SecurityFile model so the search row, Add Torrent,
+ * the torrent list and Details all analyze exactly the same data. The old
+ * name is kept because it is the public type of this fetcher.
  */
-struct TorrentFileEntry {
-    std::string path;       // Path relative to the torrent root, as-is
-    int64_t size = 0;       // Bytes
-};
+using TorrentFileEntry = SecurityFile;
 
 // Where a file list is in its journey. Failed is a normal outcome, not an
 // error to recover from: most results never get a swarm answer and the row

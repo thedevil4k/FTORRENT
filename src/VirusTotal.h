@@ -6,9 +6,10 @@
 /**
  * @brief VirusTotal links built from a local hash.
  *
- * FTorrent does not query the VirusTotal API and does not upload files. The
- * user clicked a button, so the least surprising and most private behaviour is
- * to open the normal report page for the SHA-256 we already computed.
+ * FTorrent does not query the VirusTotal API and does not upload files. This
+ * builds the normal report page for a SHA-256 the caller already computed; the
+ * current build has no UI that opens it, so the engine is kept for a later
+ * pre-download phase.
  */
 class VirusTotal {
 public:

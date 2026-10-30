@@ -3,6 +3,7 @@
 
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/torrent_status.hpp>
+#include "SecurityTypes.h"
 #include <string>
 #include <cstdint>
 #include <mutex>
@@ -91,11 +92,19 @@ public:
         double progress;
         bool complete;          // Every byte of this file is on disk
         int priority;
+        int fileIndex = -1;     // libtorrent index, pad files keep their gaps
+        bool hidden = false;
+        bool executable = false;
+        bool symlink = false;
+        bool absolutePath = false;
+        std::string symlinkPath;
     };
 
     std::vector<TrackerInfo> getTrackers() const;
     std::vector<PeerInfo> getPeers() const;
     std::vector<FileInfo> getFiles() const;
+    // Same files in the shared model the metadata analyzer consumes.
+    std::vector<SecurityFile> getSecurityFiles() const;
 
     // Utility
     static std::string formatSize(int64_t bytes);

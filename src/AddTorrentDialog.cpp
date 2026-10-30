@@ -1,5 +1,8 @@
 #include "AddTorrentDialog.h"
 #include "SettingsManager.h"
+#include "SecurityAnalyzer.h"
+#include "SecurityBadge.h"
+#include "TorrentItem.h"   // formatSize
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_File_Chooser.H>
@@ -8,6 +11,8 @@
 #include <libtorrent/version.hpp>
 #include <libtorrent/load_torrent.hpp>
 #include <libtorrent/torrent_info.hpp>
+#include <libtorrent/file_storage.hpp>
+#include <algorithm>
 #include <iomanip>
 #include <filesystem>
 #include <FL/fl_draw.H>
@@ -30,7 +35,7 @@ public:
 } // namespace
 
 AddTorrentDialog::AddTorrentDialog()
-    : Fl_Window(500, 520, "Add Torrent")
+    : Fl_Window(500, 650, "Add Torrent")
     , m_okClicked(false)
 {
     m_startImmediatelyResult = true;
@@ -108,11 +113,42 @@ void AddTorrentDialog::createUI() {
 
     m_fileBrowser = new Fl_Check_Browser(20, y, 460, 150);
     m_fileBrowser->textsize(12);
+    m_fileBrowser->when(FL_WHEN_CHANGED);
+    m_fileBrowser->callback(onFileSelectionChanged, this);
     y += 160;
+
+    // --- Security panel ---
+    m_securityPanel = new Fl_Box(20, y, 460, 112);
+    m_securityPanel->box(FL_THIN_DOWN_BOX);
+    m_securityPanel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+    m_securityShield = new SecurityShieldBox(30, y + 10, 20, 20);
+    m_securityShield->setRisk(RiskLevel::Unknown,
+        "No file list is available yet.");
+
+    m_securitySummary = new Fl_Box(56, y + 7, 412, 20);
+    m_securitySummary->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    m_securitySummary->labelfont(FL_HELVETICA_BOLD);
+
+    m_securityDetail = new Fl_Box(56, y + 27, 412, 32);
+    m_securityDetail->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
+    m_securityDetail->labelsize(11);
+
+    m_securityHint = new Fl_Box(30, y + 60, 440, 16,
+        "Metadata only. No file contents were read.");
+    m_securityHint->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    m_securityHint->labelsize(10);
+    m_securityHint->labelcolor(fl_rgb_color(140, 140, 140));
+
+    m_selectNonExecutables = new Fl_Button(30, y + 80, 220, 26,
+        "Select only non-executables");
+    m_selectNonExecutables->callback(onSelectNonExecutables, this);
+    m_selectNonExecutables->tooltip(
+        "Uncheck files that run code: executables, scripts, shortcuts and macros");
 }
 
 void AddTorrentDialog::createButtons() {
-    int btn_y = 470;
+    int btn_y = 605;
     int btn_w = 80;
     int btn_h = 30;
     
@@ -157,20 +193,31 @@ bool AddTorrentDialog::validate() {
     }
     m_savePath = m_savePathInput->value();
     
-    // Validate file selection
+    // Validate file selection. Priorities are indexed by the libtorrent file
+    // index, not by the visible row: pad files occupy indices but have no row,
+    // and getting this wrong shifts every later file by one.
     m_filePriorities.clear();
     bool anySelected = false;
-    for (int i = 1; i <= m_fileBrowser->nitems(); ++i) {
-        if (m_fileBrowser->checked(i)) {
-            m_filePriorities.push_back(1); // Priority 1 (Normal)
+    if (!m_files.empty() && m_totalFileCount > 0) {
+        m_filePriorities.assign(static_cast<std::size_t>(m_totalFileCount), 0);
+        for (int row = 0; row < static_cast<int>(m_files.size()); ++row) {
+            if (!m_fileBrowser->checked(row + 1)) continue;
             anySelected = true;
-        } else {
-            m_filePriorities.push_back(0); // Priority 0 (Skip)
+            int index = m_files[static_cast<std::size_t>(row)].fileIndex;
+            if (index < 0) index = row;
+            if (index >= 0 && index < m_totalFileCount) {
+                m_filePriorities[static_cast<std::size_t>(index)] = 1;
+            }
         }
     }
     
-    if (m_fileBrowser->nitems() > 0 && !anySelected) {
+    if (!m_files.empty() && !anySelected) {
         fl_alert("Please select at least one file to download");
+        return false;
+    }
+
+    updateSecurityPanel();
+    if (!confirmRiskySelection()) {
         return false;
     }
     
@@ -182,6 +229,20 @@ bool AddTorrentDialog::validate() {
     }
     
     return true;
+}
+
+bool AddTorrentDialog::confirmRiskySelection() {
+    if (!SecurityBadge::hasWarning(m_selectedReport.level)) return true;
+
+    std::string message =
+        "The selected files have high-risk metadata indicators.\n\n";
+    message += m_selectedReport.summary;
+    message += "\n\nDownload them anyway?";
+
+    // The first button is the non-destructive one. fl_choice() returns 0 for
+    // it and 1 for the explicit "Download anyway".
+    return fl_choice("%s", "Cancel", "Download anyway", nullptr,
+                     message.c_str()) == 1;
 }
 
 bool AddTorrentDialog::show_modal() {
@@ -281,12 +342,14 @@ void AddTorrentDialog::setSavePath(const std::string& path) {
     }
 }
 
-#include <libtorrent/torrent_info.hpp>
-#include "TorrentItem.h"
-
 void AddTorrentDialog::updateFileList(const std::string& torrentPath) {
+    if (!m_fileBrowser) return;
     m_fileBrowser->clear();
+    m_files.clear();
+    m_totalFileCount = 0;
+
     if (torrentPath.empty()) {
+        updateSecurityPanel();
         return;
     }
 
@@ -300,26 +363,189 @@ void AddTorrentDialog::updateFileList(const std::string& torrentPath) {
 #else
         auto const& fs = atp.ti->files();
 #endif
-        
+
+        std::vector<TorrentFileEntry> files;
         for (int i = 0; i < fs.num_files(); ++i) {
-            std::string fname = std::string(fs.file_name(lt::file_index_t(i)));
-            int64_t fsize = fs.file_size(lt::file_index_t(i));
-            
-            std::string label = fname + " (" + TorrentItem::formatSize(fsize) + ")";
-            m_fileBrowser->add(label.c_str(), 1); // Checked by default
+            const lt::file_index_t index(i);
+            // Pad files are piece alignment, not content. They still count
+            // towards the priority vector, which is why totalFileCount is
+            // taken from num_files() and not from the visible rows.
+            if (fs.pad_file_at(index)) continue;
+
+            TorrentFileEntry file;
+            file.fileIndex = i;
+            // file_path(), not file_name(): file_name() is only the leaf and
+            // would hide both the folder and duplicate names.
+            file.path = std::string(fs.file_path(index));
+            file.size = fs.file_size(index);
+            const auto flags = fs.file_flags(index);
+            file.hidden =
+                static_cast<bool>(flags & lt::file_storage::flag_hidden);
+            file.executable =
+                static_cast<bool>(flags & lt::file_storage::flag_executable);
+            file.symlink =
+                static_cast<bool>(flags & lt::file_storage::flag_symlink);
+            file.absolutePath = fs.file_absolute_path(index);
+            if (file.symlink) file.symlinkPath = fs.symlink(index);
+            files.push_back(std::move(file));
         }
+        showFiles(files, fs.num_files());
     } catch (const std::exception& e) {
+        m_files.clear();
+        m_totalFileCount = 0;
         m_fileBrowser->add(("Error: " + std::string(e.what())).c_str(), 0);
+        updateSecurityPanel();
     }
 }
 
-// Placed after the TorrentItem.h include above: formatSize is needed here,
-// and that header plus libtorrent live at the bottom of this file.
 void AddTorrentDialog::setFileList(const std::vector<TorrentFileEntry>& files) {
     if (!m_fileBrowser) return;
-    m_fileBrowser->clear();
-    for (const auto& f : files) {
-        std::string label = f.path + " (" + TorrentItem::formatSize(f.size) + ")";
-        m_fileBrowser->add(label.c_str(), 1); // checked = download
+
+    // The search row already resolved the metadata. Its fileIndex values are
+    // libtorrent indices, so the priority vector must cover every index,
+    // including the pad files that have no row here.
+    int total = static_cast<int>(files.size());
+    for (const TorrentFileEntry& file : files) {
+        total = std::max(total, file.fileIndex + 1);
     }
+    showFiles(files, total);
+}
+
+void AddTorrentDialog::showFiles(const std::vector<TorrentFileEntry>& files,
+                                 int totalFileCount) {
+    if (!m_fileBrowser) return;
+
+    m_fileBrowser->clear();
+    m_files.clear();
+    m_files.reserve(files.size());
+    for (const TorrentFileEntry& file : files) {
+        if (file.padFile) continue;
+        m_files.push_back(file);
+        m_fileBrowser->add(fileRowLabel(file).c_str(), 1);  // checked
+    }
+    m_totalFileCount = std::max(totalFileCount, static_cast<int>(m_files.size()));
+    updateSecurityPanel();
+    m_fileBrowser->redraw();
+}
+
+std::string AddTorrentDialog::fileRowLabel(const TorrentFileEntry& file) const {
+    std::string label = SecurityBadge::displayText(file.path);
+    label += " (";
+    label += TorrentItem::formatSize(file.size);
+    label += ")";
+
+    const std::vector<std::string> tags = SecurityAnalyzer::tagsForFile(file);
+    if (!tags.empty()) {
+        label += "  [";
+        for (std::size_t i = 0; i < tags.size() && i < 3; ++i) {
+            if (i) label += ", ";
+            label += tags[i];
+        }
+        label += "]";
+    }
+    return label;
+}
+
+std::vector<TorrentFileEntry> AddTorrentDialog::selectedFiles() const {
+    std::vector<TorrentFileEntry> selected;
+    if (!m_fileBrowser) return selected;
+
+    for (int row = 0; row < static_cast<int>(m_files.size()); ++row) {
+        if (m_fileBrowser->checked(row + 1)) {
+            selected.push_back(m_files[static_cast<std::size_t>(row)]);
+        }
+    }
+    return selected;
+}
+
+void AddTorrentDialog::updateSecurityPanel() {
+    if (!m_securityShield) return;
+
+    const std::vector<TorrentFileEntry> selected = selectedFiles();
+    m_selectedReport = SecurityAnalyzer::analyze(selected);
+
+    // An empty report means either "no metadata at all" or "the user
+    // unchecked everything". They are different situations and should not
+    // share the "expand the search row" hint.
+    const bool hasList = !m_files.empty();
+    const bool hasSelection = !selected.empty();
+
+    RiskLevel level = m_selectedReport.level;
+    std::string summary = m_selectedReport.summary;
+    if (hasList && !hasSelection) {
+        level = RiskLevel::Unknown;
+        summary = "No files selected. Metadata risk is unknown.";
+    }
+
+    m_securityShield->setRisk(
+        level, SecurityBadge::riskLabel(level) + ". " + summary);
+
+    if (m_securitySummary) {
+        m_securitySummary->copy_label(
+            (SecurityBadge::riskLabel(level) + "  -  " + summary).c_str());
+        m_securitySummary->labelcolor(SecurityBadge::riskColor(level));
+    }
+
+    if (m_securityDetail) {
+        std::string detail;
+        int shown = 0;
+        for (const Finding& finding : m_selectedReport.findings) {
+            if (shown >= 3) break;
+            if (!detail.empty()) detail += "\n";
+            detail += SecurityBadge::displayText(
+                SecurityAnalyzer::describeFinding(finding));
+            ++shown;
+        }
+        if (detail.empty()) {
+            if (!hasList) {
+                detail = "No file list available. Metadata risk is unknown.";
+            } else if (!hasSelection) {
+                detail = "Select at least one file to analyze its metadata.";
+            } else {
+                detail = "No known indicators in file names or metadata.";
+            }
+        }
+        m_securityDetail->copy_label(detail.c_str());
+        m_securityDetail->labelcolor(SecurityBadge::riskColor(level));
+    }
+
+    if (m_securityHint) {
+        if (!hasList) {
+            m_securityHint->copy_label(
+                "No metadata yet. Expand the search row first.");
+        } else if (!hasSelection) {
+            m_securityHint->copy_label(
+                "Nothing is selected, so there is nothing to download.");
+        } else {
+            m_securityHint->copy_label(
+                "Metadata only. No file contents were read.");
+        }
+    }
+
+    if (m_selectNonExecutables) {
+        if (hasList) m_selectNonExecutables->activate();
+        else m_selectNonExecutables->deactivate();
+    }
+}
+
+void AddTorrentDialog::onFileSelectionChanged(Fl_Widget* w, void* data) {
+    (void)w;
+    AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
+    if (dlg) dlg->updateSecurityPanel();
+}
+
+void AddTorrentDialog::onSelectNonExecutables(Fl_Widget* w, void* data) {
+    (void)w;
+    AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
+    if (!dlg || !dlg->m_fileBrowser) return;
+
+    // Archives and disk images stay checked: they are containers, not code,
+    // and dropping them would silently lose the content the user asked for.
+    for (int row = 0; row < static_cast<int>(dlg->m_files.size()); ++row) {
+        const bool runnable =
+            SecurityAnalyzer::isRunnable(dlg->m_files[static_cast<std::size_t>(row)]);
+        dlg->m_fileBrowser->checked(row + 1, runnable ? 0 : 1);
+    }
+    dlg->m_fileBrowser->redraw();
+    dlg->updateSecurityPanel();
 }

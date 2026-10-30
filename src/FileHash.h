@@ -10,8 +10,8 @@
  * @brief Hashing helpers for files the user asks to check.
  *
  * The digest is computed locally. No bytes leave the machine here; the caller
- * decides what to do with the finished SHA-256 (FTorrent opens VirusTotal with
- * it, which is a lookup by hash, not an upload).
+ * decides what to do with the finished SHA-256. The current build has no UI
+ * that consumes it: the engine is kept for a later pre-download phase.
  */
 class FileHash {
 public:

@@ -986,9 +986,19 @@ bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const st
             // Honour the checkboxes only when they describe this exact magnet:
             // the list was resolved for prefilledMagnet, so an edited field or
             // a length mismatch falls back to "download all" rather than
-            // shifting libtorrent's file order.
-            if (magnet != prefilledMagnet) filePriorities.clear();
-            else if (filePriorities.size() != prefilledFiles.size()) filePriorities.clear();
+            // shifting libtorrent's file order. The priority vector is indexed
+            // by libtorrent file index, so pad files count even though they
+            // have no row in the dialog.
+            int expectedFiles = static_cast<int>(prefilledFiles.size());
+            for (const TorrentFileEntry& file : prefilledFiles) {
+                expectedFiles = std::max(expectedFiles, file.fileIndex + 1);
+            }
+            if (magnet != prefilledMagnet) {
+                filePriorities.clear();
+            } else if (filePriorities.size() !=
+                       static_cast<std::size_t>(expectedFiles)) {
+                filePriorities.clear();
+            }
             success = m_manager->addMagnetLink(magnet, savePath, filePriorities);
         }
 

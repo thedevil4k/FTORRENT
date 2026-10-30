@@ -281,11 +281,21 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
         if (fs.pad_file_at(lt::file_index_t(i))) continue;
 
         FileInfo fi;
+        fi.fileIndex = i;
         fi.name = std::string(fs.file_name(lt::file_index_t(i)));
         // file_path() keeps the folders. Hashing needs the on-disk path, and
         // two files with the same leaf name can otherwise not be told apart.
         fi.path = std::string(fs.file_path(lt::file_index_t(i)));
         fi.size = fs.file_size(lt::file_index_t(i));
+        const auto flags = fs.file_flags(lt::file_index_t(i));
+        fi.hidden = static_cast<bool>(flags & lt::file_storage::flag_hidden);
+        fi.executable =
+            static_cast<bool>(flags & lt::file_storage::flag_executable);
+        fi.symlink = static_cast<bool>(flags & lt::file_storage::flag_symlink);
+        fi.absolutePath = fs.file_absolute_path(lt::file_index_t(i));
+        if (fi.symlink) {
+            fi.symlinkPath = fs.symlink(lt::file_index_t(i));
+        }
         
         if (fi.size > 0 && i < (int)file_progress.size()) {
             fi.progress = (double)file_progress[i] / fi.size;
@@ -297,6 +307,23 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
         
         fi.priority = (int)static_cast<std::uint8_t>(m_handle.file_priority(lt::file_index_t(i)));
         result.push_back(fi);
+    }
+    return result;
+}
+
+std::vector<SecurityFile> TorrentItem::getSecurityFiles() const {
+    std::vector<SecurityFile> result;
+    for (const FileInfo& info : getFiles()) {
+        SecurityFile file;
+        file.fileIndex = info.fileIndex;
+        file.path = info.path;
+        file.size = info.size;
+        file.hidden = info.hidden;
+        file.executable = info.executable;
+        file.symlink = info.symlink;
+        file.absolutePath = info.absolutePath;
+        file.symlinkPath = info.symlinkPath;
+        result.push_back(std::move(file));
     }
     return result;
 }

@@ -54,7 +54,21 @@ FTorrent includes built-in features to protect your sensitive information:
 
 ## 🛡️ Security Analysis
 
-FTorrent is replacing post-download checks with analysis that runs before the file is downloaded. The Details window no longer offers **Open in VirusTotal** or **Inspect Archive**; the hash, archive and VirusTotal engines remain internal to the pre-download analysis. FTorrent never uploads files and does not send telemetry.
+FTorrent analyzes a torrent **before** the download starts. The shield next to the name tells you what the metadata shows:
+
+-   **Unknown** (grey): there is no file list yet. A magnet that was never expanded has no names to inspect.
+-   **Low risk**: no known indicators in the names or metadata.
+-   **Medium risk**: for example an executable, installer, archive or disk image.
+-   **High risk**: a script, shortcut, macro-enabled document, hidden runnable file or other strong warning.
+-   **Critical risk**: a double extension, path traversal, absolute/UNC path, bidi override or symlink.
+
+The shield appears in search results, the Add Torrent dialog, the torrent list and the Details window. Expanding a search result shows a summary line and one tagged line per file (`EXE`, `SCRIPT`, `ARCHIVE`, `DOUBLE EXT`, `PATH`, `SYMLINK`, `HIDDEN`, and so on). Details has a **Security** tab with the complete report.
+
+In **Add Torrent**, the panel analyzes the files that are currently checked. **Select only non-executables** unchecks executables, scripts, shortcuts and macro documents, but keeps archives and disk images because they are containers. If the checked selection is High or Critical, FTorrent asks for confirmation before accepting it. When a magnet has no resolved file list, expand its search row first; without metadata the panel stays **Unknown**.
+
+The analysis reads names and the metadata libtorrent already carries: size, hidden/executable/symlink flags and symlink targets. **No file contents are read, no file is uploaded and no telemetry is sent.** Reputation lookups against external providers are a later phase and are not contacted by this build.
+
+A clean report means **no known indicators**, not that the file is safe: a name cannot prove what a program does. Treat the shield as a warning system, not a guarantee. The former post-download **Open in VirusTotal** and **Inspect Archive** actions remain retired.
 
 ## ❓ Frequently Asked Questions
 

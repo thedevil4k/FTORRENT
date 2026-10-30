@@ -57,12 +57,23 @@ void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out
         // showing them here would only make the list longer and scarier.
         if (fs.pad_file_at(lt::file_index_t(i))) continue;
         TorrentFileEntry e;
+        e.fileIndex = i;
         // file_path(), not file_name(): since libtorrent 2.x file_name() hands
         // back only the last component, which would hide that a file sits in
         // some folder and, worse, that two files of the same name are
         // different.
         e.path = fs.file_path(lt::file_index_t(i));
         e.size = fs.file_size(lt::file_index_t(i));
+        const auto flags = fs.file_flags(lt::file_index_t(i));
+        e.hidden = static_cast<bool>(flags & lt::file_storage::flag_hidden);
+        e.executable =
+            static_cast<bool>(flags & lt::file_storage::flag_executable);
+        e.symlink =
+            static_cast<bool>(flags & lt::file_storage::flag_symlink);
+        e.absolutePath = fs.file_absolute_path(lt::file_index_t(i));
+        if (e.symlink) {
+            e.symlinkPath = fs.symlink(lt::file_index_t(i));
+        }
         out.push_back(std::move(e));
     }
 }

@@ -5,7 +5,9 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <unordered_map>
 #include "TorrentItem.h"
+#include "SecurityTypes.h"
 
 /**
  * @brief Widget de tabla para mostrar la lista de torrents
@@ -84,6 +86,10 @@ public:
 private:
     std::vector<TorrentItem*> m_torrents;
     std::vector<int> m_sortedIndices;
+    // Metadata risk per infohash. The files of a torrent do not change, so the
+    // report is computed once and reused by every redraw.
+    std::unordered_map<std::string, SecurityReport> m_reports;
+    const SecurityReport& reportForTorrent(TorrentItem* torrent);
     
     Column m_sortColumn;
     bool m_sortAscending;

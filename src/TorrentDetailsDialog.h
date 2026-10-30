@@ -11,6 +11,7 @@
 #include <FL/Fl_Button.H>
 #include <vector>
 #include "TorrentItem.h"
+#include "SecurityBadge.h"
 
 /**
  * @brief Diálogo de detalles de un torrent específico
@@ -19,6 +20,7 @@
  * - General: Información básica del torrent
  * - Trackers: Lista de trackers
  * - Peers: Peers conectados
+ * - Security: Análisis de los metadatos de los archivos
  * - Files: Archivos del torrent (si está disponible)
  *
  * La comprobación de seguridad vive ahora en el análisis previo a la
@@ -41,6 +43,7 @@ private:
     
     // General tab
     Fl_Group* m_generalTab;
+    SecurityShieldBox* m_generalShield;
     Fl_Box* m_nameLabel;
     Fl_Box* m_sizeLabel;
     Fl_Box* m_hashLabel;
@@ -54,17 +57,27 @@ private:
     Fl_Box* m_uploadSpeedLabel;
     Fl_Box* m_etaLabel;
     Fl_Box* m_savePathLabel;
+    Fl_Box* m_generalSecuritySummary;
     
     // Trackers tab
     Fl_Group* m_trackersTab;
     Fl_Text_Display* m_trackersDisplay;
-    Fl_Text_Buffer* m_trackersBuffer;
+    Fl_Text_Buffer* m_trackersBuffer = nullptr;
     
     // Peers tab
     Fl_Group* m_peersTab;
     Fl_Text_Display* m_peersDisplay;
-    Fl_Text_Buffer* m_peersBuffer;
+    Fl_Text_Buffer* m_peersBuffer = nullptr;
     
+    // Security tab
+    Fl_Group* m_securityTab;
+    SecurityShieldBox* m_securityShield;
+    Fl_Box* m_securitySummary;
+    Fl_Text_Display* m_securityDisplay;
+    Fl_Text_Buffer* m_securityBuffer = nullptr;
+    SecurityReport m_securityReport;
+    bool m_securityLoaded = false;
+
     // Files tab
     Fl_Group* m_filesTab;
     Fl_Browser* m_filesBrowser;
@@ -79,6 +92,7 @@ private:
     void createGeneralTab();
     void createTrackersTab();
     void createPeersTab();
+    void createSecurityTab();
     void createFilesTab();
     void createButtons();
     
@@ -86,6 +100,7 @@ private:
     void updateGeneralInfo();
     void updateTrackers();
     void updatePeers();
+    void updateSecurity();
     void updateFiles();
     
     // Callbacks
@@ -95,8 +110,6 @@ private:
     
     // Helper
     std::string formatLabel(const std::string& label, const std::string& value);
-    static bool isExecutablePath(const std::string& path);
-    static std::string extensionLower(const std::string& path);
 };
 
 #endif // TORRENTDETAILSDIALOG_H
