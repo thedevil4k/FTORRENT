@@ -34,6 +34,14 @@ public:
         std::vector<Entry> executables;
     };
 
+    // Every regular file the index exposes, not only the executables. Used by
+    // the pre-download archive check, which analyzes all the names.
+    struct ListingAll {
+        bool ok = false;
+        std::string error;
+        std::vector<Entry> entries;
+    };
+
     static bool isAvailable();
 
     /** @brief True for the archive formats the pre-download analysis accepts. */
@@ -47,6 +55,16 @@ public:
      */
     static Listing listExecutables(const std::string& archivePath,
                                    const std::atomic<bool>* cancelled = nullptr);
+
+    /**
+     * @brief List every regular file without decompressing any data.
+     *
+     * Works on a file that only carries the archive's index, which is what the
+     * first-plus-last-piece preflight produces: the entries are read from the
+     * headers, and their data is skipped as usual.
+     */
+    static ListingAll listEntries(const std::string& archivePath,
+                                  const std::atomic<bool>* cancelled = nullptr);
 
     /**
      * @brief Hash one .exe entry by its position in the archive.
@@ -68,6 +86,12 @@ public:
 private:
     static bool isExecutableName(const std::string& path);
     static std::string extensionLower(const std::string& path);
+
+    // One loop, two filters: .exe only, or every regular file.
+    static bool readEntries(const std::string& archivePath,
+                            bool executablesOnly,
+                            std::vector<Entry>& out, std::string& error,
+                            const std::atomic<bool>* cancelled);
 };
 
 #endif // ARCHIVEINSPECTOR_H

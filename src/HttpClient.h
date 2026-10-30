@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 /**
  * @brief Minimal blocking HTTP/HTTPS client used by the search feature.
@@ -27,6 +28,13 @@ public:
         long httpStatus = 0;
     };
 
+    // One request header. Never logged, never echoed back in an error: an API
+    // key travels in one of these.
+    struct Header {
+        std::string name;
+        std::string value;
+    };
+
     // Called while the transfer runs; returning true abandons it at once.
     // This is what lets the Cancel button take effect immediately instead of
     // after the current request finishes.
@@ -37,19 +45,39 @@ public:
     // This is what drives progress bars while a plugin or torrent is fetched.
     using ProgressCallback = std::function<void(int64_t, int64_t)>;
 
-    // Performs a GET. Redirects are followed. Returns false and fills
-    // Response::error on any failure; body is empty in that case. When
-    // 'shouldStop' is given and starts returning true, the transfer is aborted
-    // and Response::error reads "Cancelled". The connection phase has its own
-    // shorter timeout so that cancelling (or a dead host) never waits for the
-    // full transfer timeout: progress callbacks do not fire while curl is
-    // still connecting, so without this Cancel would look frozen.
+    // Performs a GET. Redirects are followed unless the caller says otherwise.
+    // Returns false and fills Response::error on any failure; body is empty in
+    // that case. When 'shouldStop' is given and starts returning true, the
+    // transfer is aborted and Response::error reads "Cancelled". The connection
+    // phase has its own shorter timeout so that cancelling (or a dead host)
+    // never waits for the full transfer timeout: progress callbacks do not fire
+    // while curl is still connecting, so without this Cancel would look frozen.
+    //
+    // 'followRedirects' is there for the API calls: a redirect would replay
+    // whatever header the caller sent (an API key, for instance) to a host the
+    // caller never chose, so a provider request passes false and treats a 3xx
+    // answer as a failure.
     static Response get(const std::string& url,
                         const std::string& userAgent,
                         int timeoutSeconds = 15,
                         const StopCheck& shouldStop = nullptr,
                         const ProgressCallback& onProgress = nullptr,
-                        int connectTimeoutSeconds = 10);
+                        int connectTimeoutSeconds = 10,
+                        const std::vector<Header>& headers = {},
+                        bool followRedirects = true);
+
+    // Performs an application/x-www-form-urlencoded POST. Same guarantees and
+    // the same stop semantics as get(). Redirects are not followed by default,
+    // for the reason above.
+    static Response postForm(const std::string& url,
+                             const std::string& userAgent,
+                             const std::string& body,
+                             int timeoutSeconds = 15,
+                             const StopCheck& shouldStop = nullptr,
+                             int connectTimeoutSeconds = 10,
+                             const std::vector<Header>& headers = {},
+                             bool followRedirects = false);
+
     // True if the URL uses https:// (search engines must never be queried in
     // the clear, otherwise the query leaks to the network).
     static bool isSecure(const std::string& url);

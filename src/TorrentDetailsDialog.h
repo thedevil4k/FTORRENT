@@ -9,9 +9,11 @@
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Browser.H>
 #include <FL/Fl_Button.H>
+#include <memory>
 #include <vector>
 #include "TorrentItem.h"
 #include "SecurityBadge.h"
+#include "SecurityReputation.h"
 
 /**
  * @brief Diálogo de detalles de un torrent específico
@@ -34,6 +36,10 @@ public:
     
     void show_modal();
     void updateInfo();
+
+    // Opens on the Security tab and asks about the torrent's hash, for the
+    // shield click in the torrent list.
+    void showSecurityAndCheck();
     
 private:
     TorrentItem* m_torrent;
@@ -77,6 +83,13 @@ private:
     Fl_Text_Buffer* m_securityBuffer = nullptr;
     SecurityReport m_securityReport;
     bool m_securityLoaded = false;
+    // Reputation of the hash the user clicked the shield about. Never fetched
+    // automatically; see checkReputation().
+    ReputationResult m_reputation;
+    std::string m_reputationSha;
+    // Cleared in the destructor, so a lookup landing later cannot touch a dead
+    // dialog.
+    std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
 
     // Files tab
     Fl_Group* m_filesTab;
@@ -101,6 +114,7 @@ private:
     void updateTrackers();
     void updatePeers();
     void updateSecurity();
+    void checkReputation();
     void updateFiles();
     
     // Callbacks

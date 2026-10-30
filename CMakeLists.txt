@@ -116,6 +116,12 @@ set(SOURCES
     src/FileListService.cpp
     src/SecurityAnalyzer.cpp
     src/SecurityBadge.cpp
+    src/SecurityKeys.cpp
+    src/Reputation.cpp
+    src/ReputationService.cpp
+    src/SecurityHashes.cpp
+    src/SecurityReputation.cpp
+    src/ArchivePreflight.cpp
 )
 
 if(WIN32)
@@ -154,6 +160,12 @@ set(HEADERS
     src/SecurityTypes.h
     src/SecurityAnalyzer.h
     src/SecurityBadge.h
+    src/SecurityKeys.h
+    src/Reputation.h
+    src/ReputationService.h
+    src/SecurityHashes.h
+    src/SecurityReputation.h
+    src/ArchivePreflight.h
 )
 
 # The shared body of the app: everything except main(). An OBJECT library, so

@@ -45,7 +45,10 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 - Details gains a **Security** tab with the report and every finding; the Files tab tags each entry with the same metadata analysis
 - The analysis is metadata only: names, executable/hidden/symlink flags and symlink targets. No file contents are read, nothing is uploaded and no telemetry is sent
 - A clean report says **no known indicators**, never “safe”. When there is no file list yet, the shield stays **Unknown** instead of guessing
-- The former post-download VirusTotal and RAR/ZIP inspection actions remain retired; `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for later pre-download phases
+- **Reputation by hash, on request.** Clicking a shield asks VirusTotal and MalwareBazaar about the file's SHA-256, and only then. The hash comes from the torrent metadata; when the metadata does not carry a whole-file hash, FTorrent says exactly `VT no disponible antes de descargar el archivo completo.` instead of downloading the file to compute one
+- **Archives without the archive.** For a RAR or ZIP, **Check archive** fetches only the first and last piece, lists the entries from a temporary folder that is deleted immediately, and reports whether anything inside can run
+- Keys never live in `settings.ini`: VirusTotal's key is stored with Windows DPAPI, or in a 0600 file on Linux, from Preferences ▸ Security. MalwareBazaar needs no key
+- The former post-download VirusTotal and RAR/ZIP inspection actions remain retired; `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for the pre-download analysis
 - Archive support is optional at build time
 
 **Interface**
@@ -107,6 +110,9 @@ ctest --test-dir build --output-on-failure
 | `archive_inspector` | read-only listing and hashing inside a generated ZIP and the RAR5/ZIP fixtures, plus its refusals for bad input (built when libarchive is found) |
 | `security_analyzer` | metadata heuristics: file families, hostile names, symlinks, torrent-level counts and the non-verdict wording |
 | `security_badge` | risk labels/palette, name sanitising and the rendered shield |
+| `security_keys` | the key store: round trip, removal, per-file separation and the absence of the key from the stored bytes |
+| `reputation` | provider parsing from canned answers, the service's states and wording, and the exact no-hash sentence |
+| `archive_preflight` | piece arithmetic, sparse head+tail assembly, and a real ZIP/RAR5 listing rebuilt from only its two ends |
 
 `flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 
@@ -149,6 +155,7 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **A test suite in the repository.** CTest programs built from the same objects the app ships.
 - **Post-download security UI retired.** The Details window no longer offers “Open in VirusTotal” or “Inspect Archive”. `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for the pre-download analysis; no file is uploaded and no telemetry is sent.
 - **Metadata risk analysis before downloading.** A shield now sits next to the torrent name in search results, Add Torrent, the torrent list and Details. Expanding a search row shows the risk summary and per-file tags; Add Torrent analyzes the checked files and can select only non-executables; Details has a Security tab. The analysis reads names and metadata only, and says “no known indicators” rather than “safe”.
+- **Reputation and archive checks, on demand.** Clicking a shield looks the file's SHA-256 up in VirusTotal and MalwareBazaar; **Check archive** reads a RAR/ZIP index from its first and last piece in a temporary folder. Neither runs without a click, neither uploads anything, and without a whole-file hash FTorrent says so plainly instead of downloading the file.
 - **Search engines report their reachability.** A green, red or gray dot next to each engine in the dropdown, probed once per session with no new dependencies.
 - **Magnets can be picked file by file.** The Add dialog lists a magnet's already-resolved files with one checkbox each; the file rows under each result are separated so multi-file torrents read clearly.
 - **Search results survive small windows and use wide ones.** Names ellipsize by pixels (full name when it fits), double-click and Enter both download, and cancelling the dialog keeps the results.

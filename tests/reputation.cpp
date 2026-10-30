@@ -1,0 +1,435 @@
+// Reputation checks.
+//
+// Two things are being held down here. First, the parsing: a provider answer
+// is remote data, and a malformed one must produce an error rather than a
+// fabricated verdict. Second, the wording and the state machine: a lookup that
+// could not run must never read as "clean", and the no-hash case must show the
+// exact sentence the product requires.
+//
+// The service checks use a fake provider, so nothing here touches the network.
+#include "Reputation.h"
+#include "ReputationService.h"
+#include "SecurityReputation.h"
+#include "SecurityTypes.h"
+
+#include <FL/Fl.H>
+
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <thread>
+#include <vector>
+
+namespace {
+
+int checks = 0;
+int failures = 0;
+
+void ok(bool condition, const std::string& what) {
+    checks++;
+    if (!condition) {
+        failures++;
+        std::cout << "    FAIL " << what << '\n';
+    }
+}
+
+void section(const char* title) {
+    std::cout << "\n== " << title << " ==\n";
+}
+
+bool contains(const std::string& text, const std::string& part) {
+    return text.find(part) != std::string::npos;
+}
+
+const char* const HASH =
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+std::filesystem::path scratchDir() {
+    return std::filesystem::temp_directory_path() /
+           "ftorrent-test-reputation";
+}
+
+// Keeps the no-key check from reading a real key the developer may have saved.
+void useScratchConfig() {
+    namespace fs = std::filesystem;
+    const fs::path dir = scratchDir();
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir, ec);
+#ifdef _WIN32
+    _putenv_s("APPDATA", dir.string().c_str());
+#else
+    setenv("XDG_CONFIG_HOME", dir.string().c_str(), 1);
+#endif
+}
+
+class FakeProvider : public ReputationProvider {
+public:
+    FakeProvider(std::string name, bool requiresKey, ProviderVerdict verdict,
+                 int delayMs = 0)
+        : m_name(std::move(name))
+        , m_requiresKey(requiresKey)
+        , m_verdict(std::move(verdict))
+        , m_delayMs(delayMs) {}
+
+    std::string name() const override { return m_name; }
+    bool requiresKey() const override { return m_requiresKey; }
+
+    ProviderVerdict query(const std::string&, const std::string&,
+                          const std::atomic<bool>&) const override {
+        if (m_delayMs > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(m_delayMs));
+        }
+        return m_verdict;
+    }
+
+private:
+    std::string m_name;
+    bool m_requiresKey;
+    ProviderVerdict m_verdict;
+    int m_delayMs;
+};
+
+ProviderVerdict verdictOf(const std::string& provider, bool answered, bool known,
+                          int malicious, int total,
+                          const std::string& summary) {
+    ProviderVerdict v;
+    v.provider = provider;
+    v.answered = answered;
+    v.known = known;
+    v.malicious = malicious;
+    v.total = total;
+    v.summary = summary;
+    return v;
+}
+
+// Runs the UI loop until the service has nothing in flight, so the delivery
+// through Fl::awake() actually happens.
+bool waitFor(ReputationService& service, int timeoutMs = 5000) {
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(timeoutMs);
+    while (service.pending() > 0) {
+        if (std::chrono::steady_clock::now() > deadline) return false;
+        Fl::wait(0.02);
+    }
+    return true;
+}
+
+} // namespace
+
+int main() {
+    useScratchConfig();
+
+    section("hash shape");
+    ok(isSha256Hex(HASH), "a 64-character hex digest is a SHA-256");
+    ok(!isSha256Hex(std::string(HASH).substr(0, 63)),
+       "63 characters is not a SHA-256");
+    ok(!isSha256Hex("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"),
+       "non-hex characters are not a SHA-256");
+    ok(isSha256Hex("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"),
+       "uppercase hex is accepted");
+    ok(normalizeSha256("E3B0") == "e3b0", "normalising lowercases");
+    ok(VirusTotalProvider::reportPageUrl(HASH) ==
+           std::string("https://www.virustotal.com/gui/file/") + HASH,
+       "the report page is built from the hash");
+    ok(VirusTotalProvider::reportPageUrl("nope").empty(),
+       "a malformed hash has no report page");
+
+    section("VirusTotal parsing");
+    {
+        const std::string body =
+            "{\"data\":{\"type\":\"file\",\"attributes\":{"
+            "\"last_analysis_stats\":{\"harmless\":60,\"malicious\":3,"
+            "\"suspicious\":1,\"undetected\":6,\"timeout\":0}}}}";
+        const ProviderVerdict v = VirusTotalProvider::parseReport(body);
+        ok(v.answered, "a full report counts as answered");
+        ok(v.known, "a full report has a record");
+        ok(v.malicious == 3, "the malicious count is read");
+        ok(v.suspicious == 1, "the suspicious count is read");
+        ok(v.total == 70, "the engine total is the sum of the buckets");
+        ok(contains(v.summary, "3 of 70"), "the summary states the ratio");
+        ok(!contains(v.summary, "safe"), "the summary never says safe");
+    }
+    {
+        const ProviderVerdict v = VirusTotalProvider::parseReport("not json");
+        ok(!v.answered, "garbage is not an answer");
+        ok(!v.known, "garbage does not produce a record");
+        ok(contains(v.summary, "could not be read"),
+           "garbage is reported as unreadable");
+    }
+    {
+        const ProviderVerdict v =
+            VirusTotalProvider::parseReport("{\"data\":{\"attributes\":{}}}");
+        ok(!v.answered, "a report with no analysis is not an answer");
+        ok(!v.known, "a report with no analysis is not a record");
+    }
+    {
+        const ProviderVerdict v = VirusTotalProvider::parseReport(
+            "{\"data\":{\"attributes\":{\"last_analysis_stats\":"
+            "{\"harmless\":\"many\"}}}}");
+        ok(v.answered, "wrong types in the stats do not break the parse");
+        ok(v.malicious == 0, "a non-numeric count is not read as a detection");
+    }
+
+    section("MalwareBazaar parsing");
+    {
+        const ProviderVerdict v =
+            MalwareBazaarProvider::parseReport("{\"query_status\":\"hash_not_found\"}");
+        ok(v.answered, "hash_not_found is a real answer");
+        ok(!v.known, "hash_not_found is not a record");
+        ok(contains(v.summary, "No record"), "hash_not_found says so plainly");
+    }
+    {
+        const ProviderVerdict v = MalwareBazaarProvider::parseReport(
+            "{\"query_status\":\"ok\",\"data\":[{\"sha256_hash\":\"" +
+            std::string(HASH) +
+            "\",\"signature\":\"Emotet\",\"file_type\":\"exe\"}]}");
+        ok(v.answered, "a hit is an answer");
+        ok(v.known, "a hit is a record");
+        ok(contains(v.summary, "Emotet"), "the signature is in the summary");
+        ok(contains(v.summary, "malware database"),
+           "the summary says where the record comes from");
+    }
+    {
+        // A tag is remote text and must not be able to break a label.
+        const ProviderVerdict v = MalwareBazaarProvider::parseReport(
+            "{\"query_status\":\"ok\",\"data\":[{\"signature\":\"Evil\\nFamily\"}]}");
+        ok(v.known, "a tag with a control character is still a record");
+        ok(!contains(v.summary, "\n"), "the tag's newline is dropped");
+    }
+    {
+        const ProviderVerdict v =
+            MalwareBazaarProvider::parseReport("{\"query_status\":\"ok\"}");
+        ok(!v.known, "an ok answer with no samples is not a record");
+        ok(v.answered, "an ok answer with no samples is still an answer");
+    }
+    {
+        const ProviderVerdict v = MalwareBazaarProvider::parseReport("<<<>>>");
+        ok(!v.answered, "garbage is not an answer");
+    }
+
+    section("the no-hash sentence");
+    {
+        const std::string expected =
+            "VT no disponible antes de descargar el archivo completo.";
+        ok(std::string(reputationNoHashMessage()) == expected,
+           "the required wording is exact");
+        const ReputationResult r = ReputationService::noHashResult();
+        ok(r.state == ReputationState::NoCompleteHash,
+           "no hash has its own state");
+        ok(r.message == expected, "the no-hash result carries the sentence");
+        ok(!contains(r.message, "safe"), "the no-hash result never says safe");
+    }
+
+    section("service: a known malicious hash");
+    {
+        std::vector<std::shared_ptr<ReputationProvider>> providers;
+        providers.push_back(std::make_shared<FakeProvider>(
+            "VirusTotal", false,
+            verdictOf("VirusTotal", true, true, 12, 70,
+                      "VirusTotal: 12 of 70 engines flag this file.")));
+        providers.push_back(std::make_shared<FakeProvider>(
+            "MalwareBazaar", false,
+            verdictOf("MalwareBazaar", true, false, 0, 0,
+                      "No record in MalwareBazaar for this hash.")));
+
+        ReputationService service(providers);
+        ReputationResult got;
+        bool called = false;
+        ok(service.request(HASH, [&](const ReputationResult& r) {
+               called = true;
+               got = r;
+           }) == ReputationService::Start::Started,
+           "a valid hash starts a lookup");
+        ok(waitFor(service), "the lookup finishes");
+        ok(called, "the completion runs on the UI thread");
+        ok(got.state == ReputationState::Known, "a detection is Known");
+        ok(contains(got.message, "12 of 70"), "the message carries the ratio");
+        ok(!contains(got.message, "safe"), "the message never says safe");
+
+        ok(service.request(HASH, nullptr) == ReputationService::Start::Cached,
+           "a cached answer is not requested twice");
+        ok(service.find(HASH).state == ReputationState::Known,
+           "the cached answer is readable");
+    }
+
+    section("service: nobody knows the hash");
+    {
+        std::vector<std::shared_ptr<ReputationProvider>> providers;
+        providers.push_back(std::make_shared<FakeProvider>(
+            "VirusTotal", false,
+            verdictOf("VirusTotal", true, false, 0, 0,
+                      "No record in VirusTotal for this hash.")));
+        providers.push_back(std::make_shared<FakeProvider>(
+            "MalwareBazaar", false,
+            verdictOf("MalwareBazaar", true, false, 0, 0,
+                      "No record in MalwareBazaar for this hash.")));
+
+        ReputationService service(providers);
+        ReputationResult got;
+        service.request(HASH, [&](const ReputationResult& r) { got = r; });
+        ok(waitFor(service), "the lookup finishes");
+        ok(got.state == ReputationState::Unknown, "no record is Unknown");
+        ok(contains(got.message, "No record for this hash"),
+           "the message says there is no record");
+        ok(!contains(got.message, "clean") && !contains(got.message, "safe"),
+           "an unknown hash is never called clean or safe");
+    }
+
+    section("service: a record with no detections");
+    {
+        std::vector<std::shared_ptr<ReputationProvider>> providers;
+        providers.push_back(std::make_shared<FakeProvider>(
+            "VirusTotal", false,
+            verdictOf("VirusTotal", true, true, 0, 70,
+                      "VirusTotal: 0 of 70 engines flag this file.")));
+        ReputationService service(providers);
+        ReputationResult got;
+        service.request(HASH, [&](const ReputationResult& r) { got = r; });
+        ok(waitFor(service), "the lookup finishes");
+        ok(got.state == ReputationState::Known, "a zero-detection record exists");
+        ok(contains(got.message, "not a guarantee"),
+           "a clean record is explicitly not a guarantee");
+    }
+
+    section("service: a provider that needs a key");
+    {
+        std::vector<std::shared_ptr<ReputationProvider>> providers;
+        // Named VirusTotal and requiresKey(), so the service looks for a key
+        // and finds none in the scratch config.
+        providers.push_back(std::make_shared<FakeProvider>(
+            "VirusTotal", true,
+            verdictOf("VirusTotal", true, true, 5, 70, "should not be used")));
+
+        ReputationService service(providers);
+        ReputationResult got;
+        service.request(HASH, [&](const ReputationResult& r) { got = r; });
+        ok(waitFor(service), "the lookup finishes");
+        ok(got.state == ReputationState::NoKey,
+           "a missing key is its own state, not an error");
+        ok(contains(got.message, "API key"), "the message explains the key");
+        ok(got.verdicts.size() == 1 && got.verdicts[0].needsKey,
+           "the verdict says the key was the blocker");
+        ok(got.verdicts.size() == 1 && !got.verdicts[0].known,
+           "nothing is looked up without a key");
+    }
+
+    section("service: bad input and limits");
+    {
+        std::vector<std::shared_ptr<ReputationProvider>> providers;
+        providers.push_back(std::make_shared<FakeProvider>(
+            "VirusTotal", false,
+            verdictOf("VirusTotal", true, false, 0, 0, "No record.")));
+        ReputationService service(providers);
+
+        ok(service.request("", nullptr) == ReputationService::Start::Rejected,
+           "an empty hash starts nothing");
+        ok(service.request("not-a-hash", nullptr) ==
+               ReputationService::Start::Rejected,
+           "a malformed hash starts nothing");
+        ok(service.pending() == 0, "nothing was started");
+
+        ok(service.request(HASH, nullptr) == ReputationService::Start::Started,
+           "a valid hash starts a lookup");
+        ok(service.request(HASH, nullptr) ==
+               ReputationService::Start::AlreadyRunning,
+           "the same hash in flight is not started twice");
+        ok(waitFor(service), "the lookup finishes");
+
+        service.clear();
+        ok(service.find(HASH).state == ReputationState::NotRequested,
+           "clearing forgets the cached answer");
+        ok(service.find("").state == ReputationState::NotRequested,
+           "an empty hash was never asked about");
+    }
+
+    section("choosing what to ask about");
+    {
+        SecurityFile picture;
+        picture.path = "photo.jpg";
+        picture.size = 100;
+        picture.sha256 = HASH;
+        picture.sha256Complete = true;
+
+        SecurityFile tool;
+        tool.path = "setup.exe";
+        tool.size = 200;
+        tool.sha256 = std::string(64, 'a');
+        tool.sha256Complete = true;
+
+        SecurityFile big;
+        big.path = "movie.mp4";
+        big.size = 900000;
+        big.sha256 = std::string(64, 'b');
+        big.sha256Complete = false;   // a Merkle root, not a file hash
+
+        ReputationTarget target = findReputationTarget({picture, big});
+        ok(target.found(), "a complete hash is found");
+        ok(target.sha256 == HASH, "the first complete hash is used");
+
+        target = findReputationTarget({picture, tool});
+        ok(target.sha256 == tool.sha256,
+           "a runnable file is preferred over a picture");
+        ok(target.path == "setup.exe", "the target names the file it belongs to");
+
+        target = findReputationTarget({big});
+        ok(!target.found(), "a hash that is not the whole file is never used");
+
+        target = findReputationTarget({});
+        ok(!target.found(), "an empty list has nothing to ask about");
+    }
+
+    section("display wording");
+    {
+        ok(reputationLine(ReputationService::noHashResult()) ==
+               std::string(reputationNoHashMessage()),
+           "the no-hash line is the required sentence");
+
+        const std::string notAsked = reputationLine(ReputationResult{});
+        ok(contains(notAsked, "shield"),
+           "an unasked lookup says how to ask");
+        ok(!contains(notAsked, "safe"), "an unasked lookup never says safe");
+
+        ReputationResult querying;
+        querying.state = ReputationState::Querying;
+        ok(contains(reputationLine(querying), "Checking"),
+           "a running lookup says it is checking");
+
+        ReputationResult hit;
+        hit.state = ReputationState::Known;
+        ProviderVerdict verdict;
+        verdict.provider = "VirusTotal";
+        verdict.answered = true;
+        verdict.known = true;
+        verdict.malicious = 4;
+        verdict.total = 70;
+        hit.verdicts.push_back(verdict);
+        ok(reputationHasDetections(hit), "a detection is reported as such");
+
+        ReputationResult miss;
+        miss.state = ReputationState::Unknown;
+        ok(!reputationHasDetections(miss),
+           "no record is not a detection");
+
+        ReputationResult clean;
+        clean.state = ReputationState::Known;
+        ProviderVerdict zero;
+        zero.answered = true;
+        zero.known = true;
+        zero.malicious = 0;
+        zero.total = 70;
+        clean.verdicts.push_back(zero);
+        ok(!reputationHasDetections(clean),
+           "a zero-detection record is not a detection");
+    }
+
+    std::cout << "\nreputation checks=" << checks
+              << " failures=" << failures << '\n';
+
+    std::error_code ec;
+    std::filesystem::remove_all(scratchDir(), ec);
+    return failures ? 1 : 0;
+}

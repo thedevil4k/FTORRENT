@@ -1,6 +1,7 @@
 #include "SearchResultsWidget.h"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
+#include "ReputationService.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
 #include "TorrentItem.h"   // formatSize, used for the size column
@@ -102,7 +103,11 @@ SearchResultsWidget::SearchResultsWidget(int x, int y, int w, int h, const char*
     end();
 }
 
-SearchResultsWidget::~SearchResultsWidget() = default;
+SearchResultsWidget::~SearchResultsWidget() {
+    // A lookup started from this table may still be running; its completion
+    // must not touch rows that no longer exist.
+    if (m_alive) *m_alive = false;
+}
 
 std::string SearchResultsWidget::cacheKey(const SearchResult& r) {
     // The infohash is the one identifier two engines agree on, so the same
@@ -137,6 +142,95 @@ const SecurityReport& SearchResultsWidget::reportForRow(int row) {
 
     auto inserted = m_reports.emplace(key, SecurityAnalyzer::analyze(rf.files));
     return inserted.first->second;
+}
+
+bool SearchResultsWidget::shieldHit(int row, int x, int y) {
+    if (row < 0 || row >= rows()) return false;
+    int cellX = 0, cellY = 0, cellW = 0, cellH = 0;
+    if (!find_cell(CONTEXT_CELL, row, COL_NAME, cellX, cellY, cellW, cellH)) {
+        return false;
+    }
+    (void)cellW;
+    (void)cellH;
+    // Same 15 px box the shield is drawn in, in the top slice of the row.
+    constexpr int SHIELD = 15;
+    return x >= cellX + 5 && x <= cellX + 5 + SHIELD && y >= cellY &&
+           y <= cellY + SHIELD + 4;
+}
+
+void SearchResultsWidget::onShieldClicked(int row) {
+    const SearchResult* result = getResultAt(row);
+    if (!result) return;
+
+    const std::string key = cacheKey(*result);
+    const FileListService::Entry entry = filesForRow(row);
+    if (entry.state != FileListState::Loaded || entry.files.empty()) {
+        // No hashes yet. The click is the request for them: fetch the list and
+        // run the lookup the moment it lands. This is still one user action,
+        // not a background query.
+        m_reputationPending[key] = true;
+        requestFiles(row);
+        redraw();
+        return;
+    }
+    startReputationLookup(key, entry.files);
+}
+
+void SearchResultsWidget::startReputationLookup(
+    const std::string& key, const std::vector<TorrentFileEntry>& files) {
+    const ReputationTarget target = findReputationTarget(files);
+
+    if (!target.found()) {
+        m_reputation[key] = ReputationService::noHashResult();
+        forEachRow([&](int row, const SearchResult& r) {
+            if (cacheKey(r) == key) updateRowHeight(row);
+        });
+        redraw();
+        return;
+    }
+
+    ReputationService& service = sharedReputationService();
+    std::shared_ptr<bool> alive = m_alive;
+    SearchResultsWidget* self = this;
+    const ReputationService::Start start = service.request(
+        target.sha256, [self, alive, key](const ReputationResult& answer) {
+            if (!alive || !*alive) return;
+            self->m_reputation[key] = answer;
+            self->forEachRow([&](int row, const SearchResult& r) {
+                if (SearchResultsWidget::cacheKey(r) == key) {
+                    self->updateRowHeight(row);
+                }
+            });
+            self->redraw();
+        });
+
+    switch (start) {
+        case ReputationService::Start::Started:
+        case ReputationService::Start::AlreadyRunning: {
+            ReputationResult querying;
+            querying.state = ReputationState::Querying;
+            querying.sha256 = target.sha256;
+            m_reputation[key] = querying;
+            break;
+        }
+        case ReputationService::Start::Cached:
+            m_reputation[key] = service.find(target.sha256);
+            break;
+        case ReputationService::Start::Rejected: {
+            ReputationResult rejected;
+            rejected.state = ReputationState::Error;
+            rejected.sha256 = target.sha256;
+            rejected.message =
+                "Too many reputation checks are running. Try again in a moment.";
+            m_reputation[key] = rejected;
+            break;
+        }
+    }
+
+    forEachRow([&](int row, const SearchResult& r) {
+        if (cacheKey(r) == key) updateRowHeight(row);
+    });
+    redraw();
 }
 
 bool SearchResultsWidget::isExpanded(const std::string& key) const {
@@ -180,6 +274,18 @@ void SearchResultsWidget::requestFiles(int row) {
 void SearchResultsWidget::filesArrived(const std::string& key) {
     // The list changed, so the cached report for it is stale.
     m_reports.erase(key);
+
+    // A shield clicked before the list was known asked for this: now that the
+    // hashes are here, run it.
+    auto pending = m_reputationPending.find(key);
+    if (pending != m_reputationPending.end()) {
+        m_reputationPending.erase(pending);
+        const FileListService::Entry entry = m_files.find(key);
+        if (entry.state == FileListState::Loaded) {
+            startReputationLookup(key, entry.files);
+        }
+    }
+
     forEachRow([&](int row, const SearchResult& r) {
         if (cacheKey(r) == key) updateRowHeight(row);
     });
@@ -263,6 +369,8 @@ void SearchResultsWidget::clear() {
     m_files.clear();
     m_expanded.clear();
     m_reports.clear();
+    m_reputation.clear();
+    m_reputationPending.clear();
     rows(0);
     row_height_all(BASE_ROW_HEIGHT);
     redraw();
@@ -348,6 +456,8 @@ void SearchResultsWidget::updateRowHeight(int row) {
             lines = 1 + static_cast<int>(rf.files.size());
             const int maxFiles = MAX_SHOWN_FILES + 1;
             if (lines > 1 + maxFiles) lines = 1 + maxFiles;
+            // A reputation answer the user asked for gets its own line.
+            if (m_reputation.find(cacheKey(*r)) != m_reputation.end()) ++lines;
             break;
         }
         case FileListState::Loading:
@@ -432,6 +542,28 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         return;
     }
     if (rf.state == FileListState::NotRequested) return;
+
+    // Reputation, when the user asked for it, sits above the metadata summary:
+    // it is the answer to the question the shield click asked.
+    {
+        auto asked = m_reputation.find(cacheKey(*r));
+        if (asked != m_reputation.end()) {
+            const std::string line = elideToWidth(
+                reputationLine(asked->second), avail);
+            fl_color(reputationHasDetections(asked->second)
+                         ? SecurityBadge::riskColor(RiskLevel::Critical)
+                         : FL_FOREGROUND_COLOR);
+            fl_font(FL_HELVETICA, 11);
+            fl_draw(line.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                    FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+            int x2 = x + w - 6;
+            if (x2 < x + 24) x2 = x + 24;
+            fl_color(sepColor);
+            fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2,
+                    ly + FILE_LINE_HEIGHT - 1);
+            ly += FILE_LINE_HEIGHT;
+        }
+    }
 
     // Summary line first: the user expanded the row to see what is inside,
     // and the answer to "is any of this runnable?" belongs at the top.
@@ -612,6 +744,26 @@ void SearchResultsWidget::draw_cell(TableContext context, int row, int col,
 }
 
 int SearchResultsWidget::handle(int event) {
+    // A click on the shield asks about the torrent's hash. Handled here, before
+    // the table sees the event, so the click neither selects nor expands the
+    // row: it only asks the question the shield stands for.
+    if (event == FL_PUSH) {
+        int R = 0, C = 0;
+        ResizeFlag resizeFlag = RESIZE_NONE;
+        if (cursor2rowcol(R, C, resizeFlag) == CONTEXT_CELL && C == COL_NAME &&
+            shieldHit(R, Fl::event_x(), Fl::event_y())) {
+            m_shieldPressedRow = R;
+            return 1;
+        }
+    } else if (event == FL_RELEASE && m_shieldPressedRow >= 0) {
+        const int row = m_shieldPressedRow;
+        m_shieldPressedRow = -1;
+        if (shieldHit(row, Fl::event_x(), Fl::event_y())) {
+            onShieldClicked(row);
+            return 1;
+        }
+    }
+
     if (event == FL_MOUSEWHEEL) {
         int dy = Fl::event_dy();
         int dx = Fl::event_dx();

@@ -1,6 +1,7 @@
 #include "TorrentFileList.h"
 #include "HttpClient.h"
 #include "PathUtils.h"
+#include "SecurityHashes.h"
 
 #include <libtorrent/version.hpp>
 #include <libtorrent/load_torrent.hpp>
@@ -74,6 +75,9 @@ void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out
         if (e.symlink) {
             e.symlinkPath = fs.symlink(lt::file_index_t(i));
         }
+        // Only a v2/hybrid file that fits in one 16 KiB block carries a hash
+        // that is really the file's SHA-256; see SecurityHashes.
+        SecurityHashes::fillWholeFileHash(ti, fs, i, e);
         out.push_back(std::move(e));
     }
 }

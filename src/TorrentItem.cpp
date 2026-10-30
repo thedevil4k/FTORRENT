@@ -1,4 +1,5 @@
 #include "TorrentItem.h"
+#include "SecurityHashes.h"
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/version.hpp>
 #include <libtorrent/hex.hpp>
@@ -296,6 +297,10 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
         if (fi.symlink) {
             fi.symlinkPath = fs.symlink(lt::file_index_t(i));
         }
+        SecurityFile hashSource;
+        SecurityHashes::fillWholeFileHash(*info, fs, i, hashSource);
+        fi.sha256 = hashSource.sha256;
+        fi.sha256Complete = hashSource.sha256Complete;
         
         if (fi.size > 0 && i < (int)file_progress.size()) {
             fi.progress = (double)file_progress[i] / fi.size;
@@ -323,6 +328,8 @@ std::vector<SecurityFile> TorrentItem::getSecurityFiles() const {
         file.symlink = info.symlink;
         file.absolutePath = info.absolutePath;
         file.symlinkPath = info.symlinkPath;
+        file.sha256 = info.sha256;
+        file.sha256Complete = info.sha256Complete;
         result.push_back(std::move(file));
     }
     return result;

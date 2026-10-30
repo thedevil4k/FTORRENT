@@ -21,6 +21,12 @@
 #                   the metadata heuristics: file families, hostile names,
 #                   symlinks, torrent-level counts and the non-verdict wording
 #   security_badge  risk labels/palette, name sanitising and the rendered shield
+#   security_keys   the key store: round trip, removal and the stored bytes
+#   reputation      provider parsing, the service's states and wording, and the
+#                   exact no-hash sentence (fake providers, no network)
+#   archive_preflight
+#                   piece arithmetic and a real ZIP/RAR5 listing rebuilt from
+#                   only its first and last piece
 #
 # Sources are listed by hand rather than globbed, so adding a file is a decision
 # someone makes rather than something that happens.
@@ -64,6 +70,9 @@ ftorrent_add_test(icons icons.cpp)
 ftorrent_add_test(file_hash file_hash.cpp)
 ftorrent_add_test(security_analyzer security_analyzer.cpp)
 ftorrent_add_test(security_badge security_badge.cpp)
+ftorrent_add_test(security_keys security_keys.cpp)
+ftorrent_add_test(reputation reputation.cpp)
+ftorrent_add_test(archive_preflight archive_preflight.cpp)
 
 # The archive reader is optional, so its test is only built when the reader is.
 # FTORRENT_HAVE_LIBARCHIVE is set by the parent CMakeLists.txt and also reaches
@@ -103,9 +112,12 @@ add_test(NAME flows COMMAND flows)
 add_test(NAME file_hash COMMAND file_hash)
 add_test(NAME security_analyzer COMMAND security_analyzer)
 add_test(NAME security_badge COMMAND security_badge)
+add_test(NAME security_keys COMMAND security_keys)
+add_test(NAME reputation COMMAND reputation)
+add_test(NAME archive_preflight COMMAND archive_preflight)
 
 set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
-    security_analyzer security_badge)
+    security_analyzer security_badge security_keys reputation archive_preflight)
 if(FTORRENT_HAVE_LIBARCHIVE)
     add_test(NAME archive_inspector COMMAND archive_inspector)
     list(APPEND FTORRENT_TESTS archive_inspector)
@@ -126,7 +138,16 @@ set_tests_properties(toolbar_layout PROPERTIES TIMEOUT 300)
 # covers the end-to-end journeys that talk to search engines and trackers.
 set_tests_properties(toolbar_layout toolbar_clicks icons_full security_badge
     PROPERTIES LABELS "ui")
-set_tests_properties(file_hash security_analyzer PROPERTIES LABELS "unit")
+set_tests_properties(file_hash security_analyzer security_keys
+    PROPERTIES LABELS "unit")
+# reputation drives Fl::awake() delivery, so it needs the FLTK event loop even
+# though nothing is drawn and no network is touched.
+set_tests_properties(reputation PROPERTIES LABELS "ui")
+set_tests_properties(archive_preflight PROPERTIES LABELS "unit")
+if(FTORRENT_HAVE_LIBARCHIVE)
+    target_compile_definitions(archive_preflight PRIVATE
+        FTORRENT_ARCHIVE_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/archives")
+endif()
 set_tests_properties(flows PROPERTIES LABELS "network")
 if(FTORRENT_HAVE_LIBARCHIVE)
     set_tests_properties(archive_inspector PROPERTIES LABELS "unit")

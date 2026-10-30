@@ -10,6 +10,8 @@
 #include <FL/Fl_Box.H>
 #include "TorrentFileList.h"   // TorrentFileEntry, for pre-filling magnets
 #include "SecurityBadge.h"
+#include "SecurityReputation.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -81,6 +83,12 @@ private:
     Fl_Box* m_securitySummary;
     Fl_Box* m_securityDetail;
     Fl_Box* m_securityHint;
+    Fl_Box* m_reputationLabel;
+    Fl_Button* m_checkArchive;
+    // Result of the last extra check, whichever ran last. Both are explicit
+    // user actions and share one line so the dialog stays compact.
+    std::string m_checkLine;
+    bool m_archiveRunning = false;
     
     // Buttons
     Fl_Button* m_okButton;
@@ -101,6 +109,13 @@ private:
     std::vector<TorrentFileEntry> m_files;
     int m_totalFileCount = 0;
     SecurityReport m_selectedReport;
+    // Reputation of the hash the user asked about. Never starts on its own:
+    // only a click on the shield runs checkReputation().
+    ReputationResult m_reputation;
+    std::string m_reputationSha;
+    // Cleared in the destructor so a lookup that lands later cannot touch a
+    // dialog that is already gone.
+    std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
     
     // UI Creation
     void createUI();
@@ -127,6 +142,11 @@ private:
     void showFiles(const std::vector<TorrentFileEntry>& files, int totalFileCount);
     std::vector<TorrentFileEntry> selectedFiles() const;
     void updateSecurityPanel();
+    void checkReputation();
+    void refreshReputationLabel();
+    void checkArchive();
+    static void onCheckArchive(Fl_Widget* w, void* data);
+    static void deliverArchiveCheck(void* data);
     bool confirmRiskySelection();
     std::string fileRowLabel(const TorrentFileEntry& file) const;
     // Shows or hides the green dot, following the same precedence validate()

@@ -138,34 +138,38 @@ bool ArchiveInspector::isExecutableName(const std::string& path)
     return extensionLower(path) == ".exe";
 }
 
-ArchiveInspector::Listing ArchiveInspector::listExecutables(
-    const std::string& archivePath,
-    const std::atomic<bool>* cancelled)
+// Shared body of both listings. 'executablesOnly' keeps the old behaviour of
+// listExecutables; the pre-download check wants every name and passes false.
+bool ArchiveInspector::readEntries(const std::string& archivePath,
+                                   bool executablesOnly,
+                                   std::vector<Entry>& out, std::string& error,
+                                   const std::atomic<bool>* cancelled)
 {
-    Listing result;
-
 #ifndef FTORRENT_HAVE_LIBARCHIVE
     (void)archivePath;
+    (void)executablesOnly;
+    (void)out;
     (void)cancelled;
-    result.error = "archive support is not available in this build";
-    return result;
+    error = "archive support is not available in this build";
+    return false;
 #else
+    out.clear();
     if (archivePath.empty()) {
-        result.error = "empty archive path";
-        return result;
+        error = "empty archive path";
+        return false;
     }
     if (cancelled && cancelled->load()) {
-        result.error = "cancelled";
-        return result;
+        error = "cancelled";
+        return false;
     }
 
     ArchivePtr archive(archive_read_new());
     if (!archive) {
-        result.error = "could not create the archive reader";
-        return result;
+        error = "could not create the archive reader";
+        return false;
     }
-    if (!openArchive(archive.get(), archivePath, result.error)) {
-        return result;
+    if (!openArchive(archive.get(), archivePath, error)) {
+        return false;
     }
 
     archive_entry* entry = nullptr;
@@ -176,49 +180,75 @@ ArchiveInspector::Listing ArchiveInspector::listExecutables(
         ++entryIndex;
 
         if (cancelled && cancelled->load()) {
-            result.error = "cancelled";
+            error = "cancelled";
             break;
         }
         if (entryIndex > MAX_ENTRIES) {
-            result.error = "archive has too many entries";
+            error = "archive has too many entries";
             break;
         }
 
         if (isRegularFileEntry(entry)) {
             const std::string name = entryName(entry);
-            if (!name.empty() && isExecutableName(name)) {
-                Entry executable;
-                executable.index = entryIndex;
-                executable.path = name;
+            if (!name.empty() &&
+                (!executablesOnly || isExecutableName(name))) {
+                Entry found;
+                found.index = entryIndex;
+                found.path = name;
 
                 const la_int64_t size = archive_entry_size(entry);
                 if (archive_entry_size_is_set(entry) && size >= 0) {
-                    executable.size = static_cast<std::uint64_t>(size);
-                    executable.sizeKnown = true;
+                    found.size = static_cast<std::uint64_t>(size);
+                    found.sizeKnown = true;
                 }
-                executable.encrypted = isEncrypted(entry);
-                result.executables.push_back(std::move(executable));
+                found.encrypted = isEncrypted(entry);
+                out.push_back(std::move(found));
 
-                if (result.executables.size() > MAX_EXECUTABLES) {
-                    result.error = "archive has too many .exe files";
+                if (executablesOnly && out.size() > MAX_EXECUTABLES) {
+                    error = "archive has too many .exe files";
                     break;
                 }
             }
         }
 
         if (archive_read_data_skip(archive.get()) != ARCHIVE_OK) {
-            result.error = archiveError(archive.get(), "could not skip archive data");
+            error = archiveError(archive.get(), "could not skip archive data");
             break;
         }
     }
 
-    if (result.error.empty() && status != ARCHIVE_EOF) {
-        result.error = archiveError(archive.get(), "could not read archive");
+    if (error.empty() && status != ARCHIVE_EOF) {
+        error = archiveError(archive.get(), "could not read archive");
     }
 
-    result.ok = result.error.empty();
-    return result;
+    return error.empty();
 #endif
+}
+
+ArchiveInspector::Listing ArchiveInspector::listExecutables(
+    const std::string& archivePath,
+    const std::atomic<bool>* cancelled)
+{
+    Listing result;
+    if (!readEntries(archivePath, true, result.executables, result.error,
+                     cancelled)) {
+        return result;
+    }
+    result.ok = true;
+    return result;
+}
+
+ArchiveInspector::ListingAll ArchiveInspector::listEntries(
+    const std::string& archivePath,
+    const std::atomic<bool>* cancelled)
+{
+    ListingAll result;
+    if (!readEntries(archivePath, false, result.entries, result.error,
+                     cancelled)) {
+        return result;
+    }
+    result.ok = true;
+    return result;
 }
 
 bool ArchiveInspector::hashExecutable(const std::string& archivePath,

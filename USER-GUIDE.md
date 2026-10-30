@@ -70,6 +70,20 @@ The analysis reads names and the metadata libtorrent already carries: size, hidd
 
 A clean report means **no known indicators**, not that the file is safe: a name cannot prove what a program does. Treat the shield as a warning system, not a guarantee. The former post-download **Open in VirusTotal** and **Inspect Archive** actions remain retired.
 
+### Reputation by hash
+
+Click the shield to ask **VirusTotal** and **MalwareBazaar** about a file's SHA-256. Nothing is sent before that click, and only the hash travels: no file, no name, no torrent.
+
+- If the torrent metadata carries the whole-file SHA-256 (BitTorrent v2), the answer appears in the search row, the Add Torrent panel or the Details **Security** tab.
+- If it does not, FTorrent says exactly `VT no disponible antes de descargar el archivo completo.` It will not download the file just to compute the hash.
+- A record with no detections is reported as such, and is not a guarantee.
+
+To use VirusTotal, open **Preferences ▸ Security** and paste an API key (64 hexadecimal characters). The key is stored with Windows DPAPI, or in a file only your user can read on Linux; it is never written to `settings.ini`. MalwareBazaar needs no key. Without a VirusTotal key, that provider is skipped and MalwareBazaar is still asked.
+
+### Looking inside a RAR or ZIP
+
+Select an archive in **Add Torrent** and press **Check archive**. FTorrent fetches only the first and the last piece of the archive, reads its index, and reports how many entries it lists and whether any of them can run. ZIP keeps its index at the end and RAR5 at both ends, so that is enough to see what is inside without downloading the archive. The pieces go to a temporary folder under the config directory and are deleted as soon as the list is read: nothing is written to your download folder. If the archive's index cannot be read from its two ends, FTorrent says so instead of guessing.
+
 ## ❓ Frequently Asked Questions
 
 **Where are my files saved?**

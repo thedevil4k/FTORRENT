@@ -1,6 +1,8 @@
 #include "TorrentDetailsDialog.h"
+#include "ReputationService.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
+#include "SecurityReputation.h"
 #include <FL/Fl.H>
 #include <algorithm>
 #include <iomanip>
@@ -39,6 +41,7 @@ TorrentDetailsDialog::TorrentDetailsDialog(TorrentItem* torrent)
 
 TorrentDetailsDialog::~TorrentDetailsDialog() {
     Fl::remove_timeout(updateTimerCallback, this);
+    if (m_alive) *m_alive = false;
     
     delete m_trackersBuffer;
     delete m_peersBuffer;
@@ -58,6 +61,7 @@ void TorrentDetailsDialog::createGeneralTab() {
     m_generalShield = new SecurityShieldBox(20, y + 2, 16, 16);
     m_generalShield->setRisk(RiskLevel::Unknown,
         "No file list available. Metadata risk is unknown.");
+    m_generalShield->onClick([this]() { checkReputation(); });
 
     m_nameLabel = new Fl_Box(42, y, 538, label_h);
     m_nameLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -156,6 +160,7 @@ void TorrentDetailsDialog::createSecurityTab() {
     m_securityShield = new SecurityShieldBox(20, 50, 24, 24);
     m_securityShield->setRisk(RiskLevel::Unknown,
         "No file list available. Metadata risk is unknown.");
+    m_securityShield->onClick([this]() { checkReputation(); });
 
     m_securitySummary = new Fl_Box(54, 50, 526, 24);
     m_securitySummary->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -294,12 +299,20 @@ void TorrentDetailsDialog::updateSecurity() {
 
     // The file list of a torrent does not change, so one successful analysis
     // is final. While a magnet is still fetching metadata, retry on the next
-    // two-second tick instead of caching "unknown" forever.
-    if (m_securityLoaded) return;
+    // two-second tick instead of caching "unknown" forever. The reputation
+    // section below is rebuilt every time, because it changes on its own.
+    if (!m_securityLoaded) {
+        const std::vector<SecurityFile> files = m_torrent->getSecurityFiles();
+        m_securityReport = SecurityAnalyzer::analyze(files);
+        if (!files.empty()) m_securityLoaded = true;
 
-    const std::vector<SecurityFile> files = m_torrent->getSecurityFiles();
-    m_securityReport = SecurityAnalyzer::analyze(files);
-    if (!files.empty()) m_securityLoaded = true;
+        // A different set of hashes means the previous answer is stale.
+        const ReputationTarget target = findReputationTarget(files);
+        if (target.sha256 != m_reputationSha) {
+            m_reputationSha = target.sha256;
+            m_reputation = ReputationResult{};
+        }
+    }
 
     const RiskLevel level = m_securityReport.level;
     const Fl_Color color = SecurityBadge::riskColor(level);
@@ -307,8 +320,12 @@ void TorrentDetailsDialog::updateSecurity() {
         SecurityBadge::riskLabel(level) + "  -  " + m_securityReport.summary;
     const std::string shown = SecurityBadge::displayText(summary);
 
-    m_generalShield->setRisk(level, shown);
-    m_securityShield->setRisk(level, shown);
+    // The tooltip carries the metadata verdict and, once the user asked, the
+    // reputation answer. The shield is what starts that request.
+    const std::string tooltip =
+        shown + "\n" + SecurityBadge::displayText(reputationLine(m_reputation));
+    m_generalShield->setRisk(level, tooltip);
+    m_securityShield->setRisk(level, tooltip);
     m_securitySummary->copy_label(shown.c_str());
     m_securitySummary->labelcolor(color);
     if (m_generalSecuritySummary) {
@@ -351,7 +368,55 @@ void TorrentDetailsDialog::updateSecurity() {
         }
     }
 
+    out << "\nReputation\n  "
+        << SecurityBadge::displayText(reputationLine(m_reputation)) << "\n";
+
     m_securityBuffer->text(out.str().c_str());
+}
+
+void TorrentDetailsDialog::checkReputation() {
+    const std::vector<SecurityFile> files = m_torrent->getSecurityFiles();
+    const ReputationTarget target = findReputationTarget(files);
+
+    if (!target.found()) {
+        // No whole-file hash in the metadata: the exact required sentence,
+        // instead of a check that would have to download the file first.
+        m_reputationSha.clear();
+        m_reputation = ReputationService::noHashResult();
+        updateSecurity();
+        return;
+    }
+
+    ReputationService& service = sharedReputationService();
+    std::shared_ptr<bool> alive = m_alive;
+    TorrentDetailsDialog* self = this;
+    const ReputationService::Start start = service.request(
+        target.sha256, [self, alive](const ReputationResult& result) {
+            if (!alive || !*alive) return;
+            self->m_reputation = result;
+            self->updateSecurity();
+        });
+
+    m_reputationSha = target.sha256;
+    switch (start) {
+        case ReputationService::Start::Started:
+        case ReputationService::Start::AlreadyRunning:
+            m_reputation = ReputationResult{};
+            m_reputation.state = ReputationState::Querying;
+            m_reputation.sha256 = target.sha256;
+            break;
+        case ReputationService::Start::Cached:
+            m_reputation = service.find(target.sha256);
+            break;
+        case ReputationService::Start::Rejected:
+            m_reputation = ReputationResult{};
+            m_reputation.state = ReputationState::Error;
+            m_reputation.sha256 = target.sha256;
+            m_reputation.message =
+                "Too many reputation checks are running. Try again in a moment.";
+            break;
+    }
+    updateSecurity();
 }
 
 void TorrentDetailsDialog::updateFiles() {
@@ -449,6 +514,11 @@ void TorrentDetailsDialog::updateFiles() {
 
 std::string TorrentDetailsDialog::formatLabel(const std::string& label, const std::string& value) {
     return label + ": " + value;
+}
+
+void TorrentDetailsDialog::showSecurityAndCheck() {
+    if (m_tabs && m_securityTab) m_tabs->value(m_securityTab);
+    checkReputation();
 }
 
 void TorrentDetailsDialog::show_modal() {

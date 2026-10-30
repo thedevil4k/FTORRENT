@@ -1,6 +1,7 @@
 #include "SecurityBadge.h"
 
 #include <FL/Fl.H>
+#include <FL/Fl_Window.H>
 #include <FL/fl_draw.H>
 
 #include <algorithm>
@@ -178,4 +179,30 @@ void SecurityShieldBox::setRisk(RiskLevel level, const std::string& tooltip) {
 
 void SecurityShieldBox::draw() {
     SecurityBadge::drawShield(x() + 1, y() + 1, w() - 2, h() - 2, m_level);
+}
+
+int SecurityShieldBox::handle(int event) {
+    if (!m_onClick) return Fl_Box::handle(event);
+
+    switch (event) {
+        case FL_PUSH:
+            // Claimed so the click does not fall through to the label beside
+            // the shield, which would look like the whole row reacted.
+            return 1;
+        case FL_RELEASE:
+            if (Fl::event_inside(this)) {
+                m_onClick();
+                return 1;
+            }
+            return 0;
+        case FL_ENTER:
+            if (window()) window()->cursor(FL_CURSOR_HAND);
+            return 1;
+        case FL_LEAVE:
+            if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+            return 1;
+        default:
+            break;
+    }
+    return Fl_Box::handle(event);
 }

@@ -4,8 +4,10 @@
 #include <FL/Fl_Table_Row.H>
 #include "SearchEngine.h"
 #include "FileListService.h"
+#include "SecurityReputation.h"
 #include "SecurityTypes.h"
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -110,6 +112,21 @@ private:
     // is kept until the list changes.
     std::unordered_map<std::string, SecurityReport> m_reports;
     const SecurityReport& reportForRow(int row);
+
+    // Reputation the user asked for by clicking a shield. Never filled in on
+    // its own: a lookup exists only after that click. Keyed like m_reports.
+    std::unordered_map<std::string, ReputationResult> m_reputation;
+    // Rows whose shield was clicked before their file list was known. The
+    // lookup runs as soon as Level 1 lands, because the click was the request.
+    std::unordered_map<std::string, bool> m_reputationPending;
+    // Cleared in the destructor: a lookup can outlive this table.
+    std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
+
+    int m_shieldPressedRow = -1;
+    bool shieldHit(int row, int x, int y);
+    void onShieldClicked(int row);
+    void startReputationLookup(const std::string& key,
+                               const std::vector<TorrentFileEntry>& files);
 
     // Cache key for a result: infohash, else the .torrent URL, else the row.
     static std::string cacheKey(const SearchResult& r);

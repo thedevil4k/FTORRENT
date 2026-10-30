@@ -6,7 +6,9 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 
+#include <functional>
 #include <string>
+#include <utility>
 
 /**
  * @brief Drawing and display text for the security shield.
@@ -56,10 +58,19 @@ public:
     void setRisk(RiskLevel level, const std::string& tooltip = {});
     RiskLevel risk() const { return m_level; }
 
+    // The shield is the only control that starts a reputation lookup. Without
+    // a handler it stays a plain badge and ignores clicks, so a surface that
+    // has nowhere to show an answer cannot start a request by accident.
+    void onClick(std::function<void()> handler) {
+        m_onClick = std::move(handler);
+    }
+
     void draw() override;
+    int handle(int event) override;
 
 private:
     RiskLevel m_level = RiskLevel::Unknown;
+    std::function<void()> m_onClick;
 };
 
 #endif // SECURITYBADGE_H

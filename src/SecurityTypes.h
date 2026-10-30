@@ -39,6 +39,14 @@ struct SecurityFile {
     bool symlink = false;
     bool absolutePath = false;
     std::string symlinkPath;  // Target when symlink is true
+    // Whole-file SHA-256, lowercase hex, when the metadata itself carries it.
+    // A BitTorrent v2 pieces root is the SHA-256 of the file only when the file
+    // is a single 16 KiB block; for anything larger it is a Merkle root and
+    // must never be sent to a reputation provider as a file hash.
+    std::string sha256;
+    // True when the hash above is the whole file (not a partial or derived
+    // value). Only then may a provider be asked about it.
+    bool sha256Complete = false;
 };
 
 enum class FindingCode {
@@ -99,5 +107,46 @@ struct SecurityReport {
 
     bool hasFileList() const { return files > 0; }
 };
+
+/**
+ * @brief Where a reputation lookup stands.
+ *
+ * NoCompleteHash is the normal answer before a download and is not an error:
+ * the torrent metadata simply does not carry the whole-file SHA-256, and
+ * FTorrent refuses to download the file just to compute one.
+ */
+enum class ReputationState {
+    NotRequested = 0,
+    NoCompleteHash,
+    Querying,
+    Known,
+    Unknown,
+    NoKey,
+    Error
+};
+
+struct ProviderVerdict {
+    std::string provider;     // "VirusTotal", "MalwareBazaar"
+    bool answered = false;    // The provider gave a usable answer
+    bool known = false;       // It has a record for this hash
+    bool needsKey = false;    // Not asked: no API key is configured
+    int malicious = 0;
+    int suspicious = 0;
+    int total = 0;            // Engines reporting, 0 when the provider has none
+    std::string summary;      // One line, safe to show as-is
+};
+
+struct ReputationResult {
+    ReputationState state = ReputationState::NotRequested;
+    std::string sha256;       // Lowercase hex, empty when unavailable
+    std::vector<ProviderVerdict> verdicts;
+    std::string message;      // Ready to display; never says "safe"
+};
+
+// The exact wording the product requires when there is no whole-file hash
+// before the download. Kept here so every surface shows the same sentence.
+inline const char* reputationNoHashMessage() {
+    return "VT no disponible antes de descargar el archivo completo.";
+}
 
 #endif // SECURITYTYPES_H

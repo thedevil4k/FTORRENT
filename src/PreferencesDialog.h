@@ -8,6 +8,8 @@
 #include <FL/Fl_Int_Input.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Box.H>
+#include <FL/Fl_Secret_Input.H>
 
 /**
  * @brief Diálogo de preferencias/configuración de FLTorrent
@@ -59,6 +61,14 @@ private:
     Fl_Group* m_advancedTab;
     Fl_Input* m_userAgent;
     Fl_Check_Button* m_anonymousMode;
+
+    // Security tab widgets. The key is stored through SecurityKeys (DPAPI on
+    // Windows, a 0600 file on Linux), never in settings.ini.
+    Fl_Group* m_securityTab;
+    Fl_Secret_Input* m_virusTotalKey;
+    Fl_Button* m_saveKey;
+    Fl_Button* m_clearKey;
+    Fl_Box* m_keyStatus;
     
     // Buttons
     Fl_Button* m_okButton;
@@ -73,7 +83,14 @@ private:
     void createConnectionTab();
     void createBitTorrentTab();
     void createAdvancedTab();
+    void createSecurityTab();
     void createButtons();
+
+    // Security tab
+    void loadKeyIntoField();
+    void refreshKeyStatus();
+    static void onSaveKey(Fl_Widget* w, void* data);
+    static void onClearKey(Fl_Widget* w, void* data);
     
     // Load/Save
     void loadSettings();

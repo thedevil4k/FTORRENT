@@ -568,6 +568,29 @@ int TorrentListWidget::handle(int event) {
     }
     // ─────────────────────────────────────────────────────────────────────
 
+    // A click on the shield asks about the torrent's hash. It is checked
+    // before the table sees the event, so the click does not also change the
+    // selection or start a drag.
+    if (event == FL_PUSH) {
+        int R = 0, C = 0;
+        ResizeFlag resizeFlag = RESIZE_NONE;
+        if (cursor2rowcol(R, C, resizeFlag) == CONTEXT_CELL && C == COL_NAME &&
+            shieldHit(R, Fl::event_x(), Fl::event_y())) {
+            m_shieldPressedRow = R;
+            return 1;
+        }
+    } else if (event == FL_RELEASE && m_shieldPressedRow >= 0) {
+        const int row = m_shieldPressedRow;
+        m_shieldPressedRow = -1;
+        if (shieldHit(row, Fl::event_x(), Fl::event_y())) {
+            TorrentItem* torrent = getTorrentAt(row);
+            if (torrent) {
+                openSecurityReport(torrent);
+                return 1;
+            }
+        }
+    }
+
 int result = Fl_Table_Row::handle(event);
 
     // Handle column header clicks for sorting
@@ -625,6 +648,27 @@ int result = Fl_Table_Row::handle(event);
 
 void TorrentListWidget::showDetailsDialog(TorrentItem* torrent) {
     TorrentDetailsDialog* dlg = new TorrentDetailsDialog(torrent);
+    dlg->show_modal();
+    delete dlg;
+}
+
+bool TorrentListWidget::shieldHit(int row, int x, int y) {
+    if (row < 0 || row >= rows()) return false;
+    int cellX = 0, cellY = 0, cellW = 0, cellH = 0;
+    if (!find_cell(CONTEXT_CELL, row, COL_NAME, cellX, cellY, cellW, cellH)) {
+        return false;
+    }
+    (void)cellW;
+    (void)cellH;
+    // Same 15 px box the shield is drawn in, plus its small left margin.
+    constexpr int SHIELD = 15;
+    return x >= cellX + 5 && x <= cellX + 5 + SHIELD && y >= cellY &&
+           y <= cellY + SHIELD + 4;
+}
+
+void TorrentListWidget::openSecurityReport(TorrentItem* torrent) {
+    TorrentDetailsDialog* dlg = new TorrentDetailsDialog(torrent);
+    dlg->showSecurityAndCheck();
     dlg->show_modal();
     delete dlg;
 }

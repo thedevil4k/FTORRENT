@@ -2,6 +2,10 @@
 #include "SettingsManager.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
+#include "SecurityReputation.h"
+#include "ReputationService.h"
+#include "ArchivePreflight.h"
+#include "ArchiveInspector.h"
 #include "TorrentItem.h"   // formatSize
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
@@ -13,11 +17,21 @@
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/file_storage.hpp>
 #include <algorithm>
+#include <atomic>
+#include <thread>
 #include <iomanip>
 #include <filesystem>
 #include <FL/fl_draw.H>
 
 namespace {
+
+// Carried from the archive worker to the UI thread. The dialog pointer is only
+// used after checking 'alive', which the dialog clears in its destructor.
+struct ArchiveCheckDelivery {
+    AddTorrentDialog* dialog = nullptr;
+    std::shared_ptr<bool> alive;
+    std::string message;
+};
 
 // The green dot that sits at the right end of the magnet field. Drawn rather
 // than imaged, so it needs no asset and no theme lookup.
@@ -35,7 +49,7 @@ public:
 } // namespace
 
 AddTorrentDialog::AddTorrentDialog()
-    : Fl_Window(500, 650, "Add Torrent")
+    : Fl_Window(500, 690, "Add Torrent")
     , m_okClicked(false)
 {
     m_startImmediatelyResult = true;
@@ -51,6 +65,9 @@ AddTorrentDialog::AddTorrentDialog()
 }
 
 AddTorrentDialog::~AddTorrentDialog() {
+    // A lookup started from this dialog may still be in flight. Saying so here
+    // keeps its completion from touching widgets that no longer exist.
+    if (m_alive) *m_alive = false;
 }
 
 void AddTorrentDialog::createUI() {
@@ -118,13 +135,15 @@ void AddTorrentDialog::createUI() {
     y += 160;
 
     // --- Security panel ---
-    m_securityPanel = new Fl_Box(20, y, 460, 112);
+    m_securityPanel = new Fl_Box(20, y, 460, 150);
     m_securityPanel->box(FL_THIN_DOWN_BOX);
     m_securityPanel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
     m_securityShield = new SecurityShieldBox(30, y + 10, 20, 20);
     m_securityShield->setRisk(RiskLevel::Unknown,
         "No file list is available yet.");
+    // The shield is the only thing that starts a reputation lookup.
+    m_securityShield->onClick([this]() { checkReputation(); });
 
     m_securitySummary = new Fl_Box(56, y + 7, 412, 20);
     m_securitySummary->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -140,15 +159,31 @@ void AddTorrentDialog::createUI() {
     m_securityHint->labelsize(10);
     m_securityHint->labelcolor(fl_rgb_color(140, 140, 140));
 
-    m_selectNonExecutables = new Fl_Button(30, y + 80, 220, 26,
+    m_selectNonExecutables = new Fl_Button(30, y + 78, 220, 26,
         "Select only non-executables");
     m_selectNonExecutables->callback(onSelectNonExecutables, this);
     m_selectNonExecutables->tooltip(
         "Uncheck files that run code: executables, scripts, shortcuts and macros");
+
+    // Reputation lives below the metadata analysis: it is a second, explicit
+    // step, and it says why it cannot run when there is no whole-file hash.
+    m_reputationLabel = new Fl_Box(30, y + 108, 440, 34);
+    m_reputationLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
+    m_reputationLabel->labelsize(11);
+    m_reputationLabel->copy_label(reputationLine(ReputationResult{}).c_str());
+
+    // Second explicit check: read a RAR/ZIP's index from its first and last
+    // piece. Disabled until there is an archive in the selection.
+    m_checkArchive = new Fl_Button(260, y + 78, 200, 26, "Check archive");
+    m_checkArchive->callback(onCheckArchive, this);
+    m_checkArchive->tooltip(
+        "Downloads only the first and last piece of the archive to list what "
+        "is inside. Saved to a temporary folder and deleted afterwards.");
+    m_checkArchive->deactivate();
 }
 
 void AddTorrentDialog::createButtons() {
-    int btn_y = 605;
+    int btn_y = 645;
     int btn_w = 80;
     int btn_h = 30;
     
@@ -417,6 +452,10 @@ void AddTorrentDialog::showFiles(const std::vector<TorrentFileEntry>& files,
 
     m_fileBrowser->clear();
     m_files.clear();
+    // A new list means new hashes; any answer from the old one is stale.
+    m_reputation = ReputationResult{};
+    m_reputationSha.clear();
+    m_checkLine.clear();
     m_files.reserve(files.size());
     for (const TorrentFileEntry& file : files) {
         if (file.padFile) continue;
@@ -463,6 +502,16 @@ void AddTorrentDialog::updateSecurityPanel() {
 
     const std::vector<TorrentFileEntry> selected = selectedFiles();
     m_selectedReport = SecurityAnalyzer::analyze(selected);
+
+    // A reputation answer belongs to one hash. When the selection changes the
+    // hash, the old answer is forgotten rather than shown against another file.
+    {
+        const ReputationTarget target = findReputationTarget(selected);
+        if (target.sha256 != m_reputationSha) {
+            m_reputationSha = target.sha256;
+            m_reputation = ReputationResult{};
+        }
+    }
 
     // An empty report means either "no metadata at all" or "the user
     // unchecked everything". They are different situations and should not
@@ -526,6 +575,173 @@ void AddTorrentDialog::updateSecurityPanel() {
         if (hasList) m_selectNonExecutables->activate();
         else m_selectNonExecutables->deactivate();
     }
+
+    if (m_checkArchive) {
+        const bool hasArchive =
+            std::any_of(selected.begin(), selected.end(),
+                        [](const TorrentFileEntry& file) {
+                            return ArchiveInspector::isArchivePath(file.path);
+                        });
+        if (hasArchive && !m_archiveRunning) m_checkArchive->activate();
+        else m_checkArchive->deactivate();
+    }
+
+    refreshReputationLabel();
+}
+
+void AddTorrentDialog::onCheckArchive(Fl_Widget* w, void* data) {
+    (void)w;
+    AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
+    if (dlg) dlg->checkArchive();
+}
+
+void AddTorrentDialog::checkArchive() {
+    if (m_archiveRunning) return;
+
+    // The first archive in the selection, so the answer names one file.
+    const std::vector<TorrentFileEntry> selected = selectedFiles();
+    const TorrentFileEntry* archive = nullptr;
+    for (const TorrentFileEntry& file : selected) {
+        if (ArchiveInspector::isArchivePath(file.path)) {
+            archive = &file;
+            break;
+        }
+    }
+    if (!archive) {
+        m_checkLine = "Archive: select a RAR or ZIP first.";
+        refreshReputationLabel();
+        return;
+    }
+
+    const std::string torrentPath =
+        m_filePathInput && m_filePathInput->value() ? m_filePathInput->value() : "";
+    const std::string magnet =
+        m_magnetInput && m_magnetInput->value() ? m_magnetInput->value() : "";
+    if (torrentPath.empty() && magnet.empty()) {
+        m_checkLine = "Archive: open a .torrent file or a magnet first.";
+        refreshReputationLabel();
+        return;
+    }
+
+    m_archiveRunning = true;
+    m_checkArchive->deactivate();
+    m_checkLine = "Archive: reading the first and last piece...";
+    refreshReputationLabel();
+
+    const int index = archive->fileIndex;
+    const std::string path = archive->path;
+    std::shared_ptr<bool> alive = m_alive;
+    std::thread([this, alive, index, path, torrentPath, magnet]() {
+        std::vector<SecurityFile> entries;
+        std::string error;
+        std::atomic<bool> cancelled{false};
+        const bool ok = ArchivePreflight::inspect(magnet, torrentPath, index,
+                                                  entries, error, &cancelled);
+
+        ArchiveCheckDelivery* delivery = new ArchiveCheckDelivery;
+        delivery->dialog = this;
+        delivery->alive = alive;
+        if (!ok) {
+            delivery->message =
+                "Archive: the index could not be read (" + error + ").";
+        } else {
+            const SecurityReport report = SecurityAnalyzer::analyze(entries);
+            std::string message = "Archive " + SecurityBadge::displayText(path) +
+                                  ": " + std::to_string(entries.size()) +
+                                  " entries, ";
+            if (report.executables > 0 || report.scripts > 0) {
+                message += std::to_string(report.executables) +
+                           " executable(s) and " +
+                           std::to_string(report.scripts) + " script(s). " +
+                           "Review before downloading.";
+            } else {
+                message += "no known indicators in their names.";
+            }
+            delivery->message = message;
+        }
+        Fl::awake(&AddTorrentDialog::deliverArchiveCheck, delivery);
+    }).detach();
+}
+
+void AddTorrentDialog::deliverArchiveCheck(void* data) {
+    auto* delivery = static_cast<ArchiveCheckDelivery*>(data);
+    if (!delivery) return;
+    AddTorrentDialog* dialog = delivery->dialog;
+    const bool alive = delivery->alive && *delivery->alive;
+    const std::string message = delivery->message;
+    delete delivery;
+
+    if (!alive || !dialog) return;
+    dialog->m_archiveRunning = false;
+    dialog->m_checkLine = message;
+    dialog->refreshReputationLabel();
+    dialog->updateSecurityPanel();
+}
+
+void AddTorrentDialog::checkReputation() {
+    const std::vector<TorrentFileEntry> selected = selectedFiles();
+    const ReputationTarget target = findReputationTarget(selected);
+
+    if (!target.found()) {
+        // No whole-file SHA-256 anywhere in the metadata: say so, exactly as
+        // the product requires, instead of offering a check that cannot run.
+        m_reputationSha.clear();
+        m_reputation = ReputationService::noHashResult();
+        refreshReputationLabel();
+        return;
+    }
+
+    ReputationService& service = sharedReputationService();
+    std::shared_ptr<bool> alive = m_alive;
+    AddTorrentDialog* self = this;
+    const ReputationService::Start start = service.request(
+        target.sha256, [self, alive](const ReputationResult& result) {
+            if (!alive || !*alive) return;
+            self->m_reputation = result;
+            self->refreshReputationLabel();
+        });
+
+    m_reputationSha = target.sha256;
+    switch (start) {
+        case ReputationService::Start::Started:
+        case ReputationService::Start::AlreadyRunning:
+            m_reputation = ReputationResult{};
+            m_reputation.state = ReputationState::Querying;
+            m_reputation.sha256 = target.sha256;
+            break;
+        case ReputationService::Start::Cached:
+            m_reputation = service.find(target.sha256);
+            break;
+        case ReputationService::Start::Rejected:
+            m_reputation = ReputationResult{};
+            m_reputation.state = ReputationState::Error;
+            m_reputation.sha256 = target.sha256;
+            m_reputation.message =
+                "Too many reputation checks are running. Try again in a moment.";
+            break;
+    }
+    refreshReputationLabel();
+}
+
+void AddTorrentDialog::refreshReputationLabel() {
+    if (!m_reputationLabel) return;
+
+    // Whichever explicit check ran last owns the line. Both say what they found
+    // and neither calls anything safe.
+    const std::string line =
+        m_checkLine.empty() ? reputationLine(m_reputation) : m_checkLine;
+    m_reputationLabel->copy_label(line.c_str());
+    if (reputationHasDetections(m_reputation)) {
+        m_reputationLabel->labelcolor(
+            SecurityBadge::riskColor(RiskLevel::Critical));
+    } else if (m_reputation.state == ReputationState::Querying ||
+               m_archiveRunning) {
+        m_reputationLabel->labelcolor(
+            SecurityBadge::riskColor(RiskLevel::Medium));
+    } else {
+        m_reputationLabel->labelcolor(fl_rgb_color(110, 110, 110));
+    }
+    m_reputationLabel->redraw();
 }
 
 void AddTorrentDialog::onFileSelectionChanged(Fl_Widget* w, void* data) {

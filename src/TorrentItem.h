@@ -98,6 +98,9 @@ public:
         bool symlink = false;
         bool absolutePath = false;
         std::string symlinkPath;
+        // Whole-file SHA-256 from v2 metadata, when the metadata carries one.
+        std::string sha256;
+        bool sha256Complete = false;
     };
 
     std::vector<TrackerInfo> getTrackers() const;

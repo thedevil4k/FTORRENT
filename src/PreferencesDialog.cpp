@@ -1,5 +1,7 @@
 #include "PreferencesDialog.h"
 #include "SettingsManager.h"
+#include "SecurityKeys.h"
+#include "Reputation.h"
 #include <FL/Fl.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/fl_ask.H>
@@ -20,6 +22,7 @@ PreferencesDialog::PreferencesDialog()
     createConnectionTab();
     createBitTorrentTab();
     createAdvancedTab();
+    createSecurityTab();
     
     m_tabs->end();
     
@@ -169,6 +172,99 @@ void PreferencesDialog::createAdvancedTab() {
     m_advancedTab->end();
 }
 
+void PreferencesDialog::createSecurityTab() {
+    m_securityTab = new Fl_Group(10, 35, 580, 355, "Security");
+    m_securityTab->hide();
+    m_securityTab->begin();
+
+    Fl_Box* keyLabel = new Fl_Box(20, 50, 200, 25, "VirusTotal API key:");
+    keyLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+    m_virusTotalKey = new Fl_Secret_Input(20, 75, 400, 30);
+    m_virusTotalKey->tooltip(
+        "A free VirusTotal API key. Used only when you click a shield.");
+
+    m_saveKey = new Fl_Button(20, 115, 120, 28, "Save key");
+    m_saveKey->callback(onSaveKey, this);
+
+    m_clearKey = new Fl_Button(150, 115, 120, 28, "Remove key");
+    m_clearKey->callback(onClearKey, this);
+
+    m_keyStatus = new Fl_Box(20, 152, 550, 36);
+    m_keyStatus->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
+    m_keyStatus->labelsize(11);
+
+    Fl_Box* note = new Fl_Box(20, 196, 550, 120);
+    note->align(FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
+    note->labelsize(11);
+    const std::string text =
+        "Reputation lookups send only the SHA-256 of a file, and only after you "
+        "click a shield. Nothing is uploaded and nothing is looked up on its "
+        "own. MalwareBazaar needs no key.\n\n" +
+        SecurityKeys::storageDescription();
+    note->copy_label(text.c_str());
+
+    m_securityTab->end();
+}
+
+void PreferencesDialog::loadKeyIntoField() {
+    if (!m_virusTotalKey) return;
+    std::string key;
+    if (SecurityKeys::load(SecurityKeys::Provider::VirusTotal, key)) {
+        m_virusTotalKey->value(key.c_str());
+    } else {
+        m_virusTotalKey->value("");
+    }
+}
+
+void PreferencesDialog::refreshKeyStatus() {
+    if (!m_keyStatus) return;
+    const bool present = SecurityKeys::exists(SecurityKeys::Provider::VirusTotal);
+    m_keyStatus->copy_label(
+        present ? "A VirusTotal key is saved. Without it, VirusTotal is skipped "
+                  "and MalwareBazaar is still asked."
+                : "No VirusTotal key saved. VirusTotal is skipped; "
+                  "MalwareBazaar is still asked.");
+    m_keyStatus->labelcolor(present ? FL_FOREGROUND_COLOR
+                                    : fl_rgb_color(150, 110, 0));
+}
+
+void PreferencesDialog::onSaveKey(Fl_Widget* w, void* data) {
+    (void)w;
+    PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
+    if (!dlg || !dlg->m_virusTotalKey) return;
+
+    std::string key = dlg->m_virusTotalKey->value() ? dlg->m_virusTotalKey->value()
+                                                    : "";
+    // Trim the whitespace a copy/paste usually brings along.
+    const std::size_t first = key.find_first_not_of(" \t\r\n");
+    const std::size_t last = key.find_last_not_of(" \t\r\n");
+    key = first == std::string::npos ? std::string()
+                                     : key.substr(first, last - first + 1);
+
+    if (!isSha256Hex(key)) {
+        fl_alert("A VirusTotal API key is 64 hexadecimal characters.\n"
+                 "Check the key and try again.");
+        return;
+    }
+
+    std::string error;
+    if (!SecurityKeys::save(SecurityKeys::Provider::VirusTotal, key, error)) {
+        fl_alert("The key could not be saved: %s", error.c_str());
+        return;
+    }
+    dlg->refreshKeyStatus();
+}
+
+void PreferencesDialog::onClearKey(Fl_Widget* w, void* data) {
+    (void)w;
+    PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
+    if (!dlg) return;
+    SecurityKeys::remove(SecurityKeys::Provider::VirusTotal);
+    if (dlg->m_virusTotalKey) dlg->m_virusTotalKey->value("");
+    dlg->refreshKeyStatus();
+}
+
 void PreferencesDialog::createButtons() {
     int btn_y = 400;
     int btn_w = 80;
@@ -214,6 +310,10 @@ void PreferencesDialog::loadSettings() {
     
     // Advanced
     m_userAgent->value(settings.getUserAgent().c_str());
+
+    // Security
+    loadKeyIntoField();
+    refreshKeyStatus();
 }
 
 void PreferencesDialog::saveSettings() {

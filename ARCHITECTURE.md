@@ -106,6 +106,9 @@ headless:
 | `flows` | the user journeys end to end: preferences, add, remove, the limit toggle, a live search and its cancel path, and a real torrent through pause and resume. Labelled `network` |
 | `security_analyzer` | metadata heuristics: file families, hostile names, symlinks, torrent-level counts and the non-verdict wording |
 | `security_badge` | risk labels and palette, name sanitising and the shield rendered offscreen |
+| `security_keys` | the key store: round trip, removal and the absence of the key from the stored bytes |
+| `reputation` | provider parsing from canned answers, the service's states, the choice of hash, and the exact no-hash sentence |
+| `archive_preflight` | piece arithmetic and a real ZIP/RAR5 listing rebuilt from only its first and last piece |
 
 They link `ftorrent_core`, the same object library the app is built from, so a
 test exercises the objects that ship rather than a second copy that can drift.
@@ -188,7 +191,45 @@ zero. Getting this wrong shifts every later file by one.
 
 The analysis runs on the UI thread because it is pure string/flag work over a
 few thousand entries. Fetching the metadata itself still runs in the
-`FileListService` worker; no security provider is contacted in this phase.
+`FileListService` worker.
+
+## Reputation and archive preflight
+
+**`SecurityHashes`** decides whether a hash may be sent to a provider at all.
+A BitTorrent v2 file stores the root of a Merkle tree built from 16 KiB blocks,
+and that root equals the SHA-256 of the file only when the file is a single
+block. Anything larger is a Merkle root, so it is deliberately left without a
+hash: a wrong digest would produce a confident "no record" for a file that is
+known to be bad. That is why `SecurityFile::sha256Complete` exists next to
+`sha256`.
+
+**`Reputation`** holds the providers. Each one is a `ReputationProvider` and is
+queried with the 64 hex characters of a hash and nothing else. VirusTotal uses
+`GET /api/v3/files/<hash>` with an `x-apikey` header; MalwareBazaar uses a form
+`POST` to `mb-api.abuse.ch`. Both go through `HttpClient`, which now supports
+request headers and a body, and both refuse to follow redirects: a redirect
+would replay the API key to a host the user never chose. Answers are parsed by
+a small JSON reader with a depth limit and no tolerance for malformed input, so
+a broken reply becomes an error rather than a fabricated verdict.
+
+**`SecurityKeys`** stores those keys outside `settings.ini`: DPAPI
+(`CryptProtectData`) on Windows, and a 0600 file inside a 0700 directory on
+Linux, created with `open()` rather than written and then chmod'ed.
+
+**`ReputationService`** is the only thing that touches the network, and it never
+starts on its own. A lookup exists because a shield was clicked. It caches per
+hash, keeps several waiters per in-flight hash (so the same click from two
+surfaces is one request), and delivers on the UI thread through `Fl::awake()`.
+`NoCompleteHash` is a first-class state carrying the exact sentence the product
+requires.
+
+**`SecurityReputation`** picks the file a click should ask about (a runnable
+file wins over a picture) and words the answer. **`ArchivePreflight`** is the
+level-2 path: it computes which pieces hold a file's first and last byte from
+`file_offset()`/`file_size()`, fetches only those with `set_piece_deadline(...,
+alert_when_available)` in a throwaway session and directory, writes them into a
+sparse file of the real size, and lets `ArchiveInspector::listEntries()` read
+the index. The directory is removed before the call returns.
 
 ## 📐 Overview
 

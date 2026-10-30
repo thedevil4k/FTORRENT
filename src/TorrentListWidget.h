@@ -90,6 +90,12 @@ private:
     // report is computed once and reused by every redraw.
     std::unordered_map<std::string, SecurityReport> m_reports;
     const SecurityReport& reportForTorrent(TorrentItem* torrent);
+
+    // The shield is the only control here that asks a provider about a hash.
+    // It opens the Details window on its Security tab, where the answer fits.
+    int m_shieldPressedRow = -1;
+    bool shieldHit(int row, int x, int y);
+    void openSecurityReport(TorrentItem* torrent);
     
     Column m_sortColumn;
     bool m_sortAscending;
