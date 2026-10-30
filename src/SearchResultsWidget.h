@@ -128,6 +128,25 @@ private:
     void startReputationLookup(const std::string& key,
                                const std::vector<TorrentFileEntry>& files);
 
+    // Level 2 under an expanded row: one clickable line that reads the archive
+    // index from its first and last piece. 'top'/'bottom' are widget
+    // coordinates, recorded by the draw so the click can be matched.
+    struct ArchiveAction {
+        int fileIndex = -1;
+        std::string path;
+        std::string magnet;
+        std::string torrentUrl;
+        std::string line;      // result, empty until asked
+        bool running = false;
+        bool visible = false;
+        int top = 0;
+        int bottom = 0;
+    };
+    std::unordered_map<std::string, ArchiveAction> m_archive;
+    int archiveIndexFor(const std::vector<TorrentFileEntry>& files) const;
+    void startArchiveCheck(const std::string& key);
+    bool archiveLineHit(int row, int x, int y);
+
     // Cache key for a result: infohash, else the .torrent URL, else the row.
     static std::string cacheKey(const SearchResult& r);
     // A fetch landed: only the rows showing that same torrent change.

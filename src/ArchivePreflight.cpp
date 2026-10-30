@@ -150,6 +150,34 @@ bool ArchivePreflight::fetchSnippet(const std::string& magnet,
                                     std::string& error,
                                     const std::atomic<bool>* cancel,
                                     int timeoutSeconds) {
+    lt::add_torrent_params atp;
+    if (!torrentPath.empty()) {
+        try {
+            atp = lt::load_torrent_file(torrentPath);
+        } catch (const std::exception& e) {
+            error = std::string("could not read the .torrent file: ") + e.what();
+            return false;
+        }
+    } else {
+        if (magnet.empty()) {
+            error = "neither a .torrent file nor a magnet link";
+            return false;
+        }
+        lt::error_code mec;
+        atp = lt::parse_magnet_uri(magnet, mec);
+        if (mec) {
+            error = "bad magnet link";
+            return false;
+        }
+    }
+    return fetchSnippet(atp, fileIndex, out, error, cancel, timeoutSeconds);
+}
+
+bool ArchivePreflight::fetchSnippet(const lt::add_torrent_params& params,
+                                    int fileIndex, Snippet& out,
+                                    std::string& error,
+                                    const std::atomic<bool>* cancel,
+                                    int timeoutSeconds) {
     out = Snippet{};
     if (fileIndex < 0) {
         error = "no file to look at";
@@ -177,37 +205,15 @@ bool ArchivePreflight::fetchSnippet(const std::string& magnet,
         fs::remove_all(workDir, ignored);
     };
 
-    lt::add_torrent_params atp;
-    if (!torrentPath.empty()) {
-        try {
-            atp = lt::load_torrent_file(torrentPath);
-        } catch (const std::exception& e) {
-            error = std::string("could not read the .torrent file: ") + e.what();
-            cleanup();
-            return false;
-        }
-    } else {
-        if (magnet.empty()) {
-            error = "neither a .torrent file nor a magnet link";
-            cleanup();
-            return false;
-        }
-        lt::error_code mec;
-        atp = lt::parse_magnet_uri(magnet, mec);
-        if (mec) {
-            error = "bad magnet link";
-            cleanup();
-            return false;
-        }
-    }
-
+    lt::add_torrent_params atp = params;
+    // The probe owns where the pieces go; whatever the caller had is replaced.
     atp.save_path = workDir.string();
     // Nothing but the two pieces below is wanted: every file starts at zero
     // priority, so no other piece is ever requested.
     atp.flags &= ~(lt::torrent_flags::auto_managed | lt::torrent_flags::paused);
 
-    const lt::session_params params(probeSettings());
-    lt::session ses(params);
+    const lt::session_params sessionSettings(probeSettings());
+    lt::session ses(sessionSettings);
     lt::torrent_handle handle;
     try {
         handle = ses.add_torrent(atp);
@@ -339,29 +345,16 @@ bool ArchivePreflight::fetchSnippet(const std::string& magnet,
     return ok;
 }
 
-bool ArchivePreflight::inspect(const std::string& magnet,
-                               const std::string& torrentPath, int fileIndex,
-                               std::vector<SecurityFile>& entries,
-                               std::string& error,
-                               const std::atomic<bool>* cancel,
-                               int timeoutSeconds) {
-    entries.clear();
-    error.clear();
+namespace {
 
-    if (!ArchiveInspector::isAvailable()) {
-        error = "archive support is not available in this build";
-        return false;
-    }
-
-    Snippet snippet;
-    if (!fetchSnippet(magnet, torrentPath, fileIndex, snippet, error, cancel,
-                      timeoutSeconds)) {
-        return false;
-    }
-
+// Assembles the fetched windows into a sparse file, lists it, and removes
+// everything it created. One copy, so both inspect() overloads behave the same.
+bool listSnippet(const ArchivePreflight::Snippet& snippet,
+                 std::vector<SecurityFile>& entries, std::string& error,
+                 const std::atomic<bool>* cancel) {
     std::error_code ec;
     const fs::path workDir =
-        fs::path(tempRoot()) /
+        fs::path(ArchivePreflight::tempRoot()) /
         ("list-" + std::to_string(static_cast<unsigned long long>(
                       std::chrono::steady_clock::now().time_since_epoch().count())));
     fs::create_directories(workDir, ec);
@@ -371,9 +364,9 @@ bool ArchivePreflight::inspect(const std::string& magnet,
     }
     const fs::path partial = workDir / "head-tail.bin";
 
-    bool ok = writeSparseFile(partial.string(), snippet, error);
+    bool ok = ArchivePreflight::writeSparseFile(partial.string(), snippet, error);
     if (ok) {
-        ArchiveInspector::ListingAll listing =
+        const ArchiveInspector::ListingAll listing =
             ArchiveInspector::listEntries(partial.string(), cancel);
         if (!listing.ok) {
             // A truncated index is not a failure of the download: the archive
@@ -397,4 +390,50 @@ bool ArchivePreflight::inspect(const std::string& magnet,
     std::error_code ignored;
     fs::remove_all(workDir, ignored);
     return ok;
+}
+
+} // namespace
+
+bool ArchivePreflight::inspect(const std::string& magnet,
+                               const std::string& torrentPath, int fileIndex,
+                               std::vector<SecurityFile>& entries,
+                               std::string& error,
+                               const std::atomic<bool>* cancel,
+                               int timeoutSeconds) {
+    entries.clear();
+    error.clear();
+
+    if (!ArchiveInspector::isAvailable()) {
+        error = "archive support is not available in this build";
+        return false;
+    }
+
+    Snippet snippet;
+    if (!fetchSnippet(magnet, torrentPath, fileIndex, snippet, error, cancel,
+                      timeoutSeconds)) {
+        return false;
+    }
+    return listSnippet(snippet, entries, error, cancel);
+}
+
+bool ArchivePreflight::inspect(const lt::add_torrent_params& params,
+                               int fileIndex,
+                               std::vector<SecurityFile>& entries,
+                               std::string& error,
+                               const std::atomic<bool>* cancel,
+                               int timeoutSeconds) {
+    entries.clear();
+    error.clear();
+
+    if (!ArchiveInspector::isAvailable()) {
+        error = "archive support is not available in this build";
+        return false;
+    }
+
+    Snippet snippet;
+    if (!fetchSnippet(params, fileIndex, snippet, error, cancel,
+                      timeoutSeconds)) {
+        return false;
+    }
+    return listSnippet(snippet, entries, error, cancel);
 }

@@ -231,6 +231,23 @@ alert_when_available)` in a throwaway session and directory, writes them into a
 sparse file of the real size, and lets `ArchiveInspector::listEntries()` read
 the index. The directory is removed before the call returns.
 
+Two entry points, one body: `ArchivePreflight` accepts either a magnet or
+`.torrent` path (search rows, Add Torrent) or an `add_torrent_params` carrying
+the metadata (Details). The second one means a torrent the app already knows
+does not exchange metadata with the swarm a second time. The three surfaces
+share `archiveSummary()` for the wording and each keeps its own result line;
+the search-row line is hit-tested from the rectangle the draw recorded, and the
+archive worker reports through `Fl::awake()` behind the same `alive` flag the
+reputation lookups use.
+
+**Local hashing.** When the metadata has no whole-file hash, Details asks
+`findLocalHashTarget()` for a file that is complete, can run, and whose recorded
+path stays inside the torrent (no absolute path, no symlink, no `..` segment).
+If there is one, `FileHash::sha256File()` runs on a worker with a cancel flag the
+destructor sets, and the digest is then looked up like any other. The answer
+says the SHA-256 was computed locally, because a hash the user did not expect to
+be computed is a surprise worth naming.
+
 ## 📐 Overview
 
 FTorrent is designed with a modular, object-oriented architecture that clearly separates responsibilities:

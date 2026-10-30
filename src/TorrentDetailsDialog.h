@@ -81,8 +81,18 @@ private:
     Fl_Box* m_securitySummary;
     Fl_Text_Display* m_securityDisplay;
     Fl_Text_Buffer* m_securityBuffer = nullptr;
+    Fl_Button* m_checkArchiveButton = nullptr;
     SecurityReport m_securityReport;
     bool m_securityLoaded = false;
+    // Level 2: the answer from reading the archive's two ends.
+    std::string m_archiveLine;
+    bool m_archiveRunning = false;
+    std::shared_ptr<std::atomic<bool>> m_archiveCancel;
+    // Level 3 fallback: a file that is already complete on disk is hashed
+    // locally, never uploaded, and only after the user asked.
+    bool m_hashingLocally = false;
+    std::string m_reputationNote;
+    std::shared_ptr<std::atomic<bool>> m_hashCancel;
     // Reputation of the hash the user clicked the shield about. Never fetched
     // automatically; see checkReputation().
     ReputationResult m_reputation;
@@ -115,6 +125,12 @@ private:
     void updatePeers();
     void updateSecurity();
     void checkReputation();
+    void checkArchive();
+    void requestReputation(const std::string& sha256);
+    void startLocalHash(const std::string& relativePath);
+    void onLocalHashDone(const std::string& relativePath, bool ok,
+                         const std::string& digestOrError);
+    static void onCheckArchiveClicked(Fl_Widget* w, void* data);
     void updateFiles();
     
     // Callbacks

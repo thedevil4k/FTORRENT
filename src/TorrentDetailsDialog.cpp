@@ -1,12 +1,20 @@
 #include "TorrentDetailsDialog.h"
+#include "ArchiveInspector.h"
+#include "ArchivePreflight.h"
+#include "FileHash.h"
 #include "ReputationService.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
 #include "SecurityReputation.h"
+#include "SecurityTypes.h"
 #include <FL/Fl.H>
 #include <algorithm>
+#include <atomic>
+#include <filesystem>
 #include <iomanip>
+#include <memory>
 #include <sstream>
+#include <thread>
 
 TorrentDetailsDialog::TorrentDetailsDialog(TorrentItem* torrent)
     : Fl_Window(600, 500, "Torrent Details")
@@ -42,6 +50,9 @@ TorrentDetailsDialog::TorrentDetailsDialog(TorrentItem* torrent)
 TorrentDetailsDialog::~TorrentDetailsDialog() {
     Fl::remove_timeout(updateTimerCallback, this);
     if (m_alive) *m_alive = false;
+    // Stop a local hash, and a two-piece read, that are still running.
+    if (m_hashCancel) m_hashCancel->store(true);
+    if (m_archiveCancel) m_archiveCancel->store(true);
     
     delete m_trackersBuffer;
     delete m_peersBuffer;
@@ -162,9 +173,18 @@ void TorrentDetailsDialog::createSecurityTab() {
         "No file list available. Metadata risk is unknown.");
     m_securityShield->onClick([this]() { checkReputation(); });
 
-    m_securitySummary = new Fl_Box(54, 50, 526, 24);
+    m_securitySummary = new Fl_Box(54, 50, 380, 24);
     m_securitySummary->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     m_securitySummary->labelfont(FL_HELVETICA_BOLD);
+
+    // Level 2 lives here: the answer needs room, and this tab is where the
+    // user is already reading about the torrent.
+    m_checkArchiveButton = new Fl_Button(440, 48, 140, 26, "Check archive");
+    m_checkArchiveButton->callback(onCheckArchiveClicked, this);
+    m_checkArchiveButton->tooltip(
+        "Fetches only the first and last piece of a RAR or ZIP to list what is "
+        "inside. The pieces go to a temporary folder and are deleted.");
+    m_checkArchiveButton->deactivate();
 
     m_securityBuffer = new Fl_Text_Buffer();
     m_securityDisplay = new Fl_Text_Display(20, 84, 560, 346);
@@ -369,49 +389,250 @@ void TorrentDetailsDialog::updateSecurity() {
     }
 
     out << "\nReputation\n  "
-        << SecurityBadge::displayText(reputationLine(m_reputation)) << "\n";
+        << SecurityBadge::displayText(
+               m_hashingLocally
+                   ? "Computing the SHA-256 of the completed file on this "
+                     "machine... nothing is uploaded."
+                   : reputationLine(m_reputation))
+        << "\n";
+    if (!m_reputationNote.empty()) {
+        out << "  " << SecurityBadge::displayText(m_reputationNote) << "\n";
+    }
+
+    if (m_archiveRunning || !m_archiveLine.empty()) {
+        out << "\nArchive\n  "
+            << SecurityBadge::displayText(
+                   m_archiveRunning
+                       ? "Reading the first and last piece of the archive..."
+                       : m_archiveLine)
+            << "\n";
+    }
 
     m_securityBuffer->text(out.str().c_str());
+
+    // The archive button only makes sense when there is one to read.
+    if (m_checkArchiveButton) {
+        bool hasArchive = false;
+        if (const std::shared_ptr<const lt::torrent_info> info =
+                m_torrent->getHandle().torrent_file()) {
+            const lt::file_storage& storage =
+#if LIBTORRENT_VERSION_NUM >= 20100
+                info->layout();
+#else
+                info->files();
+#endif
+            for (int i = 0; i < storage.num_files() && !hasArchive; ++i) {
+                if (storage.pad_file_at(lt::file_index_t(i))) continue;
+                hasArchive = ArchiveInspector::isArchivePath(
+                    std::string(storage.file_path(lt::file_index_t(i))));
+            }
+        }
+        if (hasArchive && !m_archiveRunning) m_checkArchiveButton->activate();
+        else m_checkArchiveButton->deactivate();
+    }
+}
+
+void TorrentDetailsDialog::onCheckArchiveClicked(Fl_Widget* w, void* data) {
+    (void)w;
+    TorrentDetailsDialog* dlg = static_cast<TorrentDetailsDialog*>(data);
+    if (dlg) dlg->checkArchive();
+}
+
+void TorrentDetailsDialog::checkArchive() {
+    if (m_archiveRunning || !m_torrent) return;
+
+    // The first archive in the torrent, so the answer names one file.
+    const std::vector<TorrentItem::FileInfo> files = m_torrent->getFiles();
+    const TorrentItem::FileInfo* archive = nullptr;
+    for (const TorrentItem::FileInfo& file : files) {
+        if (ArchiveInspector::isArchivePath(file.path)) {
+            archive = &file;
+            break;
+        }
+    }
+    if (!archive) {
+        m_archiveLine = "Archive: this torrent holds no RAR or ZIP.";
+        updateSecurity();
+        return;
+    }
+
+    std::shared_ptr<const lt::torrent_info> info =
+        m_torrent->getHandle().torrent_file();
+    if (!info) {
+        m_archiveLine =
+            "Archive: the metadata is not here yet, so its pieces cannot be "
+            "located.";
+        updateSecurity();
+        return;
+    }
+
+    // Handing the metadata over means no second exchange with the swarm. The
+    // shared_ptr is only read from here on, so dropping const is safe.
+    lt::add_torrent_params params;
+    params.ti = std::const_pointer_cast<lt::torrent_info>(info);
+
+    const int index = archive->fileIndex;
+    const std::string path = archive->path;
+    m_archiveRunning = true;
+    m_archiveLine.clear();
+    auto cancel = std::make_shared<std::atomic<bool>>(false);
+    m_archiveCancel = cancel;
+    updateSecurity();
+
+    struct Delivery {
+        TorrentDetailsDialog* dialog = nullptr;
+        std::shared_ptr<bool> alive;
+        std::string line;
+    };
+
+    std::shared_ptr<bool> alive = m_alive;
+    std::thread([this, alive, cancel, params, index, path]() {
+        std::vector<SecurityFile> entries;
+        std::string error;
+        const bool ok = ArchivePreflight::inspect(params, index, entries,
+                                                  error, cancel.get());
+
+        Delivery* delivery = new Delivery;
+        delivery->dialog = this;
+        delivery->alive = alive;
+        delivery->line =
+            ok ? archiveSummary(path, entries)
+               : "Archive: the index could not be read (" + error + ").";
+        Fl::awake([](void* data) {
+            std::unique_ptr<Delivery> delivery(
+                static_cast<Delivery*>(data));
+            if (!delivery->alive || !*delivery->alive) return;
+            TorrentDetailsDialog* dialog = delivery->dialog;
+            dialog->m_archiveRunning = false;
+            dialog->m_archiveLine = delivery->line;
+            dialog->updateSecurity();
+        }, delivery);
+    }).detach();
 }
 
 void TorrentDetailsDialog::checkReputation() {
     const std::vector<SecurityFile> files = m_torrent->getSecurityFiles();
     const ReputationTarget target = findReputationTarget(files);
 
-    if (!target.found()) {
-        // No whole-file hash in the metadata: the exact required sentence,
-        // instead of a check that would have to download the file first.
+    if (target.found()) {
+        m_reputationNote.clear();
+        m_reputationSha = target.sha256;
+        requestReputation(target.sha256);
+        return;
+    }
+
+    // The metadata carries no whole-file hash. If a file that can run is
+    // already complete on disk, hash it here and ask about that digest. This
+    // never downloads anything and never uploads anything.
+    std::vector<bool> complete;
+    for (const TorrentItem::FileInfo& info : m_torrent->getFiles()) {
+        complete.push_back(info.complete);
+    }
+    const ReputationTarget local = findLocalHashTarget(files, complete);
+    if (local.path.empty()) {
         m_reputationSha.clear();
+        m_reputationNote.clear();
         m_reputation = ReputationService::noHashResult();
         updateSecurity();
         return;
     }
+    startLocalHash(local.path);
+}
 
+void TorrentDetailsDialog::startLocalHash(const std::string& relativePath) {
+    if (m_hashingLocally || !m_torrent) return;
+
+    const std::filesystem::path disk =
+        std::filesystem::path(m_torrent->getSavePath()) /
+        std::filesystem::path(relativePath);
+    const std::string diskPath = disk.string();
+
+    m_hashingLocally = true;
+    m_reputationSha.clear();
+    m_reputation = ReputationResult{};
+    m_reputationNote.clear();
+    updateSecurity();
+
+    struct Delivery {
+        TorrentDetailsDialog* dialog = nullptr;
+        std::shared_ptr<bool> alive;
+        std::string relativePath;
+        bool ok = false;
+        std::string digestOrError;
+    };
+
+    auto cancel = std::make_shared<std::atomic<bool>>(false);
+    m_hashCancel = cancel;
+    std::shared_ptr<bool> alive = m_alive;
+    TorrentDetailsDialog* self = this;
+
+    std::thread([self, alive, cancel, relativePath, diskPath]() {
+        std::string digest;
+        std::string error;
+        const bool ok =
+            FileHash::sha256File(diskPath, digest, error, cancel.get());
+
+        Delivery* delivery = new Delivery;
+        delivery->dialog = self;
+        delivery->alive = alive;
+        delivery->relativePath = relativePath;
+        delivery->ok = ok;
+        delivery->digestOrError = ok ? digest : error;
+        Fl::awake([](void* data) {
+            std::unique_ptr<Delivery> delivery(static_cast<Delivery*>(data));
+            if (!delivery->alive || !*delivery->alive) return;
+            delivery->dialog->onLocalHashDone(delivery->relativePath,
+                                              delivery->ok,
+                                              delivery->digestOrError);
+        }, delivery);
+    }).detach();
+}
+
+void TorrentDetailsDialog::onLocalHashDone(const std::string& relativePath,
+                                           bool ok, const std::string& digestOrError) {
+    m_hashingLocally = false;
+    if (!ok) {
+        m_reputation = ReputationResult{};
+        m_reputation.state = ReputationState::Error;
+        m_reputation.message =
+            "The completed file could not be hashed: " + digestOrError;
+        updateSecurity();
+        return;
+    }
+
+    m_reputationNote =
+        "SHA-256 computed locally from the completed file " + relativePath +
+        "; nothing was uploaded.";
+    m_reputationSha = digestOrError;
+    requestReputation(digestOrError);
+}
+
+void TorrentDetailsDialog::requestReputation(const std::string& sha256) {
     ReputationService& service = sharedReputationService();
     std::shared_ptr<bool> alive = m_alive;
     TorrentDetailsDialog* self = this;
     const ReputationService::Start start = service.request(
-        target.sha256, [self, alive](const ReputationResult& result) {
+        sha256, [self, alive](const ReputationResult& result) {
             if (!alive || !*alive) return;
             self->m_reputation = result;
             self->updateSecurity();
         });
 
-    m_reputationSha = target.sha256;
+    m_reputationSha = sha256;
     switch (start) {
         case ReputationService::Start::Started:
         case ReputationService::Start::AlreadyRunning:
             m_reputation = ReputationResult{};
             m_reputation.state = ReputationState::Querying;
-            m_reputation.sha256 = target.sha256;
+            m_reputation.sha256 = sha256;
             break;
         case ReputationService::Start::Cached:
-            m_reputation = service.find(target.sha256);
+            m_reputation = service.find(sha256);
             break;
         case ReputationService::Start::Rejected:
             m_reputation = ReputationResult{};
             m_reputation.state = ReputationState::Error;
-            m_reputation.sha256 = target.sha256;
+            m_reputation.sha256 = sha256;
             m_reputation.message =
                 "Too many reputation checks are running. Try again in a moment.";
             break;

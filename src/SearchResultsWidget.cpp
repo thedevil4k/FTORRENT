@@ -1,14 +1,19 @@
 #include "SearchResultsWidget.h"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
+#include "ArchiveInspector.h"
+#include "ArchivePreflight.h"
 #include "ReputationService.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
 #include "TorrentItem.h"   // formatSize, used for the size column
 
 #include <algorithm>
+#include <atomic>
 #include <functional>
+#include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -156,6 +161,99 @@ bool SearchResultsWidget::shieldHit(int row, int x, int y) {
     constexpr int SHIELD = 15;
     return x >= cellX + 5 && x <= cellX + 5 + SHIELD && y >= cellY &&
            y <= cellY + SHIELD + 4;
+}
+
+int SearchResultsWidget::archiveIndexFor(
+    const std::vector<TorrentFileEntry>& files) const {
+    for (std::size_t i = 0; i < files.size(); ++i) {
+        if (ArchiveInspector::isArchivePath(files[i].path)) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+bool SearchResultsWidget::archiveLineHit(int row, int x, int y) {
+    const SearchResult* result = getResultAt(row);
+    if (!result) return false;
+    auto action = m_archive.find(cacheKey(*result));
+    if (action == m_archive.end() || !action->second.visible) return false;
+
+    int cellX = 0, cellY = 0, cellW = 0, cellH = 0;
+    if (!find_cell(CONTEXT_CELL, row, COL_NAME, cellX, cellY, cellW, cellH)) {
+        return false;
+    }
+    (void)cellY;
+    (void)cellH;
+    if (x < cellX || x > cellX + cellW) return false;
+    return y >= action->second.top && y <= action->second.bottom;
+}
+
+void SearchResultsWidget::startArchiveCheck(const std::string& key) {
+    auto action = m_archive.find(key);
+    if (action == m_archive.end() || action->second.running) return;
+
+    ArchiveAction& entry = action->second;
+    if (entry.magnet.empty() && entry.torrentUrl.empty()) {
+        entry.line =
+            "Archive: this result carries neither a .torrent nor a magnet.";
+        redraw();
+        return;
+    }
+
+    entry.running = true;
+    entry.line.clear();
+
+    struct Delivery {
+        SearchResultsWidget* widget = nullptr;
+        std::shared_ptr<bool> alive;
+        std::string key;
+        std::string line;
+    };
+
+    const int index = entry.fileIndex;
+    const std::string path = entry.path;
+    const std::string magnet = entry.magnet;
+    const std::string torrentUrl = entry.torrentUrl;
+    std::shared_ptr<bool> alive = m_alive;
+    SearchResultsWidget* self = this;
+
+    std::thread([self, alive, key, index, path, magnet, torrentUrl]() {
+        std::vector<SecurityFile> entries;
+        std::string error;
+        std::atomic<bool> cancelled{false};
+        const bool ok = ArchivePreflight::inspect(magnet, torrentUrl, index,
+                                                  entries, error, &cancelled);
+
+        Delivery* delivery = new Delivery;
+        delivery->widget = self;
+        delivery->alive = alive;
+        delivery->key = key;
+        delivery->line =
+            ok ? archiveSummary(path, entries)
+               : "Archive: the index could not be read (" + error + ").";
+        Fl::awake([](void* data) {
+            std::unique_ptr<Delivery> delivery(static_cast<Delivery*>(data));
+            if (!delivery->alive || !*delivery->alive) return;
+            SearchResultsWidget* widget = delivery->widget;
+            auto found = widget->m_archive.find(delivery->key);
+            if (found != widget->m_archive.end()) {
+                found->second.running = false;
+                found->second.line = delivery->line;
+            }
+            widget->forEachRow([&](int row, const SearchResult& r) {
+                if (SearchResultsWidget::cacheKey(r) == delivery->key) {
+                    widget->updateRowHeight(row);
+                }
+            });
+            widget->redraw();
+        }, delivery);
+    }).detach();
+
+    forEachRow([&](int row, const SearchResult& r) {
+        if (cacheKey(r) == key) updateRowHeight(row);
+    });
+    redraw();
 }
 
 void SearchResultsWidget::onShieldClicked(int row) {
@@ -371,6 +469,7 @@ void SearchResultsWidget::clear() {
     m_reports.clear();
     m_reputation.clear();
     m_reputationPending.clear();
+    m_archive.clear();
     rows(0);
     row_height_all(BASE_ROW_HEIGHT);
     redraw();
@@ -458,6 +557,8 @@ void SearchResultsWidget::updateRowHeight(int row) {
             if (lines > 1 + maxFiles) lines = 1 + maxFiles;
             // A reputation answer the user asked for gets its own line.
             if (m_reputation.find(cacheKey(*r)) != m_reputation.end()) ++lines;
+            // An archive line is always offered, and grows when it answers.
+            if (archiveIndexFor(rf.files) >= 0) ++lines;
             break;
         }
         case FileListState::Loading:
@@ -630,6 +731,49 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         more = elideToWidth(more, avail);
         fl_draw(more.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+        ly += FILE_LINE_HEIGHT;
+    }
+
+    // Level 2: one clickable line for the archive in this list. It asks before
+    // anything is fetched; the words say what will happen.
+    const int archiveIndex = archiveIndexFor(rf.files);
+    ArchiveAction& action = m_archive[cacheKey(*r)];
+    if (archiveIndex < 0) {
+        action.visible = false;
+        return;
+    }
+
+    const TorrentFileEntry& archive =
+        rf.files[static_cast<std::size_t>(archiveIndex)];
+    action.fileIndex = archive.fileIndex;
+    action.path = archive.path;
+    if (action.magnet.empty()) action.magnet = r->magnet;
+    if (action.torrentUrl.empty()) action.torrentUrl = r->torrentUrl;
+
+    std::string text;
+    Fl_Color color = fl_rgb_color(30, 90, 160);
+    if (action.running) {
+        text = "Archive: reading the first and last piece...";
+        color = SecurityBadge::riskColor(RiskLevel::Medium);
+    } else if (!action.line.empty()) {
+        text = action.line;
+        color = FL_FOREGROUND_COLOR;
+    } else {
+        text = "+ Check archive " + archive.path + " (first + last piece)";
+    }
+
+    if (ly + FILE_LINE_HEIGHT <= limit + 1) {
+        fl_font(FL_HELVETICA, 11);
+        fl_color(color);
+        const std::string shown = elideToWidth(text, avail);
+        fl_draw(shown.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+        action.visible = true;
+        action.top = ly;
+        action.bottom = ly + FILE_LINE_HEIGHT;
+        ly += FILE_LINE_HEIGHT;
+    } else {
+        action.visible = false;
     }
 }
 
@@ -744,6 +888,21 @@ void SearchResultsWidget::draw_cell(TableContext context, int row, int col,
 }
 
 int SearchResultsWidget::handle(int event) {
+    // The archive line under an expanded row is the only control that starts
+    // the two-piece read.
+    if (event == FL_RELEASE) {
+        int R = 0, C = 0;
+        ResizeFlag resizeFlag = RESIZE_NONE;
+        if (cursor2rowcol(R, C, resizeFlag) == CONTEXT_CELL &&
+            archiveLineHit(R, Fl::event_x(), Fl::event_y())) {
+            const SearchResult* result = getResultAt(R);
+            if (result) {
+                startArchiveCheck(cacheKey(*result));
+                return 1;
+            }
+        }
+    }
+
     // A click on the shield asks about the torrent's hash. Handled here, before
     // the table sees the event, so the click neither selects nor expands the
     // row: it only asks the question the shield stands for.

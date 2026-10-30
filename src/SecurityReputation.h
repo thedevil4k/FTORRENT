@@ -32,4 +32,17 @@ std::string reputationLine(const ReputationResult& result);
 // True only when a provider reported detections for the hash.
 bool reputationHasDetections(const ReputationResult& result);
 
+// One line describing what an archive's index holds, for the level-2 answer.
+// Never claims the archive is safe, only what its names show.
+std::string archiveSummary(const std::string& archivePath,
+                           const std::vector<SecurityFile>& entries);
+
+// Picks the file a reputation lookup may hash on this machine when the torrent
+// metadata carries no whole-file hash: it must be complete, it must be able to
+// run, and its path must stay inside the torrent. The returned target has an
+// empty sha256 and the file's relative path: the caller hashes it. An empty
+// path means there is nothing to hash. Never hashes anything by itself.
+ReputationTarget findLocalHashTarget(const std::vector<SecurityFile>& files,
+                                     const std::vector<bool>& complete);
+
 #endif // SECURITYREPUTATION_H

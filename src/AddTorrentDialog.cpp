@@ -645,19 +645,7 @@ void AddTorrentDialog::checkArchive() {
             delivery->message =
                 "Archive: the index could not be read (" + error + ").";
         } else {
-            const SecurityReport report = SecurityAnalyzer::analyze(entries);
-            std::string message = "Archive " + SecurityBadge::displayText(path) +
-                                  ": " + std::to_string(entries.size()) +
-                                  " entries, ";
-            if (report.executables > 0 || report.scripts > 0) {
-                message += std::to_string(report.executables) +
-                           " executable(s) and " +
-                           std::to_string(report.scripts) + " script(s). " +
-                           "Review before downloading.";
-            } else {
-                message += "no known indicators in their names.";
-            }
-            delivery->message = message;
+            delivery->message = archiveSummary(path, entries);
         }
         Fl::awake(&AddTorrentDialog::deliverArchiveCheck, delivery);
     }).detach();

@@ -3,6 +3,8 @@
 
 #include "SecurityTypes.h"
 
+#include <libtorrent/add_torrent_params.hpp>
+
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -58,12 +60,24 @@ public:
                              const std::atomic<bool>* cancelled,
                              int timeoutSeconds = 90);
 
+    // Same, for a torrent already known to the app (Details). Passing its
+    // metadata means no second metadata exchange with the swarm.
+    static bool fetchSnippet(const lt::add_torrent_params& params,
+                             int fileIndex, Snippet& out, std::string& error,
+                             const std::atomic<bool>* cancelled,
+                             int timeoutSeconds = 90);
+
     // Fetch, assemble, list the entries, delete everything it created.
     // 'entries' receives every regular file name the index exposed.
     static bool inspect(const std::string& magnet,
                         const std::string& torrentPath, int fileIndex,
                         std::vector<SecurityFile>& entries, std::string& error,
                         const std::atomic<bool>* cancelled,
+                        int timeoutSeconds = 90);
+
+    static bool inspect(const lt::add_torrent_params& params, int fileIndex,
+                        std::vector<SecurityFile>& entries,
+                        std::string& error, const std::atomic<bool>* cancelled,
                         int timeoutSeconds = 90);
 
     // Root of the temporary directories. Cleaned up by inspect().

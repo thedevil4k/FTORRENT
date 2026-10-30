@@ -382,6 +382,69 @@ int main() {
         ok(!target.found(), "an empty list has nothing to ask about");
     }
 
+    section("archive summary");
+    {
+        ok(contains(archiveSummary("pack.zip", {}), "no files"),
+           "an empty index says so");
+
+        SecurityFile readme;
+        readme.path = "docs/readme.txt";
+        const std::string quiet = archiveSummary("pack.zip", {readme});
+        ok(contains(quiet, "1 entries"), "the entry count is stated");
+        ok(contains(quiet, "no known indicators"),
+           "a harmless index is worded carefully");
+        ok(!contains(quiet, "safe"), "a harmless index never says safe");
+
+        SecurityFile tool;
+        tool.path = "setup.exe";
+        const std::string loud = archiveSummary("pack.zip", {readme, tool});
+        ok(contains(loud, "1 executable"), "an executable inside is counted");
+        ok(contains(loud, "Review before downloading"),
+           "an executable inside asks for review");
+    }
+
+    section("what may be hashed locally");
+    {
+        SecurityFile doneExe;
+        doneExe.path = "setup.exe";
+        doneExe.size = 1000;
+        SecurityFile pendingExe;
+        pendingExe.path = "pending.exe";
+        pendingExe.size = 1000;
+        SecurityFile escaping;
+        escaping.path = "../escape.exe";
+        escaping.size = 10;
+        SecurityFile absolute;
+        absolute.path = "C:/Windows/evil.exe";
+        absolute.size = 10;
+        absolute.absolutePath = true;
+
+        ReputationTarget target = findLocalHashTarget(
+            {pendingExe, doneExe}, {false, true});
+        ok(target.path == "setup.exe",
+           "a completed runnable file is chosen");
+        ok(target.sha256.empty(),
+           "a local target has no hash yet: the caller must compute it");
+
+        target = findLocalHashTarget({doneExe}, {false});
+        ok(target.path.empty(), "an unfinished file is never hashed");
+
+        target = findLocalHashTarget({escaping, absolute},
+                                     {true, true});
+        ok(target.path.empty(),
+           "a path that leaves the torrent folder is never read");
+
+        SecurityFile text;
+        text.path = "readme.txt";
+        text.size = 100;
+        target = findLocalHashTarget({doneExe, text}, {false, true});
+        ok(target.path == "readme.txt",
+           "a completed non-runnable file is the fallback");
+
+        target = findLocalHashTarget({}, {});
+        ok(target.path.empty(), "nothing to hash when there is no file list");
+    }
+
     section("display wording");
     {
         ok(reputationLine(ReputationService::noHashResult()) ==
