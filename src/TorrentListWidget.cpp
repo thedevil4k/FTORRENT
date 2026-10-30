@@ -179,7 +179,7 @@ void TorrentListWidget::removeTorrent(const std::string& hash) {
 }
 
 void TorrentListWidget::updateTorrent(TorrentItem* torrent) {
-    // Just redraw, the torrent object is already updated
+    (void)torrent;   // The item is updated in place; only the paint is stale.
     redraw();
 }
 
@@ -489,7 +489,6 @@ static std::vector<std::string> parseDroppedPaths(const char* text) {
         std::string decoded;
         for (size_t i = 0; i < line.size(); i++) {
             if (line[i] == '%' && i + 2 < line.size()) {
-                int val = 0;
                 char h1 = line[i+1], h2 = line[i+2];
                 auto hex = [](char c) -> int {
                     if (c >= '0' && c <= '9') return c - '0';
@@ -720,8 +719,6 @@ void TorrentListWidget::draw() {
 
 Fl_Color TorrentListWidget::getRowColor(int row) const {
     if (const_cast<TorrentListWidget*>(this)->row_selected(row)) return FL_SELECTION_COLOR;
-    
-    bool darkMode = fl_gray_ramp(0) == FL_BLACK; // Simple check if dark mode is active
     
     if (row % 2 == 0) return FL_BACKGROUND2_COLOR;
     

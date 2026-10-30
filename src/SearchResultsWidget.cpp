@@ -574,6 +574,7 @@ void SearchResultsWidget::updateRowHeight(int row) {
 
 // The little triangle that opens the file list, plus a hint of the state.
 void SearchResultsWidget::drawExpandCell(int row, int x, int y, int w, int h) {
+    (void)h;   // The triangle is drawn inside the top slice of the row.
     const SearchResult* r = getResultAt(row);
     if (!r) return;
 

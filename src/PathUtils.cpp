@@ -47,14 +47,9 @@ std::string PathUtils::getDesktopPath() {
 
 std::string PathUtils::getDownloadsPath() {
 #ifdef _WIN32
-    char path[MAX_PATH];
-    // CSIDL_DOWNLOADS is not available in older Windows, but SHGetKnownFolderPath is better for Vista+
-    // But for simplicity with CSIDL:
-    // There isn't a CSIDL for Downloads in old versions. 
-    // We can try to get it from the registry or just append \Downloads to profile.
-    // In Windows 7+ it's a known folder.
-    
-    // Attempting to use SHGetKnownFolderPath if possible, but for now let's stick to CSIDL style or simple append
+    // CSIDL_DOWNLOADS is not available in older Windows, but
+    // SHGetKnownFolderPath is better for Vista+. There is no CSIDL for
+    // Downloads in old versions, so the profile folder is the simple answer.
     return getHomePath() + "\\Downloads";
 #else
     return getHomePath() + "/Downloads";

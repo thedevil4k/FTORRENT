@@ -68,9 +68,10 @@ std::atomic<bool> MainWindow::s_alive{true};
 MainWindow::MainWindow(int w, int h, const char* title)
     : Fl_Double_Window(w, h, title)
     , m_toolbar(nullptr)
+    , m_toolbarPack(nullptr)
+    , m_statusGroup(nullptr)
     , m_leadSpacer(nullptr)
     , m_trailSpacer(nullptr)
-    , m_statusGroup(nullptr)
     , m_darkModeBtn(nullptr)
     , m_torrentList(nullptr)
     , m_searchView(nullptr)
@@ -86,26 +87,31 @@ MainWindow::MainWindow(int w, int h, const char* title)
     , m_searchGeneration(0)
     , m_showSearchView(false)
     , m_statusBar(nullptr)
+    // From here the list follows the declaration order in MainWindow.h on
+    // purpose. C++ initialises members in that order whatever this list says,
+    // so a list that disagrees is a trap waiting for the first initialiser that
+    // reads another member.
+    , m_limitModerate(false)
+    , m_limitIdleColor(FL_BACKGROUND_COLOR)
+    , m_censored(false)
+    , m_showPublicIp(false)
+    , m_darkMode(true)
+    , m_toolbarLevel(ToolbarLayout::ICONS)
+    , m_toolbarSlack(-1)
     , m_manager(nullptr)
+    , m_engineStatusChecked(false)
+    , m_probesStop(false)
     , m_brightIcon(nullptr)
     , m_darkIcon(nullptr)
     , m_addIcon(nullptr)
     , m_createIcon(nullptr)
     , m_ecoIcon(nullptr)
-    ,m_normalIcon(nullptr)
-    ,m_turboIcon(nullptr)
-    ,m_eyeOpenedIcon(nullptr)
-    ,m_eyeClosedIcon(nullptr)
-    ,m_findIcon(nullptr)
-    ,m_limitIcon(nullptr)
-    , m_engineStatusChecked(false)
-    , m_probesStop(false)
-    ,m_limitModerate(false)
-    ,m_limitIdleColor(FL_BACKGROUND_COLOR)
-    ,m_censored(false)    , m_showPublicIp(false)
-    , m_darkMode(true)
-    , m_toolbarLevel(ToolbarLayout::ICONS)
-    , m_toolbarSlack(-1)
+    , m_normalIcon(nullptr)
+    , m_turboIcon(nullptr)
+    , m_eyeOpenedIcon(nullptr)
+    , m_eyeClosedIcon(nullptr)
+    , m_findIcon(nullptr)
+    , m_limitIcon(nullptr)
 {
     // Initialize image support
     fl_register_images();
@@ -1079,7 +1085,7 @@ void MainWindow::toggleSelectedTorrents() {
     updateUI();
 }
 
-void MainWindow::removeSelectedTorrents(bool deleteFiles) {
+void MainWindow::removeSelectedTorrents() {
     if (!m_manager || !m_torrentList) return;
     
     auto selected = m_torrentList->getSelectedTorrents();
@@ -1343,7 +1349,7 @@ void MainWindow::onTogglePause(Fl_Widget* w, void* data) {
 }
 
 void MainWindow::onRemove(Fl_Widget* w, void* data) {
-    ((MainWindow*)data)->removeSelectedTorrents(false);
+    ((MainWindow*)data)->removeSelectedTorrents();
 }
 
 void MainWindow::onPreferences(Fl_Widget* w, void* data) {

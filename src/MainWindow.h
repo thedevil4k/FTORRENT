@@ -82,7 +82,9 @@ public:    MainWindow(int w, int h, const char* title);
     
     // Torrent actions
     void toggleSelectedTorrents();
-    void removeSelectedTorrents(bool deleteFiles = false);
+    // The confirmation dialog asks whether the files go too, so there is no
+    // deleteFiles argument: a caller cannot pre-answer the user's question.
+    void removeSelectedTorrents();
 
     // Waits for every engine-probe worker to finish (in-flight GETs abort at
     // once: s_alive is already false, which is their stop condition).

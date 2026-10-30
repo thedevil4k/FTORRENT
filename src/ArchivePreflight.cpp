@@ -62,16 +62,6 @@ lt::settings_pack probeSettings() {
     return sp;
 }
 
-std::string hexOf(const lt::sha256_hash& hash) {
-    static const char digits[] = "0123456789abcdef";
-    std::string out;
-    for (unsigned char byte : hash) {
-        out.push_back(digits[byte >> 4]);
-        out.push_back(digits[byte & 0x0f]);
-    }
-    return out;
-}
-
 } // namespace
 
 ArchivePreflight::PieceRange ArchivePreflight::computeRange(

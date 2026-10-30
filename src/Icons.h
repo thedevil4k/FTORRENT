@@ -9,7 +9,11 @@
  */
 
 // FLTorrent logo (32x32)
-static const char* fltorrent_logo_xpm[] = {
+// inline constexpr, not static: a `static` array in a header is a private copy
+// in every translation unit that includes it, so every .cpp that reached
+// Resources.h duplicated all of these glyphs and warned about the copies it did
+// not use. An inline variable is one object shared by the whole program.
+inline constexpr const char* fltorrent_logo_xpm[] = {
 "32 32 6 1",
 " 	c None",
 ".	c #2196F3",
@@ -52,7 +56,7 @@ static const char* fltorrent_logo_xpm[] = {
 };
 
 // Add button icon (16x16)
-static const char* icon_add_xpm[] = {
+inline constexpr const char* icon_add_xpm[] = {
 "16 16 3 1",
 " 	c None",
 ".	c #2196F3",
@@ -76,7 +80,7 @@ static const char* icon_add_xpm[] = {
 };
 
 // Pause button icon (16x16)
-static const char* icon_pause_xpm[] = {
+inline constexpr const char* icon_pause_xpm[] = {
 "16 16 3 1",
 " 	c None",
 ".	c #FF9800",
@@ -100,7 +104,7 @@ static const char* icon_pause_xpm[] = {
 };
 
 // Play/Resume button icon (16x16)
-static const char* icon_play_xpm[] = {
+inline constexpr const char* icon_play_xpm[] = {
 "16 16 3 1",
 " 	c None",
 ".	c #4CAF50",
@@ -124,7 +128,7 @@ static const char* icon_play_xpm[] = {
 };
 
 // Remove button icon (16x16)
-static const char* icon_remove_xpm[] = {
+inline constexpr const char* icon_remove_xpm[] = {
 "16 16 3 1",
 " 	c None",
 ".	c #F44336",
@@ -148,7 +152,7 @@ static const char* icon_remove_xpm[] = {
 };
 
 // Settings button icon (16x16)
-static const char* icon_settings_xpm[] = {
+inline constexpr const char* icon_settings_xpm[] = {
 "16 16 3 1",
 " 	c None",
 ".	c #757575",
@@ -172,7 +176,7 @@ static const char* icon_settings_xpm[] = {
 };
 
 // Download icon (16x16)
-static const char* icon_download_xpm[] = {
+inline constexpr const char* icon_download_xpm[] = {
 "16 16 3 1",
 " 	c None",
 ".	c #2196F3",
@@ -196,7 +200,7 @@ static const char* icon_download_xpm[] = {
 };
 
 // Upload icon (16x16)
-static const char* icon_upload_xpm[] = {
+inline constexpr const char* icon_upload_xpm[] = {
 "16 16 3 1",
 " 	c None",
 ".	c #4CAF50",
@@ -220,7 +224,7 @@ static const char* icon_upload_xpm[] = {
 };
 
 // Magnifier / search icon (16x16)
-static const char* icon_search_xpm[] = {
+inline constexpr const char* icon_search_xpm[] = {
 "16 16 2 1",
 " 	c None",
 ".	c #2196F3",
@@ -244,7 +248,7 @@ static const char* icon_search_xpm[] = {
 
 // Network monitor icon (16x16): a globe with a meridian and an equator, so it
 // reads as "connections" rather than as another magnifier.
-static const char* icon_network_xpm[] = {
+inline constexpr const char* icon_network_xpm[] = {
 "16 16 2 1",
 " 	c None",
 ".	c #2196F3",
