@@ -242,4 +242,28 @@ static const char* icon_search_xpm[] = {
 "                "
 };
 
+// Network monitor icon (16x16): a globe with a meridian and an equator, so it
+// reads as "connections" rather than as another magnifier.
+static const char* icon_network_xpm[] = {
+"16 16 2 1",
+" 	c None",
+".	c #2196F3",
+"                ",
+"      ....      ",
+"    ..    ..    ",
+"   .   ..   .   ",
+"  .    ..    .  ",
+"  .  ......  .  ",
+"  .    ..    .  ",
+"  .    ..    .  ",
+"  .    ..    .  ",
+"  .  ......  .  ",
+"  .    ..    .  ",
+"   .   ..   .   ",
+"    ..    ..    ",
+"      ....      ",
+"                ",
+"                "
+};
+
 #endif // ICONS_H

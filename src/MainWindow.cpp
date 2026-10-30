@@ -8,6 +8,7 @@
 #include "AssetLoader.h"
 #include "ToolbarLayout.h"
 #include "SearchManager.h"
+#include "NetworkMonitorDialog.h"
 #include "HttpClient.h"
 #include <FL/Fl.H>
 #include <FL/Fl_Button.H>
@@ -296,6 +297,17 @@ void MainWindow::createToolbar() {
     // lighter than the rest of the toolbar.
     m_limitIdleColor = m_btnLimit->color();
     
+    // Network monitor: what the engine is connected to, and what it has
+    // rejected. Icon only, like its neighbours.
+    m_btnNetwork = new Fl_Button(0, 0, ToolbarLayout::kIconButton,
+                                 ToolbarLayout::kButtonHeight);
+    m_btnNetwork->box(FL_FLAT_BOX);
+    m_btnNetwork->tooltip("Network monitor: connections and engine events");
+    m_btnNetwork->callback(onNetworkMonitor, this);
+    if (Resources::getNetworkIcon()) {
+        m_btnNetwork->image(Resources::getNetworkIcon());
+    }
+
     // Search toggle, last on the right. Fl_Pack lays children out in creation
     // order, so creating it here puts it at the far right of the toolbar.
     m_btnSearch = new Fl_Button(0, 0, ToolbarLayout::kIconButton, ToolbarLayout::kButtonHeight);
@@ -578,6 +590,7 @@ void MainWindow::layoutToolbar(int available) {
     setWidth(m_btnRamMode, ToolbarLayout::kRamButton);
     setWidth(m_btnSearch, ToolbarLayout::kIconButton);
     setWidth(m_btnLimit, ToolbarLayout::kIconButton);
+    setWidth(m_btnNetwork, ToolbarLayout::kIconButton);
 
     // The row of buttons keeps the pack's height policy on every pass, so a
     // resize cannot leave it stretched from the previous layout. The pack
@@ -1357,6 +1370,16 @@ void MainWindow::onSearchToggle(Fl_Widget* w, void* data) {
 void MainWindow::onSearchGo(Fl_Widget* w, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (win) win->startSearch();
+}
+
+void MainWindow::onNetworkMonitor(Fl_Widget* w, void* data) {
+    (void)w;
+    MainWindow* win = static_cast<MainWindow*>(data);
+    if (!win || !win->m_manager) return;
+    // Modal, like the other windows, so the list behind it cannot be removed
+    // from under the rows being read.
+    NetworkMonitorDialog dialog(win->m_manager);
+    dialog.show_modal();
 }
 
 void MainWindow::setSearchStatus(const std::string& text) {

@@ -122,6 +122,8 @@ set(SOURCES
     src/SecurityHashes.cpp
     src/SecurityReputation.cpp
     src/ArchivePreflight.cpp
+    src/SecurityEvents.cpp
+    src/NetworkMonitorDialog.cpp
 )
 
 if(WIN32)
@@ -166,6 +168,8 @@ set(HEADERS
     src/SecurityHashes.h
     src/SecurityReputation.h
     src/ArchivePreflight.h
+    src/SecurityEvents.h
+    src/NetworkMonitorDialog.h
 )
 
 # The shared body of the app: everything except main(). An OBJECT library, so

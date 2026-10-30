@@ -67,7 +67,7 @@ struct ToolbarLayout {
     // Widths of the widgets that never change with the level. The limit button
     // is here, not in the table: it carries an icon only, so it is the same
     // icon-sized button at every level.
-    static constexpr int kIconButton = 46;    // add, create, pause, remove, search, limit
+    static constexpr int kIconButton = 46;    // pause, remove, search, limit, network
     static constexpr int kThemeButton = 34;
     // RAM mode button: icon plus mode text, always fully visible. Wide enough
     // for the longest label (" NORMAL") next to a toolbar icon.
@@ -100,7 +100,7 @@ struct ToolbarLayout {
     // count cannot drift from the arithmetic that depends on it:
     //
     //   3 labelled buttons      -- the three width fields of a Spec
-    //   4 fixed icon buttons    -- pause, remove, search, limit: 4 * kIconButton
+    //   5 fixed icon buttons    -- pause, remove, search, limit, network
     //   2 spacers between groups-- the two spacerWidth entries of a Spec
     //   2 other fixed widgets   -- kThemeButton and kRamButton, one each
     //   2 elastic spacers       -- the centring pair at the two ends
@@ -108,7 +108,7 @@ struct ToolbarLayout {
     // A new toolbar widget therefore has to be added to one of these groups,
     // and kChildCount -- and with it every gap count -- follows it.
     static constexpr int kLabelledButtons = 3;
-    static constexpr int kIconButtons = 4;
+    static constexpr int kIconButtons = 5;
     static constexpr int kGroupSpacers = 2;
     static constexpr int kOtherFixedWidgets = 2;
     static constexpr int kElasticSpacers = 2;

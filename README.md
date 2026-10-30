@@ -36,6 +36,8 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 - Double-click a result (or press Enter) to download it; multi-file magnets offer one checkbox per file, so you fetch only what you want
 - Per-site categories and result pages, shown in a dedicated view with a **Back to my torrents** return
 
+**Network monitor** — the globe button opens what the engine is connected to: every peer link with its torrent, address, port, direction, encryption state, client, rates and progress, plus the events libtorrent reported (peers banned, invalid requests, torrent, file and tracker errors). It shows the connections FTorrent has, not packet contents: there is no capture in this build.
+
 **Preferences** — four tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode).
 
 **Security analysis before downloading**
@@ -113,6 +115,7 @@ ctest --test-dir build --output-on-failure
 | `security_keys` | the key store: round trip, removal, per-file separation and the absence of the key from the stored bytes |
 | `reputation` | provider parsing from canned answers, the service's states and wording, and the exact no-hash sentence |
 | `archive_preflight` | piece arithmetic, sparse head+tail assembly, and a real ZIP/RAR5 listing rebuilt from only its two ends |
+| `security_events` | the engine event log: order, the capacity cap and which end it drops |
 
 `flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 

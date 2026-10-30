@@ -113,6 +113,8 @@ private:
     Fl_Button* m_btnRemove;
     Fl_Button* m_darkModeBtn;
     Fl_Button* m_btnSearch;
+    // Opens the network monitor: connections and engine events.
+    Fl_Button* m_btnNetwork;
     TorrentListWidget* m_torrentList;
     
     // Reachability of each search engine, shown as a dot in the engine
@@ -305,6 +307,7 @@ private:
     static void onPreferences(Fl_Widget* w, void* data);
     static void onToggleTheme(Fl_Widget* w, void* data);
     static void onSearchToggle(Fl_Widget* w, void* data);
+    static void onNetworkMonitor(Fl_Widget* w, void* data);
     static void onSearchGo(Fl_Widget* w, void* data);
     static void onToggleLimit(Fl_Widget* w, void* data);
     static void onToggleCensorship(Fl_Widget* w, void* data);

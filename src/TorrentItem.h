@@ -83,6 +83,10 @@ public:
         int uploadRate;
         double progress;
         std::string flags;
+        // What the network monitor needs beyond the Details list.
+        int port = 0;
+        bool outgoing = false;      // We opened the connection
+        bool encrypted = false;     // The peer link is encrypted
     };
     
     struct FileInfo {

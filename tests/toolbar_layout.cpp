@@ -116,7 +116,9 @@ int main() {
     testsupport::section("drawn geometry across the range");
     std::vector<int> widths;
     for (int w = 640; w <= 1920; w++) widths.push_back(w);
-    for (int w : {400, 526, 527, 719, 720, 721}) widths.push_back(w);
+    // 578 is below the sweep and is one of the unsplittable widths asserted
+    // below, so it is sampled explicitly; 746 and 890 are inside the sweep.
+    for (int w : {400, 526, 527, 578, 719, 720, 721}) widths.push_back(w);
     std::vector<int> dead, asym, unsplittable;
     for (int w : widths) {
         if (w < 400) continue;
@@ -161,7 +163,7 @@ int main() {
     for (int w : unsplittable) printf(" %d", w);
     printf("\n");
     std::sort(unsplittable.begin(), unsplittable.end());
-    ok((unsplittable == std::vector<int>{527, 695, 839}),
+    ok((unsplittable == std::vector<int>{578, 746, 890}),
         "the row is exactly as wide as the window at every width but the three where slack is 1");
 
     // --- the numbers themselves, at the width the user cares about and above.

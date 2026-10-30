@@ -248,6 +248,26 @@ destructor sets, and the digest is then looked up like any other. The answer
 says the SHA-256 was computed locally, because a hash the user did not expect to
 be computed is a surprise worth naming.
 
+## Network monitor
+
+Two pieces, both fed only by what libtorrent reports.
+
+**`SecurityEvents`** is a bounded, mutex-guarded ring buffer of `SecurityEvent`
+(time, torrent, kind, detail). `TorrentSession::processAlerts()` appends peer
+bans, peer errors, invalid requests, torrent/file errors and tracker failures as
+it drains the alert queue. The cap (300) drops the oldest event, because a
+monitor that forgets the newest one is useless.
+
+**`NetworkMonitorDialog`** reads `TorrentManager::getAllTorrents()` and each
+`TorrentItem::getPeers()`. `PeerInfo` carries port, direction and encryption
+next to the fields the Details window already used. The dialog rebuilds only the
+visible tab on its one-second timer, and appends new events instead of
+rebuilding the list.
+
+There is deliberately no packet capture: showing traffic would need raw sockets
+or libpcap, a different privilege level and a different failure mode. The
+dialog says what it shows.
+
 ## 📐 Overview
 
 FTorrent is designed with a modular, object-oriented architecture that clearly separates responsibilities:

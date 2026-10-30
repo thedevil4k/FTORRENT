@@ -85,6 +85,17 @@ To use VirusTotal, open **Preferences ▸ Security** and paste an API key (64 he
 
 Press **Check archive**: it is in **Add Torrent** next to the file list, on the **Security** tab of **Details**, and under the expanded file list of a search result. FTorrent fetches only the first and the last piece of the archive, reads its index, and reports how many entries it lists and whether any of them can run. ZIP keeps its index at the end and RAR5 at both ends, so that is enough to see what is inside without downloading the archive. The pieces go to a temporary folder under the config directory and are deleted as soon as the list is read: nothing is written to your download folder. If the archive's index cannot be read from its two ends, FTorrent says so instead of guessing.
 
+## 🌐 Network monitor
+
+The globe button in the toolbar opens two views of what FTorrent's engine is doing:
+
+-   **Connections** — every peer link right now: torrent, address, port, whether FTorrent opened it (`out`) or the peer did (`in`), whether the link is encrypted, the client, the rates and how much of the torrent that peer has. The line above the list counts them.
+-   **Events** — what the engine reported and acted on: peers banned, peer errors, invalid requests, torrent and file errors, tracker failures. It is cleared with **Clear events** and capped, so a long session cannot grow it without bound.
+
+The list refreshes itself once a second while the window is open.
+
+What this is **not**: it does not capture packets and cannot show what travels over a connection. It shows the connections and the engine's own decisions about them. A packet view would need a different mechanism (raw sockets or libpcap) and is not part of this build.
+
 ## ❓ Frequently Asked Questions
 
 **Where are my files saved?**

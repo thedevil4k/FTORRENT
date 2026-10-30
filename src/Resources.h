@@ -38,6 +38,8 @@ public:
     static Fl_Pixmap* getDownloadIcon();
     static Fl_Pixmap* getUploadIcon();
     static Fl_Image* getSearchIcon();
+    // Globe for the network monitor button.
+    static Fl_Image* getNetworkIcon();
     
 private:
     static Fl_RGB_Image* s_logo;
@@ -49,6 +51,7 @@ private:
     static Fl_Pixmap* s_iconDownload;
     static Fl_Pixmap* s_iconUpload;
     static Fl_Image* s_iconSearch;
+    static Fl_Image* s_iconNetwork;
 };
 
 #endif // RESOURCES_H

@@ -11,9 +11,25 @@
 #include <libtorrent/bencode.hpp>
 #include "SettingsManager.h"
 #include "PathUtils.h"
+#include "SecurityEvents.h"
 #include "TorrentItem.h"
 
 namespace fs = std::filesystem;
+
+namespace {
+
+// The name a person would recognise for the torrent behind an alert. Metadata
+// may not have arrived yet; "torrent" is better than an empty column.
+std::string torrentNameOf(const lt::torrent_handle& handle) {
+    try {
+        if (auto info = handle.torrent_file()) return info->name();
+    } catch (...) {
+        // A handle can go stale mid-loop; the event is still worth recording.
+    }
+    return "torrent";
+}
+
+} // namespace
 
 TorrentSession::TorrentSession() 
     : m_initialized(false) {
@@ -363,11 +379,15 @@ void TorrentSession::processAlerts() {
             // with deprecated functions disabled (vcpkg); use filename() instead.
             std::string msg = std::string("Torrent error [") + err->filename() + "]: " + err->message();
             std::cerr << msg << std::endl;
+            SecurityEvents::instance().add(torrentNameOf(err->handle),
+                                           "Torrent error", err->message());
             if (m_errorCallback) m_errorCallback(msg);
         }
         else if (auto* fea = lt::alert_cast<lt::file_error_alert>(alert)) {
             std::string msg = std::string("File error: ") + fea->filename() + " - " + fea->message();
             std::cerr << msg << std::endl;
+            SecurityEvents::instance().add(torrentNameOf(fea->handle),
+                                           "File error", fea->message());
             if (m_errorCallback) m_errorCallback(msg);
         }
         else if (auto* add = lt::alert_cast<lt::add_torrent_alert>(alert)) {
@@ -409,6 +429,24 @@ void TorrentSession::processAlerts() {
         else if (auto* tea = lt::alert_cast<lt::tracker_error_alert>(alert)) {
             // Log tracker errors but don't alert user every time as they are common
             std::cerr << "Tracker error: " << tea->tracker_url() << " - " << tea->error_message() << std::endl;
+            SecurityEvents::instance().add(
+                torrentNameOf(tea->handle), "Tracker error",
+                std::string(tea->tracker_url()) + ": " + tea->error_message());
+        }
+        // Connection-level events for the network monitor. They are recorded,
+        // not acted on: libtorrent has already made its own decision about the
+        // peer by the time the alert exists.
+        else if (auto* ban = lt::alert_cast<lt::peer_ban_alert>(alert)) {
+            SecurityEvents::instance().add(torrentNameOf(ban->handle),
+                                           "Peer banned", ban->message());
+        }
+        else if (auto* perr = lt::alert_cast<lt::peer_error_alert>(alert)) {
+            SecurityEvents::instance().add(torrentNameOf(perr->handle),
+                                           "Peer error", perr->message());
+        }
+        else if (auto* inv = lt::alert_cast<lt::invalid_request_alert>(alert)) {
+            SecurityEvents::instance().add(torrentNameOf(inv->handle),
+                                           "Invalid request", inv->message());
         }
     }
 }

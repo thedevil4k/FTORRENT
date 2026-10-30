@@ -234,10 +234,18 @@ std::vector<TorrentItem::PeerInfo> TorrentItem::getPeers() const {
 #if LIBTORRENT_VERSION_NUM >= 20100
         // peer_info::ip was removed in libtorrent 2.1, use remote_endpoint().
         info.ip = p.remote_endpoint().address().to_string();
+        info.port = p.remote_endpoint().port();
 #else
         info.ip = p.ip.address().to_string();
+        info.port = p.ip.port();
 #endif
         info.client = p.client;
+        // Direction and encryption are facts about the link, not about the
+        // data, so the monitor can state them without inspecting traffic.
+        info.outgoing = static_cast<bool>(p.flags & lt::peer_info::outgoing_connection);
+        info.encrypted = static_cast<bool>(
+            p.flags & (lt::peer_info::rc4_encrypted |
+                       lt::peer_info::plaintext_encrypted));
         info.downloadRate = p.down_speed;
         info.uploadRate = p.up_speed;
         info.progress = p.progress;
