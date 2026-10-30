@@ -32,6 +32,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 **Search**
 - Search torrents from the toolbar across SolidTorrents, BitSearch, Nyaa.si, The Pirate Bay (HTML and its apibay API), BTDig and Pirate Face — with a proxy/mirror fallback wherever the site offers one
 - A status dot next to each engine: green = reachable, red = unreachable, gray = not checked yet (checked once per session, in the background, when you first open search)
+- **All engines** is the first choice in the engine dropdown: every enabled site is searched at once, each in its own worker, and rows appear as each one answers. A slow or blocked site costs its own line in the status bar and never holds up the rest; the table is repainted once per burst of arrivals, not once per row
 - Expand any result to see the files it downloads before downloading anything; names are shown in full whenever the window has room
 - Double-click a result (or press Enter) to download it; multi-file magnets offer one checkbox per file, so you fetch only what you want
 - Per-site categories and result pages, shown in a dedicated view with a **Back to my torrents** return

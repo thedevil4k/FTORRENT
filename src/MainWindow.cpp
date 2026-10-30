@@ -1404,7 +1404,14 @@ void MainWindow::updateEngineChoice() {
     // a given FLTK release uses for add()/label().
     m_choiceSearchEngine->clear();
     m_engineLabels.clear();
-    int index = 0;
+
+    // Row 0 asks every enabled engine at once. Each one runs in its own worker
+    // and fills the table as it answers, so a slow site never holds up a fast
+    // one. Every other row is a single engine, as before.
+    m_engineLabels.push_back("All engines");
+    m_choiceSearchEngine->add(m_engineLabels.back().c_str());
+
+    int index = 1;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
         // Gray bullet until probed; a cached green/red survives rebuilds.
@@ -1417,15 +1424,15 @@ void MainWindow::updateEngineChoice() {
         item->labelcolor(engineColor(engineStatusOf(d.name)));
         index++;
     }
-    if (index > 0) m_choiceSearchEngine->value(0);
+    if (index > 1) m_choiceSearchEngine->value(0);
     m_choiceSearchEngine->redraw();
     updateCategoryChoice();
 }
 
-// Menu row of an engine, following the same enabled-only order as
-// updateEngineChoice(). -1 when the engine is not listed.
+// Menu row of an engine in updateEngineChoice()'s order, which starts at 1
+// because row 0 is "All engines". -1 when the engine is not listed.
 int MainWindow::engineMenuIndex(const std::string& name) const {
-    int index = 0;
+    int index = 1;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
         if (d.name == name) return index;
@@ -1522,12 +1529,14 @@ void MainWindow::applyEngineStatus(const std::string& name, bool up) {
 void MainWindow::updateCategoryChoice() {
     if (!m_choiceSearchCategory) return;
     
+    // Row 0 is "All engines", which has no categories of its own: searching
+    // everything means "all" for each site.
     const SearchEngine::Definition* def = nullptr;
-    if (m_choiceSearchEngine && m_choiceSearchEngine->value() >= 0) {
-        int chosen = 0;
+    if (m_choiceSearchEngine && m_choiceSearchEngine->value() > 0) {
+        int row = 1;
         for (const auto& d : SearchManager::instance().engines()) {
             if (!d.enabled) continue;
-            if (chosen++ == m_choiceSearchEngine->value()) {
+            if (row++ == m_choiceSearchEngine->value()) {
                 def = &d;
                 break;
             }
@@ -1589,24 +1598,26 @@ void MainWindow::startSearch() {
         return;
     }
     
+    // Row 0 is "All engines"; every other row picks exactly one.
+    const int selection = m_choiceSearchEngine->value();
     std::vector<SearchEngine::Definition> engines;
-    int chosen = 0;
+    int row = 1;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
-        if (chosen++ == m_choiceSearchEngine->value()) {
-            engines.push_back(d);
-            break;
-        }
+        if (selection == 0 || selection == row) engines.push_back(d);
+        ++row;
+        if (selection != 0 && !engines.empty()) break;
     }
     if (engines.empty()) {
         setSearchStatus("No search engine available");
         return;
     }
     
-    // Category of the selected engine, or "all" when it declares none.
+    // Category of the selected engine, or "all" when it declares none. A
+    // search across every engine has no single category to offer.
     std::string category = "all";
-    if (m_choiceSearchCategory && m_choiceSearchCategory->visible() &&
-        m_choiceSearchCategory->value() >= 0) {
+    if (selection > 0 && m_choiceSearchCategory &&
+        m_choiceSearchCategory->visible() && m_choiceSearchCategory->value() >= 0) {
         const char* picked = m_choiceSearchCategory->text(m_choiceSearchCategory->value());
         if (picked && picked[0] != '\0') category = picked;
     }
@@ -1616,73 +1627,241 @@ void MainWindow::startSearch() {
     const unsigned long generation = ++m_searchGeneration;
     m_searching = true;
     m_searchCancelled = false;
-    setSearchStatus("Searching...");
+    m_engineStates.clear();
+    for (const SearchEngine::Definition& def : engines) {
+        m_engineStates[def.name] = EngineState{};
+    }
     if (m_searchResults) m_searchResults->clear();
     {
-        // The generation was just bumped above, so no batch from the search
+        // The generation was just bumped above, so no message from the search
         // being replaced can be parked after this point. Whatever it had
         // already parsed is dropped here: the table was just emptied, and
         // those rows belong to a search the user has moved on from.
         std::lock_guard<std::mutex> lock(m_searchMutex);
-        m_pendingBatch.clear();
+        m_pendingEvents.clear();
     }
     if (m_btnSearchCancel) m_btnSearchCancel->show();
     if (m_btnSearchGo) m_btnSearchGo->deactivate();
     m_toolbar->redraw();
-    
-    std::thread([this, query, engines, generation, category]() {
-        SearchEngine engine(engines[0]);
-        
-        auto isCurrent = [this, generation]() {
-            return generation == m_searchGeneration;
-        };
-        
-        // Rows are delivered as they are parsed rather than all at the end, so a
-        // slow site fills the table progressively. Fl::awake only takes a plain
-        // function, so the batch is parked under the mutex and picked up there.
-        std::string error;
-        engine.searchStreaming(query,
-            [this, isCurrent, generation](const std::vector<SearchResult>& batch) {
-                if (batch.empty() || !isCurrent()) return;
-                {
-                    std::lock_guard<std::mutex> lock(m_searchMutex);
-                    // Checked again with the lock held: a new search may have
-                    // taken over between the test above and this line, and its
-                    // table was cleared. Parking a batch from the superseded
-                    // search now would mix its rows into the new results.
-                    if (generation != m_searchGeneration.load()) return;
-                    m_pendingBatch.push_back(batch);
-                }
-                Fl::awake(&MainWindow::handleSearchBatch, this);
-            },
-            [this, isCurrent]() { return !isCurrent() || m_searchCancelled.load(); },
-            error,
-            category,
-            [this, isCurrent](const std::string& stage) {
-                if (!isCurrent() || stage.empty()) return;
-                {
-                    std::lock_guard<std::mutex> lock(m_searchMutex);
-                    m_pendingStatus = stage;
-                }
-                Fl::awake(&MainWindow::handleSearchStatus, this);
-            });
-        
-        // A newer search took over while this one was running: leave the state,
-        // the table and the buttons to it.
-        if (!isCurrent()) return;
-        
-        {
-            std::lock_guard<std::mutex> lock(m_searchMutex);
-            m_pendingSearch.results.clear();
-            m_pendingSearch.engine = engines[0].name;
-            m_pendingSearch.error = error;
-        }
-        Fl::awake(&MainWindow::handleSearchDone, this);
-    }).detach();
+    updateSearchProgressStatus();
+
+    // One thread per engine, not one per search. A site that hangs costs its
+    // own row in the status line and nothing else: the others keep filling the
+    // table while it times out.
+    for (const SearchEngine::Definition& def : engines) {
+        std::thread([this, query, def, generation, category]() {
+            SearchEngine engine(def);
+
+            auto isCurrent = [this, generation]() {
+                return generation == m_searchGeneration.load();
+            };
+
+            // Rows are delivered as they are parsed rather than all at the end,
+            // so a slow site fills the table progressively. Fl::awake only takes
+            // a plain function, so each message is parked under the mutex and
+            // picked up there.
+            std::string error;
+            bool ok = false;
+            try {
+                ok = engine.searchStreaming(query,
+                    [this, def, generation, isCurrent](
+                        const std::vector<SearchResult>& batch) {
+                        if (batch.empty() || !isCurrent()) return;
+                        SearchEvent event;
+                        event.kind = SearchEvent::Kind::Batch;
+                        event.engine = def.name;
+                        event.batch = batch;
+                        postSearchEvent(std::move(event), generation);
+                    },
+                    [this, isCurrent]() {
+                        return !isCurrent() || m_searchCancelled.load();
+                    },
+                    error,
+                    category,
+                    [this, def, generation, isCurrent](const std::string& stage) {
+                        if (stage.empty() || !isCurrent()) return;
+                        SearchEvent event;
+                        event.kind = SearchEvent::Kind::Stage;
+                        event.engine = def.name;
+                        event.text = stage;
+                        postSearchEvent(std::move(event), generation);
+                    });
+            } catch (const std::exception& e) {
+                ok = false;
+                error = e.what();
+            } catch (...) {
+                ok = false;
+                error = "the engine failed unexpectedly";
+            }
+
+            // A newer search took over: leave the state, the table and the
+            // buttons to it.
+            if (!isCurrent()) return;
+
+            SearchEvent done;
+            done.kind = SearchEvent::Kind::EngineDone;
+            done.engine = def.name;
+            done.text = error;
+            done.ok = ok;
+            postSearchEvent(std::move(done), generation);
+        }).detach();
+    }
 }
 
-void MainWindow::appendSearchResults(const std::vector<SearchResult>& batch) {
-    if (m_searchResults) m_searchResults->appendResults(batch);
+// Worker side. The generation is checked again with the lock held: a new search
+// may have taken over between the caller's test and this line, and its table
+// was cleared. Parking a message from the superseded search now would mix its
+// rows into the new results.
+void MainWindow::postSearchEvent(SearchEvent event, unsigned long generation) {
+    if (!s_alive) return;
+    {
+        std::lock_guard<std::mutex> lock(m_searchMutex);
+        if (generation != m_searchGeneration.load()) return;
+        event.generation = generation;
+        m_pendingEvents.push_back(std::move(event));
+    }
+    Fl::awake(&MainWindow::handleSearchEvents, this);
+}
+
+// UI side: drains everything the workers posted and repaints once.
+void MainWindow::handleSearchEvents(void* data) {
+    MainWindow* win = static_cast<MainWindow*>(data);
+    if (!win || !s_alive) return;
+    // A cancelled search put the UI back in order already; nothing it parked
+    // may be painted now.
+    if (!win->m_searching) return;
+
+    const unsigned long generation = win->m_searchGeneration.load();
+    std::deque<SearchEvent> events;
+    {
+        std::lock_guard<std::mutex> lock(win->m_searchMutex);
+        events.swap(win->m_pendingEvents);
+    }
+    if (events.empty()) return;
+
+    // Every batch of this wake is appended together: one re-sort and one
+    // repaint, however many engines and batches are behind it.
+    std::vector<SearchResult> rows;
+    bool finishedOne = false;
+    std::string lastStage;
+    std::string lastError;
+    bool errorFromSingle = false;
+
+    for (SearchEvent& event : events) {
+        // Parked by a search that has since been replaced or cancelled.
+        if (event.generation != generation) continue;
+        switch (event.kind) {
+            case SearchEvent::Kind::Batch:
+                rows.insert(rows.end(), event.batch.begin(), event.batch.end());
+                break;
+            case SearchEvent::Kind::Stage:
+                lastStage = event.text;
+                break;
+            case SearchEvent::Kind::EngineDone: {
+                auto state = win->m_engineStates.find(event.engine);
+                if (state != win->m_engineStates.end()) {
+                    state->second.running = false;
+                    state->second.failed = !event.ok;
+                }
+                if (!event.ok && !event.text.empty()) {
+                    lastError = event.text;
+                    errorFromSingle = win->m_engineStates.size() == 1;
+                }
+                finishedOne = true;
+                break;
+            }
+        }
+    }
+
+    if (!rows.empty() && win->m_searchResults) {
+        win->m_searchResults->appendResults(rows);
+    }
+
+    if (!win->m_searching) return;   // cancelled while this was in flight
+
+    if (win->m_engineStates.size() <= 1) {
+        // One engine: its own stage line is the most useful thing to show.
+        if (errorFromSingle && !lastError.empty()) {
+            win->setSearchStatus(lastError);
+        } else if (!lastStage.empty()) {
+            win->setSearchStatus(lastStage);
+        } else if (!rows.empty() && win->m_searchResults) {
+            win->setSearchStatus(
+                std::to_string(win->m_searchResults->rowCount()) +
+                " results...");
+        }
+    }
+
+    if (win->m_engineStates.size() > 1 && finishedOne) {
+        win->updateSearchProgressStatus();
+    }
+
+    bool stillRunning = false;
+    for (const auto& entry : win->m_engineStates) {
+        if (entry.second.running) stillRunning = true;
+    }
+    if (!stillRunning) win->finishSearch();
+}
+
+// UI side: one line for a whole search, so several engines can report at once
+// without fighting over the status widget.
+void MainWindow::updateSearchProgressStatus() {
+    const int total = static_cast<int>(m_engineStates.size());
+    const int rows = m_searchResults ? m_searchResults->rowCount() : 0;
+
+    if (total <= 1) {
+        setSearchStatus(rows > 0 ? std::to_string(rows) + " results..."
+                                 : std::string("Searching..."));
+        return;
+    }
+
+    int done = 0;
+    std::string failedNames;
+    for (const auto& entry : m_engineStates) {
+        if (!entry.second.running) ++done;
+        if (entry.second.failed) {
+            if (!failedNames.empty()) failedNames += ", ";
+            failedNames += entry.first;
+        }
+    }
+
+    std::string text = "Searching " + std::to_string(done) + "/" +
+                       std::to_string(total) + " engines";
+    if (rows > 0) text += " · " + std::to_string(rows) + " results";
+    if (!failedNames.empty()) text += " · failed: " + failedNames;
+    setSearchStatus(text);
+}
+
+// UI side: the last engine of a search has reported.
+void MainWindow::finishSearch() {
+    m_searching = false;
+    m_searchCancelled = false;
+    if (m_btnSearchCancel) m_btnSearchCancel->hide();
+    if (m_btnSearchGo) m_btnSearchGo->activate();
+    m_toolbar->redraw();
+
+    const int rows = m_searchResults ? m_searchResults->rowCount() : 0;
+    int answered = 0;
+    std::string failedNames;
+    for (const auto& entry : m_engineStates) {
+        if (!entry.second.failed) ++answered;
+        else {
+            if (!failedNames.empty()) failedNames += ", ";
+            failedNames += entry.first;
+        }
+    }
+
+    std::string text;
+    if (rows == 0) {
+        text = "No results";
+    } else {
+        text = std::to_string(rows) + (rows == 1 ? " result" : " results");
+        if (m_engineStates.size() > 1) {
+            text += " from " + std::to_string(answered) + " engine(s)";
+        }
+    }
+    if (!failedNames.empty()) text += " · failed: " + failedNames;
+    setSearchStatus(text);
 }
 
 void MainWindow::onSearchCancelClick(Fl_Widget* w, void* data) {
@@ -1706,70 +1885,16 @@ void MainWindow::onSearchCancelClick(Fl_Widget* w, void* data) {
         }
     }
     
-    // Bumping the generation tells the worker thread that its results no longer
-    // belong on screen, so nothing lands in the table after the cancel.
+    // Bumping the generation tells every worker that its results no longer
+    // belong on screen, so nothing lands in the table after the cancel. The
+    // queue is emptied too: whatever was already parked belongs to the search
+    // the user just stopped.
     ++win->m_searchGeneration;
-}
-
-// Paints the results parsed by the search thread, so rows appear while the
-// search runs. Every batch waiting is painted, not just one: Fl::awake() wakes
-// the UI once per batch but the payload is parked in m_pendingBatch, so taking
-// a single slot silently threw away every batch but the last.
-void MainWindow::handleSearchBatch(void* data) {
-    MainWindow* win = (MainWindow*)data;
-    if (!win || !s_alive) return;
-    
-    // The whole queue moves out at once, so each batch is appended exactly
-    // once no matter how many times the UI thread is woken for it.
-    std::deque<std::vector<SearchResult>> batches;
     {
         std::lock_guard<std::mutex> lock(win->m_searchMutex);
-        batches.swap(win->m_pendingBatch);
+        win->m_pendingEvents.clear();
     }
-    if (batches.empty() || !win->m_searchResults) return;
-    
-    // Painted in the order the search produced them, so the table keeps the
-    // engine's ordering until the user re-sorts it by clicking a header.
-    for (const auto& batch : batches) {
-        if (!batch.empty()) win->appendSearchResults(batch);
-    }
-    win->setSearchStatus("Found " +
-        std::to_string(win->m_searchResults->rowCount()) + " results...");
-}
-
-// Restores the search controls once the worker thread is done.
-void MainWindow::handleSearchDone(void* data) {
-    MainWindow* win = (MainWindow*)data;
-    if (!win || !s_alive) return;
-    
-    PendingSearch pending;
-    {
-        std::lock_guard<std::mutex> lock(win->m_searchMutex);
-        pending = win->m_pendingSearch;
-        win->m_pendingSearch.results.clear();
-        win->m_pendingSearch.engine.clear();
-        win->m_pendingSearch.error.clear();
-    }
-    
-    win->m_searching = false;
-    win->m_searchCancelled = false;
-    if (win->m_btnSearchCancel) win->m_btnSearchCancel->hide();
-    if (win->m_btnSearchGo) win->m_btnSearchGo->activate();
-    win->onSearchResults(pending.results, pending.engine, pending.error);
-}
-
-// Paints a stage line posted by the search thread ("Contacting X..."), so a
-// stall names its culprit instead of leaving a bare "Searching...".
-void MainWindow::handleSearchStatus(void* data) {
-    MainWindow* win = (MainWindow*)data;
-    if (!win || !s_alive) return;
-    
-    std::string text;
-    {
-        std::lock_guard<std::mutex> lock(win->m_searchMutex);
-        text.swap(win->m_pendingStatus);
-    }
-    if (!text.empty()) win->setSearchStatus(text);
+    win->m_engineStates.clear();
 }
 
 // Repaints the status bar after the latency measurement finishes.
@@ -1777,21 +1902,6 @@ void MainWindow::handleStatusRefresh(void* data) {
     MainWindow* win = (MainWindow*)data;
     if (!win || !s_alive) return;
     win->updateStatusBar();
-}
-
-void MainWindow::onSearchResults(const std::vector<SearchResult>& results,
-                                 const std::string& engineName,
-                                 const std::string& error) {
-    if (!results.empty() && m_searchResults) {
-        m_searchResults->appendResults(results);
-    }
-    
-    int count = m_searchResults ? m_searchResults->rowCount() : 0;
-    if (count > 0) {
-        setSearchStatus(std::to_string(count) + " results from " + engineName);
-    } else {
-        setSearchStatus(error.empty() ? "No results" : error);
-    }
 }
 
 void MainWindow::updateRamModeButton() {

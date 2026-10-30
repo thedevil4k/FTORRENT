@@ -179,34 +179,43 @@ private:
     // cannot carry its results inside a capturing lambda. They are parked here
     // under a mutex instead, and the callback (which receives "this") picks
     // them up on the UI thread.
-    struct PendingSearch {
-        std::vector<SearchResult> results;
+    // One thing a search worker reports to the UI thread. A search may run
+    // several engines at once, so every message says which engine it came from
+    // and the UI keeps a per-engine state instead of a single "done" flag.
+    struct SearchEvent {
+        enum class Kind { Batch, Stage, EngineDone };
+        Kind kind = Kind::Batch;
         std::string engine;
-        std::string error;
+        std::vector<SearchResult> batch;   // Batch only
+        std::string text;                  // Stage line, or EngineDone's error
+        bool ok = true;                    // EngineDone: finished without error
+        // The search this message belongs to. Checked again on the UI thread,
+        // so a message parked before a cancel or a new search is dropped
+        // instead of painting rows into a table that has moved on.
+        unsigned long generation = 0;
     };
+    // Progress of one engine, touched only on the UI thread. 'running' ends
+    // when that engine reports EngineDone, whatever the others are doing: one
+    // slow or blocked site never holds up the rest.
+    struct EngineState {
+        bool running = true;
+        bool failed = false;
+    };
+
     // Fl::awake() takes a plain function pointer, so the handlers that bring
     // worker results back to the UI are static members: that way they keep
     // access to the private state they need.
-    static void handleSearchBatch(void* data);
-    static void handleSearchDone(void* data);
+    static void handleSearchEvents(void* data);
     static void handleStatusRefresh(void* data);
-    static void handleSearchStatus(void* data);
     std::mutex m_searchMutex;
-    PendingSearch m_pendingSearch;
-    // Batches parsed by the search thread, waiting to be painted. Fl::awake
-    // only accepts a plain function, so the data travels through here.
-    //
-    // This is a queue and not a single batch on purpose. Fl::awake() only
-    // queues the handler, not the payload, so two batches parsed back to back
-    // woke the UI twice but left only the second one in memory: the handler
-    // drained an empty slot and the first batch was dropped without a trace.
-    // A search of 100 results showed 25 for that reason. Every batch is now
-    // parked in order and the handler takes all of them at once.
-    std::deque<std::vector<SearchResult>> m_pendingBatch;
-    // One-line status posted by the search thread ("Contacting X, page N").
-    // Painted on the UI thread so a stall names its culprit instead of
-    // leaving a bare "Searching...".
-    std::string m_pendingStatus;
+    // Everything the workers posted, in the order they posted it. A queue and
+    // not a single slot: Fl::awake() only queues the handler, not the payload,
+    // so two messages back to back used to overwrite each other and a batch
+    // was lost without a trace. The handler drains all of them per wake, and
+    // appends their batches in one go so a burst costs one repaint.
+    std::deque<SearchEvent> m_pendingEvents;
+    // UI-thread only: which engines this search started, and how each is doing.
+    std::map<std::string, EngineState> m_engineStates;
     
     // Manager
     TorrentManager* m_manager;
@@ -286,10 +295,13 @@ private:
     static void handleEngineStatus(void* data);
     void updateCategoryChoice();
     void setSearchStatus(const std::string& text);
-    void onSearchResults(const std::vector<SearchResult>& results,
-                         const std::string& engineName,
-                         const std::string& error);
-    void appendSearchResults(const std::vector<SearchResult>& batch);
+    // Worker side: park one message and wake the UI thread. 'generation' is the
+    // search the worker belongs to; a superseded search is dropped.
+    void postSearchEvent(SearchEvent event, unsigned long generation);
+    // UI side: called when the last engine of a search has reported.
+    void finishSearch();
+    // UI side: one line describing how the whole search is going.
+    void updateSearchProgressStatus();
     static void onSearchCancelClick(Fl_Widget* w, void* data);
     void loadSearchEngines();
     

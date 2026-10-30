@@ -39,6 +39,12 @@ FTorrent includes built-in features to protect your sensitive information:
 -   **IP Censorship:** Click the **eye icon** in the status bar to mask your public IP address. This is useful for streamers or when sharing screenshots.
 -   **Persistent Privacy:** Your censorship preference is saved automatically for future sessions.
 
+## 🔎 Searching
+
+The magnifier button switches to the search view. Pick a site in the dropdown, or leave **All engines** selected to ask every enabled site at once.
+
+With **All engines**, each site runs on its own, so results appear as they answer rather than all at the end: a fast site fills the table while a slow one is still connecting, and a site that fails is named in the status line (`Searching 4/7 engines · 120 results · failed: Nyaa`) without stopping the others. The table is repainted once per burst of arrivals, which is what keeps the window responsive while thousands of rows are landing. **Cancel** stops every engine at once and keeps the rows already shown.
+
 ## 📊 Understanding the Interface
 
 -   **Torrent List:** Shows the name, size, progress, speed, and status of each download.

@@ -75,6 +75,7 @@ ftorrent_add_test(security_keys security_keys.cpp)
 ftorrent_add_test(reputation reputation.cpp)
 ftorrent_add_test(archive_preflight archive_preflight.cpp)
 ftorrent_add_test(security_events security_events.cpp)
+ftorrent_add_test(search_results search_results.cpp)
 
 # The archive reader is optional, so its test is only built when the reader is.
 # FTORRENT_HAVE_LIBARCHIVE is set by the parent CMakeLists.txt and also reaches
@@ -118,10 +119,11 @@ add_test(NAME security_keys COMMAND security_keys)
 add_test(NAME reputation COMMAND reputation)
 add_test(NAME archive_preflight COMMAND archive_preflight)
 add_test(NAME security_events COMMAND security_events)
+add_test(NAME search_results COMMAND search_results)
 
 set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
     security_analyzer security_badge security_keys reputation archive_preflight
-    security_events)
+    security_events search_results)
 if(FTORRENT_HAVE_LIBARCHIVE)
     add_test(NAME archive_inspector COMMAND archive_inspector)
     list(APPEND FTORRENT_TESTS archive_inspector)
@@ -141,7 +143,7 @@ set_tests_properties(toolbar_layout PROPERTIES TIMEOUT 300)
 # headless and offline, `ui` needs FLTK but not the network, and `network`
 # covers the end-to-end journeys that talk to search engines and trackers.
 set_tests_properties(toolbar_layout toolbar_clicks icons_full security_badge
-    PROPERTIES LABELS "ui")
+    search_results PROPERTIES LABELS "ui")
 set_tests_properties(file_hash security_analyzer security_keys
     PROPERTIES LABELS "unit")
 # reputation drives Fl::awake() delivery, so it needs the FLTK event loop even

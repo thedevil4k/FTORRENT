@@ -182,29 +182,35 @@ int main() {
     // run's network, so only the gray baseline is asserted here.
     Fl_Choice* engines = engineChoice(top);
     ok(engines != nullptr, "engine dropdown exists");
-    int nEngines = 0, nPlain = 0, nBulleted = 0, nDrawn = 0;
+    int rows = 0, nPlain = 0, nBulleted = 0, nDrawn = 0;
+    bool allFirst = false;
     if (engines) {
         for (const Fl_Menu_Item* m = engines->menu(); m && m->label(); ++m) {
-            nEngines++;
+            // Row 0 is "All engines", a mode rather than a site: it has no
+            // reachability of its own, so it carries no bullet on purpose.
+            const bool isMode = rows == 0 && strcmp(m->label(), "All engines") == 0;
+            if (isMode) allFirst = true;
+            rows++;
             // No images, ever: a non-normal labeltype means someone rehung a
             // picture on the rows, which is how the blank dropdowns happened.
             if (m->labeltype() == FL_NORMAL_LABEL) nPlain++;
-            if (strncmp(m->label(), "\xE2\x97\x8F ", 4) == 0) nBulleted++;
+            if (isMode || strncmp(m->label(), "\xE2\x97\x8F ", 4) == 0) nBulleted++;
             int ink = menuRowInk(m, engines);
             char inkMsg[160];
             snprintf(inkMsg, sizeof inkMsg,
-                     "engine row renders bullet and name (%d ink px)", ink);
+                     "dropdown row renders its text (%d ink px)", ink);
             ok(ink > 200, inkMsg);
             if (ink > 200) nDrawn++;
         }
     }
-    ok(nEngines > 0, "dropdown lists engines");
-    ok(nPlain == nEngines && nEngines > 0,
-       "every engine row is plain text (no menu images)");
-    ok(nBulleted == nEngines && nEngines > 0,
-       "every engine row carries the status bullet");
-    ok(nDrawn == nEngines && nEngines > 0,
-       "no engine row renders blank");
+    ok(rows > 1, "dropdown lists the all-engines mode and the engines");
+    ok(allFirst, "the first row is the all-engines mode");
+    ok(nPlain == rows && rows > 0,
+       "every dropdown row is plain text (no menu images)");
+    ok(nBulleted == rows && rows > 0,
+       "every engine row carries the status bullet, and the mode row does not");
+    ok(nDrawn == rows && rows > 0,
+       "no dropdown row renders blank");
     // Let the probes run and deliver (Fl::awake is drained by Fl::wait); the
     // verdict itself is network-dependent and is not asserted, but surviving
     // the deliveries without hanging is.
