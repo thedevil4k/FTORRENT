@@ -76,6 +76,7 @@ ftorrent_add_test(reputation reputation.cpp)
 ftorrent_add_test(archive_preflight archive_preflight.cpp)
 ftorrent_add_test(security_events security_events.cpp)
 ftorrent_add_test(search_results search_results.cpp)
+ftorrent_add_test(search_scope search_scope.cpp)
 
 # The archive reader is optional, so its test is only built when the reader is.
 # FTORRENT_HAVE_LIBARCHIVE is set by the parent CMakeLists.txt and also reaches
@@ -120,10 +121,11 @@ add_test(NAME reputation COMMAND reputation)
 add_test(NAME archive_preflight COMMAND archive_preflight)
 add_test(NAME security_events COMMAND security_events)
 add_test(NAME search_results COMMAND search_results)
+add_test(NAME search_scope COMMAND search_scope)
 
 set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
     security_analyzer security_badge security_keys reputation archive_preflight
-    security_events search_results)
+    security_events search_results search_scope)
 if(FTORRENT_HAVE_LIBARCHIVE)
     add_test(NAME archive_inspector COMMAND archive_inspector)
     list(APPEND FTORRENT_TESTS archive_inspector)

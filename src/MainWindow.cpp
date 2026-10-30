@@ -8,6 +8,7 @@
 #include "AssetLoader.h"
 #include "ToolbarLayout.h"
 #include "SearchManager.h"
+#include "SearchScope.h"
 #include "NetworkMonitorDialog.h"
 #include "HttpClient.h"
 #include <FL/Fl.H>
@@ -1424,7 +1425,10 @@ void MainWindow::updateEngineChoice() {
         item->labelcolor(engineColor(engineStatusOf(d.name)));
         index++;
     }
-    if (index > 1) m_choiceSearchEngine->value(0);
+    // Default to the first real engine, not to the all-engines mode: a search
+    // the user did not ask to widen must not reach every site at once. The
+    // all-engines row stays available as an explicit choice.
+    if (index > 1) m_choiceSearchEngine->value(1);
     m_choiceSearchEngine->redraw();
     updateCategoryChoice();
 }
@@ -1598,16 +1602,12 @@ void MainWindow::startSearch() {
         return;
     }
     
-    // Row 0 is "All engines"; every other row picks exactly one.
+    // Row 0 is the explicit "All engines" mode; every other row picks exactly
+    // one engine, and the requests go to that engine only. The mapping lives in
+    // SearchScope so it can be tested.
     const int selection = m_choiceSearchEngine->value();
-    std::vector<SearchEngine::Definition> engines;
-    int row = 1;
-    for (const auto& d : SearchManager::instance().engines()) {
-        if (!d.enabled) continue;
-        if (selection == 0 || selection == row) engines.push_back(d);
-        ++row;
-        if (selection != 0 && !engines.empty()) break;
-    }
+    std::vector<SearchEngine::Definition> engines =
+        searchScopeForRow(SearchManager::instance().engines(), selection);
     if (engines.empty()) {
         setSearchStatus("No search engine available");
         return;
@@ -1616,7 +1616,7 @@ void MainWindow::startSearch() {
     // Category of the selected engine, or "all" when it declares none. A
     // search across every engine has no single category to offer.
     std::string category = "all";
-    if (selection > 0 && m_choiceSearchCategory &&
+    if (!isAllEnginesRow(selection) && m_choiceSearchCategory &&
         m_choiceSearchCategory->visible() && m_choiceSearchCategory->value() >= 0) {
         const char* picked = m_choiceSearchCategory->text(m_choiceSearchCategory->value());
         if (picked && picked[0] != '\0') category = picked;

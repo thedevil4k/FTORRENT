@@ -124,6 +124,7 @@ set(SOURCES
     src/ArchivePreflight.cpp
     src/SecurityEvents.cpp
     src/NetworkMonitorDialog.cpp
+    src/SearchScope.cpp
 )
 
 if(WIN32)
@@ -170,6 +171,7 @@ set(HEADERS
     src/ArchivePreflight.h
     src/SecurityEvents.h
     src/NetworkMonitorDialog.h
+    src/SearchScope.h
     src/Version.h
 )
 
