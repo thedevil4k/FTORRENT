@@ -54,7 +54,9 @@ public:
 class MalwareBazaarProvider : public ReputationProvider {
 public:
     std::string name() const override { return "MalwareBazaar"; }
-    bool requiresKey() const override { return false; }
+    // abuse.ch requires an Auth-Key on every query; without one the API answers
+    // HTTP 401. That was found by asking it, not by reading its documentation.
+    bool requiresKey() const override { return true; }
 
     ProviderVerdict query(const std::string& sha256, const std::string& apiKey,
                           const std::atomic<bool>& cancel) const override;

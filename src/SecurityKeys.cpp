@@ -56,6 +56,8 @@ bool ensureDirectory(std::string& error) {
 
 const char* SecurityKeys::providerId(Provider provider) {
     switch (provider) {
+        case Provider::MalwareBazaar:
+            return "malwarebazaar";
         case Provider::VirusTotal:
         default:
             return "virustotal";

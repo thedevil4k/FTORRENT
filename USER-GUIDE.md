@@ -79,7 +79,12 @@ Click the shield to ask **VirusTotal** and **MalwareBazaar** about a file's SHA-
 - If it does not and the file is not on disk, FTorrent says exactly `VT no disponible antes de descargar el archivo completo.` It will not download the file just to compute the hash.
 - A record with no detections is reported as such, and is not a guarantee.
 
-To use VirusTotal, open **Preferences ▸ Security** and paste an API key (64 hexadecimal characters). The key is stored with Windows DPAPI, or in a file only your user can read on Linux; it is never written to `settings.ini`. MalwareBazaar needs no key. Without a VirusTotal key, that provider is skipped and MalwareBazaar is still asked.
+Both providers need a key, so open **Preferences ▸ Security** and paste two:
+
+- **VirusTotal API key** — from your VirusTotal account, 64 characters.
+- **MalwareBazaar Auth-Key** — from abuse.ch. MalwareBazaar answers HTTP 401 without it, so it cannot be asked anonymously.
+
+Each is stored with Windows DPAPI, or in a file only your user can read on Linux; neither is ever written to `settings.ini`. If one is missing, that provider is skipped and the other is still asked; the dialog says which.
 
 ### Looking inside a RAR or ZIP
 

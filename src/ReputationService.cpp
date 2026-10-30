@@ -100,6 +100,8 @@ std::string loadKeyFor(const ReputationProvider& provider) {
     std::string key;
     if (provider.name() == "VirusTotal") {
         SecurityKeys::load(SecurityKeys::Provider::VirusTotal, key);
+    } else if (provider.name() == "MalwareBazaar") {
+        SecurityKeys::load(SecurityKeys::Provider::MalwareBazaar, key);
     }
     return key;
 }

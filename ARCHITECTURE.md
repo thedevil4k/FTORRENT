@@ -206,7 +206,11 @@ known to be bad. That is why `SecurityFile::sha256Complete` exists next to
 **`Reputation`** holds the providers. Each one is a `ReputationProvider` and is
 queried with the 64 hex characters of a hash and nothing else. VirusTotal uses
 `GET /api/v3/files/<hash>` with an `x-apikey` header; MalwareBazaar uses a form
-`POST` to `mb-api.abuse.ch`. Both go through `HttpClient`, which now supports
+`POST` to `mb-api.abuse.ch` with an `Auth-Key` header. Both headers are set from
+headers the user stored; a provider without one is skipped rather than asked
+anonymously. (abuse.ch began requiring the Auth-Key; a live check answered 401
+without it, which is why the "open service" assumption in the first version of
+this module was wrong.) Both go through `HttpClient`, which now supports
 request headers and a body, and both refuse to follow redirects: a redirect
 would replay the API key to a host the user never chose. Answers are parsed by
 a small JSON reader with a depth limit and no tolerance for malformed input, so

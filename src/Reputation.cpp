@@ -458,11 +458,15 @@ ProviderVerdict MalwareBazaarProvider::query(const std::string& sha256,
                                              const std::atomic<bool>& cancel) const {
     ProviderVerdict verdict;
     verdict.provider = "MalwareBazaar";
-    (void)apiKey;   // Open service: it never needs a key.
 
     if (!isSha256Hex(sha256)) {
         verdict.summary =
             "MalwareBazaar was not asked: the hash is not a SHA-256.";
+        return verdict;
+    }
+    if (apiKey.empty()) {
+        verdict.summary =
+            "MalwareBazaar needs an Auth-Key (Preferences, Security).";
         return verdict;
     }
 
@@ -470,8 +474,14 @@ ProviderVerdict MalwareBazaarProvider::query(const std::string& sha256,
         MALWAREBAZAAR_API, USER_AGENT,
         "query=get_info&hash=" + normalizeSha256(sha256), 15,
         [&cancel]() { return cancel.load(); }, 10,
-        {{"Content-Type", "application/x-www-form-urlencoded"}}, false);
+        {{"Content-Type", "application/x-www-form-urlencoded"},
+         {"Auth-Key", apiKey}},
+        false);
 
+    if (res.httpStatus == 401 || res.httpStatus == 403) {
+        verdict.summary = "MalwareBazaar rejected the Auth-Key.";
+        return verdict;
+    }
     if (!res.ok) {
         verdict.summary = "MalwareBazaar could not be reached: " + res.error;
         return verdict;

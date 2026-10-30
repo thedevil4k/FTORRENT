@@ -153,6 +153,29 @@ int main() {
         ok(SecurityKeys::remove(vt), "removing a missing key is not an error");
     }
 
+    section("two providers, two files");
+    {
+        const SecurityKeys::Provider mb = SecurityKeys::Provider::MalwareBazaar;
+        const std::string bazaarKey = "0123456789abcdef0123456789abcdef";  // 32 hex
+
+        std::string error;
+        ok(SecurityKeys::save(vt, key, error), "the VirusTotal key is saved");
+        ok(SecurityKeys::save(mb, bazaarKey, error),
+           "the MalwareBazaar key is saved: " + error);
+        ok(SecurityKeys::storagePath(vt) != SecurityKeys::storagePath(mb),
+           "each provider has its own file");
+
+        std::string vtLoaded, mbLoaded;
+        ok(SecurityKeys::load(vt, vtLoaded) && vtLoaded == key,
+           "the VirusTotal key survives next to the other one");
+        ok(SecurityKeys::load(mb, mbLoaded) && mbLoaded == bazaarKey,
+           "the MalwareBazaar key is read back on its own");
+
+        SecurityKeys::save(mb, std::string(), error);
+        ok(!SecurityKeys::exists(mb), "removing one key removes its file");
+        ok(SecurityKeys::exists(vt), "the other provider's key is untouched");
+    }
+
     section("corrupt and foreign files");
     {
         const std::filesystem::path path = SecurityKeys::storagePath(vt);

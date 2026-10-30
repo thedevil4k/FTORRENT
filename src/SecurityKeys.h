@@ -22,10 +22,12 @@
  */
 class SecurityKeys {
 public:
-    // Only providers that need a key appear here. MalwareBazaar is queried
-    // without one.
+    // Every provider that needs a key appears here. Both current ones do:
+    // VirusTotal wants an x-apikey, MalwareBazaar an Auth-Key (it answers 401
+    // without one, which a live check found).
     enum class Provider {
-        VirusTotal
+        VirusTotal,
+        MalwareBazaar
     };
 
     // Stable identifier, also used as the file name.

@@ -1,7 +1,6 @@
 #include "PreferencesDialog.h"
 #include "SettingsManager.h"
 #include "SecurityKeys.h"
-#include "Reputation.h"
 #include <FL/Fl.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/fl_ask.H>
@@ -177,30 +176,45 @@ void PreferencesDialog::createSecurityTab() {
     m_securityTab->hide();
     m_securityTab->begin();
 
-    Fl_Box* keyLabel = new Fl_Box(20, 50, 200, 25, "VirusTotal API key:");
+    Fl_Box* keyLabel = new Fl_Box(20, 44, 200, 22, "VirusTotal API key:");
     keyLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
-    m_virusTotalKey = new Fl_Secret_Input(20, 75, 400, 30);
+    m_virusTotalKey = new Fl_Secret_Input(20, 66, 400, 28);
     m_virusTotalKey->tooltip(
         "A free VirusTotal API key. Used only when you click a shield.");
 
-    m_saveKey = new Fl_Button(20, 115, 120, 28, "Save key");
+    m_saveKey = new Fl_Button(20, 100, 120, 26, "Save key");
     m_saveKey->callback(onSaveKey, this);
 
-    m_clearKey = new Fl_Button(150, 115, 120, 28, "Remove key");
+    m_clearKey = new Fl_Button(150, 100, 120, 26, "Remove key");
     m_clearKey->callback(onClearKey, this);
 
-    m_keyStatus = new Fl_Box(20, 152, 550, 36);
+    Fl_Box* bazaarLabel =
+        new Fl_Box(20, 136, 260, 22, "MalwareBazaar Auth-Key:");
+    bazaarLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+    m_malwareBazaarKey = new Fl_Secret_Input(20, 158, 400, 28);
+    m_malwareBazaarKey->tooltip(
+        "The abuse.ch Auth-Key. MalwareBazaar answers HTTP 401 without one.");
+
+    m_saveBazaarKey = new Fl_Button(20, 192, 120, 26, "Save key");
+    m_saveBazaarKey->callback(onSaveBazaarKey, this);
+
+    m_clearBazaarKey = new Fl_Button(150, 192, 120, 26, "Remove key");
+    m_clearBazaarKey->callback(onClearBazaarKey, this);
+
+    m_keyStatus = new Fl_Box(20, 224, 550, 44);
     m_keyStatus->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
     m_keyStatus->labelsize(11);
 
-    Fl_Box* note = new Fl_Box(20, 196, 550, 120);
+    Fl_Box* note = new Fl_Box(20, 272, 550, 78);
     note->align(FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
     note->labelsize(11);
     const std::string text =
         "Reputation lookups send only the SHA-256 of a file, and only after you "
         "click a shield. Nothing is uploaded and nothing is looked up on its "
-        "own. MalwareBazaar needs no key.\n\n" +
+        "own. Both providers need a key; without one it is skipped and the "
+        "other is still asked.\n\n" +
         SecurityKeys::storageDescription();
     note->copy_label(text.c_str());
 
@@ -208,61 +222,98 @@ void PreferencesDialog::createSecurityTab() {
 }
 
 void PreferencesDialog::loadKeyIntoField() {
-    if (!m_virusTotalKey) return;
-    std::string key;
-    if (SecurityKeys::load(SecurityKeys::Provider::VirusTotal, key)) {
-        m_virusTotalKey->value(key.c_str());
-    } else {
-        m_virusTotalKey->value("");
-    }
+    const auto fill = [](Fl_Input* field, SecurityKeys::Provider provider) {
+        if (!field) return;
+        std::string key;
+        if (SecurityKeys::load(provider, key)) field->value(key.c_str());
+        else field->value("");
+    };
+    fill(m_virusTotalKey, SecurityKeys::Provider::VirusTotal);
+    fill(m_malwareBazaarKey, SecurityKeys::Provider::MalwareBazaar);
 }
 
 void PreferencesDialog::refreshKeyStatus() {
     if (!m_keyStatus) return;
-    const bool present = SecurityKeys::exists(SecurityKeys::Provider::VirusTotal);
-    m_keyStatus->copy_label(
-        present ? "A VirusTotal key is saved. Without it, VirusTotal is skipped "
-                  "and MalwareBazaar is still asked."
-                : "No VirusTotal key saved. VirusTotal is skipped; "
-                  "MalwareBazaar is still asked.");
-    m_keyStatus->labelcolor(present ? FL_FOREGROUND_COLOR
-                                    : fl_rgb_color(150, 110, 0));
+    const bool vt = SecurityKeys::exists(SecurityKeys::Provider::VirusTotal);
+    const bool bazaar = SecurityKeys::exists(SecurityKeys::Provider::MalwareBazaar);
+
+    std::string text;
+    if (vt && bazaar) {
+        text = "Both keys are saved. A lookup asks VirusTotal and MalwareBazaar.";
+    } else if (vt) {
+        text = "Only the VirusTotal key is saved; MalwareBazaar is skipped "
+               "until its Auth-Key is added.";
+    } else if (bazaar) {
+        text = "Only the MalwareBazaar Auth-Key is saved; VirusTotal is skipped "
+               "until its API key is added.";
+    } else {
+        text = "No keys saved. Clicking a shield cannot ask either provider "
+               "until one is added here.";
+    }
+    m_keyStatus->copy_label(text.c_str());
+    m_keyStatus->labelcolor(vt && bazaar ? FL_FOREGROUND_COLOR
+                                         : fl_rgb_color(150, 110, 0));
 }
 
-void PreferencesDialog::onSaveKey(Fl_Widget* w, void* data) {
-    (void)w;
-    PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
-    if (!dlg || !dlg->m_virusTotalKey) return;
+void PreferencesDialog::saveKeyFromField(SecurityKeys::Provider provider,
+                                         Fl_Input* field) {
+    if (!field) return;
 
-    std::string key = dlg->m_virusTotalKey->value() ? dlg->m_virusTotalKey->value()
-                                                    : "";
+    std::string key = field->value() ? field->value() : "";
     // Trim the whitespace a copy/paste usually brings along.
     const std::size_t first = key.find_first_not_of(" \t\r\n");
     const std::size_t last = key.find_last_not_of(" \t\r\n");
     key = first == std::string::npos ? std::string()
                                      : key.substr(first, last - first + 1);
 
-    if (!isSha256Hex(key)) {
-        fl_alert("A VirusTotal API key is 64 hexadecimal characters.\n"
-                 "Check the key and try again.");
+    if (key.empty()) {
+        fl_alert("Paste the key first, or use Remove key.");
         return;
     }
 
     std::string error;
-    if (!SecurityKeys::save(SecurityKeys::Provider::VirusTotal, key, error)) {
+    if (!SecurityKeys::save(provider, key, error)) {
         fl_alert("The key could not be saved: %s", error.c_str());
         return;
     }
-    dlg->refreshKeyStatus();
+    refreshKeyStatus();
+}
+
+void PreferencesDialog::clearKeyFor(SecurityKeys::Provider provider,
+                                    Fl_Input* field) {
+    SecurityKeys::remove(provider);
+    if (field) field->value("");
+    refreshKeyStatus();
+}
+
+void PreferencesDialog::onSaveKey(Fl_Widget* w, void* data) {
+    (void)w;
+    PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
+    if (!dlg) return;
+    dlg->saveKeyFromField(SecurityKeys::Provider::VirusTotal, dlg->m_virusTotalKey);
 }
 
 void PreferencesDialog::onClearKey(Fl_Widget* w, void* data) {
     (void)w;
     PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
     if (!dlg) return;
-    SecurityKeys::remove(SecurityKeys::Provider::VirusTotal);
-    if (dlg->m_virusTotalKey) dlg->m_virusTotalKey->value("");
-    dlg->refreshKeyStatus();
+    dlg->clearKeyFor(SecurityKeys::Provider::VirusTotal, dlg->m_virusTotalKey);
+}
+
+void PreferencesDialog::onSaveBazaarKey(Fl_Widget* w, void* data) {
+    (void)w;
+    PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
+    if (!dlg) return;
+    dlg->saveKeyFromField(SecurityKeys::Provider::MalwareBazaar,
+                          dlg->m_malwareBazaarKey);
+}
+
+void PreferencesDialog::onClearBazaarKey(Fl_Widget* w, void* data) {
+    (void)w;
+    PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
+    if (!dlg) return;
+    dlg->clearKeyFor(SecurityKeys::Provider::MalwareBazaar,
+                     dlg->m_malwareBazaarKey);
 }
 
 void PreferencesDialog::createButtons() {

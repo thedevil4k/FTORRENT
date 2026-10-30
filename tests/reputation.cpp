@@ -211,6 +211,52 @@ int main() {
         ok(!v.answered, "garbage is not an answer");
     }
 
+    section("live providers (opt-in)");
+    {
+        // Off by default: the suite must stay offline for CI and for the
+        // "no telemetry" promise. Setting FTORRENT_LIVE_PROVIDERS=1 runs one
+        // real MalwareBazaar query; FTORRENT_VT_API_KEY adds VirusTotal.
+        // Nothing is uploaded either way: a provider only ever sees a hash.
+        const char* live = std::getenv("FTORRENT_LIVE_PROVIDERS");
+        if (!live || std::string(live) != "1") {
+            std::cout << "    skipped: set FTORRENT_LIVE_PROVIDERS=1 to ask the "
+                         "real providers\n";
+        } else {
+            const std::atomic<bool> cancel{false};
+
+            // abuse.ch needs an Auth-Key; the live run reports which way it
+            // went rather than pretending the provider is open.
+            const char* bazaarKey = std::getenv("FTORRENT_MB_API_KEY");
+            MalwareBazaarProvider bazaar;
+            const ProviderVerdict bazaarVerdict =
+                bazaar.query(HASH, bazaarKey ? bazaarKey : std::string(), cancel);
+            std::cout << "    MalwareBazaar: " << bazaarVerdict.summary << '\n';
+            if (bazaarKey && *bazaarKey) {
+                ok(bazaarVerdict.answered,
+                   "MalwareBazaar answered when given an Auth-Key");
+            } else {
+                ok(!bazaarVerdict.answered &&
+                       bazaarVerdict.summary.find("Auth-Key") != std::string::npos,
+                   "without an Auth-Key MalwareBazaar says which key it wants");
+            }
+            ok(bazaarVerdict.summary.find("safe") == std::string::npos,
+               "a live answer never says safe");
+
+            const char* vtKey = std::getenv("FTORRENT_VT_API_KEY");
+            if (vtKey && *vtKey) {
+                VirusTotalProvider virusTotal;
+                const ProviderVerdict vtVerdict =
+                    virusTotal.query(HASH, vtKey, cancel);
+                std::cout << "    VirusTotal: " << vtVerdict.summary << '\n';
+                ok(!vtVerdict.summary.empty(),
+                   "VirusTotal gave an answer or a clear reason");
+            } else {
+                std::cout << "    VirusTotal: skipped (set FTORRENT_VT_API_KEY "
+                             "to ask it)\n";
+            }
+        }
+    }
+
     section("the no-hash sentence");
     {
         const std::string expected =

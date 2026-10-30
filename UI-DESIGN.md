@@ -1,5 +1,12 @@
 # 🎨 Phase 3: User Interface Design - COMPLETED
 
+> Historical report from the phase that built the first UI. It is kept for the
+> decisions it records, not as a description of the current window: the toolbar,
+> the security surfaces and the network monitor have all moved on since.
+> **For what the app looks like today, read [README.md](README.md) and
+> [USER-GUIDE.md](USER-GUIDE.md).** The two places below that describe the
+> layout (the toolbar and the picture) have been updated to the current bar.
+
 ## ✅ UI Components Created
 
 ### 1. MainWindow (`MainWindow.h/cpp`)
@@ -27,12 +34,18 @@
   - About FTorrent
 
 #### Toolbar:
-- Add File button
-- Add Magnet button
-- Pause button
-- Resume button
-- Remove button
-- Preferences button
+Left to right, as it is drawn today:
+
+- Add Torrent (label shrinks with the toolbar level, icon always)
+- Create Torrent
+- Pause/Resume toggle, Remove (icon only)
+- Preferences, theme toggle, RAM mode (icon plus mode name)
+- Network limit (icon only, magenta when active)
+- Network monitor (icon only)
+- Search (icon only)
+
+Labels drop to short forms and then to icons as the window narrows; the bar
+centres itself and never overflows. The numbers live in `ToolbarLayout`.
 
 #### Status Bar:
 - Total torrents count
@@ -122,25 +135,27 @@ User selects torrent + clicks "Pause"
 
 ## 📊 Visual Design
 
+There is no menu bar: everything lives on the toolbar and its row of dialogs.
+
 ```
-┌──────────────────────────────────────────────────────┐
-│ File  Edit  Torrent  View  Help                     │ ← Menu Bar
-├──────────────────────────────────────────────────────┤
-│ [Add File] [Add Magnet] | [Pause] [Resume] [Remove] │ ← Toolbar
-│ [Preferences]                                        │
-├──────────────────────────────────────────────────────┤
-│ Name ▲│ Size │ Progress │ Status │ Down │ Up │ ETA  │ ← Headers
-├──────────────────────────────────────────────────────┤
-│ Ubuntu.torrent   │ 3.5GB │ ████░░ 75% │ Downloading  │
-│ Movie.torrent    │ 1.2GB │ ██████ 100%│ Seeding      │
-│ Album.torrent    │ 150MB │ ░░░░░░ 0%  │ Queued       │
-│                                                      │ ← Torrent List
-│                                                      │
-│                                                      │
-├──────────────────────────────────────────────────────┤
-│ Torrents: 3 (Active: 2)  |  ↓ 2.5 MB/s  ↑ 500 KB/s  | 👁️ │ ← Status Bar
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ [＋ Add Torrent][✦ Create Torrent] | [⏸][🗑] | [⚙ Preferences] │
+│ [🌓][⚡ TURBO][🔌][🌐][🔍]                                     │ ← Toolbar
+├──────────────────────────────────────────────────────────────┤
+│ 🛡 Name ▲   │ Size  │ Progress │ Status │ Down │ Up │ ETA    │ ← Headers
+├──────────────────────────────────────────────────────────────┤
+│ 🛡 Ubuntu    │ 3.5GB │ ████░░ 75% │ Downloading               │
+│ 🛡 Movie     │ 1.2GB │ ██████ 100%│ Seeding                   │
+│ 🛡 Album     │ 150MB │ ░░░░░░ 0%  │ Queued                    │
+│                                                              │ ← Torrent List
+├──────────────────────────────────────────────────────────────┤
+│ Torrents: 3 (Active: 2) | ↓ 2.5 MB/s ↑ 500 KB/s | 👁️        │ ← Status Bar
+└──────────────────────────────────────────────────────────────┘
 ```
+
+The shield before the name is the metadata risk lamp; it is also the control
+that asks the reputation providers, and only on a click. See
+[USER-GUIDE.md](USER-GUIDE.md).
 
 ---
 
@@ -206,22 +221,13 @@ src/
 
 ---
 
-## 🚀 Next Steps
+## 🚀 What happened after this phase
 
-### Option A: Compile and Test
-- [ ] Wait for dependency installation
-- [ ] Compile full project
-- [ ] Run and test UI
-
-### Option B: Additional Components
-- [ ] PreferencesDialog - Advanced settings
-- [ ] TorrentDetailsDialog - Individual torrent details
-- [ ] AddTorrentDialog - Full add dialog
-
-### Option C: Visual Improvements
-- [ ] Button icons
-- [ ] Dark theme
-- [ ] Progress animations
+All three options landed: the project compiles and runs, `PreferencesDialog`,
+`TorrentDetailsDialog`, `AddTorrentDialog` and `CreateTorrentDialog` exist, and
+the buttons carry icons with a light/dark theme. The security work (metadata
+analysis, reputation, archive preflight) and the network monitor came later; they
+are described in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 

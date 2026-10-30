@@ -38,7 +38,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 **Network monitor** — the globe button opens what the engine is connected to: every peer link with its torrent, address, port, direction, encryption state, client, rates and progress, plus the events libtorrent reported (peers banned, invalid requests, torrent, file and tracker errors). It shows the connections FTorrent has, not packet contents: there is no capture in this build.
 
-**Preferences** — five tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode), Security (VirusTotal API key, stored by the OS rather than in `settings.ini`).
+**Preferences** — five tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode), Security (VirusTotal API key and MalwareBazaar Auth-Key, stored by the OS rather than in `settings.ini`).
 
 **Security analysis before downloading**
 - Every surface warns before the download starts: a shield next to the torrent name in search results, Add Torrent, the torrent list and Details
@@ -49,7 +49,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 - A clean report says **no known indicators**, never “safe”. When there is no file list yet, the shield stays **Unknown** instead of guessing
 - **Reputation by hash, on request.** Clicking a shield asks VirusTotal and MalwareBazaar about the file's SHA-256, and only then. The hash comes from the torrent metadata; when the metadata does not carry a whole-file hash and the file is already complete on disk, FTorrent hashes it locally and asks about that, without uploading anything. Otherwise it says exactly `VT no disponible antes de descargar el archivo completo.` instead of downloading the file to compute one
 - **Archives without the archive.** For a RAR or ZIP, **Check archive** fetches only the first and last piece, lists the entries from a temporary folder that is deleted immediately, and reports whether anything inside can run. Available from a search row, Add Torrent and Details
-- Keys never live in `settings.ini`: VirusTotal's key is stored with Windows DPAPI, or in a 0600 file on Linux, from Preferences ▸ Security. MalwareBazaar needs no key
+- Both providers need a key: VirusTotal's API key and the abuse.ch Auth-Key that MalwareBazaar now requires (it answers HTTP 401 without one). Keys never live in `settings.ini`: they are stored with Windows DPAPI, or in 0600 files on Linux, from Preferences ▸ Security. A provider without a key is skipped and the other is still asked
 - The former post-download VirusTotal and RAR/ZIP inspection actions remain retired; `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for the pre-download analysis
 - Archive support is optional at build time
 

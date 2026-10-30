@@ -1,9 +1,14 @@
 # 🎨 Phase 4: Additional Components - COMPLETED
 
+> Historical report from the phase that built these dialogs. It is kept for the
+> decisions it records; the security additions listed here were made later and
+> are the current behaviour. For the user-facing description see
+> [USER-GUIDE.md](USER-GUIDE.md).
+
 ## ✅ Advanced Dialogs Created
 
 ### 1. PreferencesDialog (`PreferencesDialog.h/cpp`)
-**Full configuration dialog with 4 tabs:**
+**Full configuration dialog with 5 tabs:**
 
 #### General Tab:
 - ✅ Default download path (with browse button)
@@ -29,6 +34,15 @@
 - ✅ Customizable User Agent
 - ✅ Anonymous mode
 - ✅ Advanced settings warning
+
+#### Security Tab:
+- ✅ VirusTotal API key (masked input)
+- ✅ MalwareBazaar Auth-Key (masked input); abuse.ch answers HTTP 401 without it
+- ✅ Save key / Remove key for each, acting immediately rather than on Apply
+- ✅ Status line saying which of the two are stored
+- ✅ The key goes through `SecurityKeys`: Windows DPAPI, or a 0600 file on
+  Linux. It is never written to `settings.ini`
+- ✅ A note that only a SHA-256 is sent, and only after clicking a shield
 
 **Features:**
 - ✅ Input validation (port, paths, limits)
@@ -60,17 +74,28 @@
   - High
   - Low
 
+#### Security panel:
+- ✅ A shield next to the selected files' metadata verdict
+- ✅ "Select only non-executables" — unchecks executables, scripts, shortcuts
+  and macros; archives and disk images stay because they are containers
+- ✅ A High/Critical selection asks for confirmation before it is accepted
+- ✅ Clicking the shield asks VirusTotal and MalwareBazaar about the file hash;
+  without one it shows `VT no disponible antes de descargar el archivo completo.`
+- ✅ "Check archive" reads a RAR/ZIP's index from its first and last piece in a
+  temporary folder, and says whether any entry can run
+
 **Features:**
 - ✅ Magnet format validation (magnet:?...)
 - ✅ Path validation
 - ✅ Default values from SettingsManager
 - ✅ Modal dialog with OK/Cancel result
 - ✅ Informative tooltips
+- ✅ File priorities indexed by libtorrent file index, pad files included
 
 ---
 
 ### 3. TorrentDetailsDialog (`TorrentDetailsDialog.h/cpp`)
-**Detailed information dialog with 4 tabs:**
+**Detailed information dialog with 5 tabs:**
 
 #### General Tab:
 Shows full torrent information:
@@ -95,9 +120,22 @@ Shows full torrent information:
 #### Peers Tab:
 - Text display for peer information
 - Shows IP, client, speeds, and progress
+- The monitor's richer view (port, direction, encryption) is in the Network
+  monitor dialog; this tab stays a plain list
+
+#### Security Tab:
+- ✅ Shield and the metadata verdict for the torrent
+- ✅ Counts and every finding, worded as "no known indicators", never "safe"
+- ✅ **Check archive**: reads the first and last piece of a RAR/ZIP and lists
+  what it holds; runs only when pressed
+- ✅ A Reputation section: clicking the shield asks about the metadata hash, or
+  hashes a completed file locally and says so. Neither uploads anything
+- ✅ The shield's tooltip carries both verdicts
 
 #### Files Tab:
 - Selectable file list with name, size, and progress
+- Each row is tagged with the same metadata analysis (`EXE`, `SCRIPT`,
+  `DOUBLE EXT`, `SYMLINK`, ...)
 - Informational only: security checks run before the download starts, so this tab has no post-download VirusTotal or archive actions
 
 **Features:**
@@ -107,6 +145,30 @@ Shows full torrent information:
 - ✅ Monospace font for technical information
 - ✅ Automatic formatting of all values
 - ✅ Timer that cleans up on close
+
+---
+
+---
+
+### 4. NetworkMonitorDialog (`NetworkMonitorDialog.h/cpp`)
+Opened from the globe button in the toolbar. Two tabs:
+
+#### Connections:
+- ✅ One line per peer link: torrent, address, port, `in`/`out`, encrypted
+  yes/no, client, down/up rates and the peer's progress
+- ✅ A summary line counts connections, torrents, outgoing and encrypted links
+- ✅ Refreshes once a second while visible; only the visible tab is rebuilt
+
+#### Events:
+- ✅ Peer bans, peer errors, invalid requests, torrent/file errors and tracker
+  failures, recorded by `SecurityEvents` as the engine drains its alerts
+- ✅ Newest last, capped at 300 (the oldest is dropped)
+- ✅ Clear events
+
+**Features:**
+- ✅ Modal, like the rest of the windows
+- ✅ No packet capture, and the dialog says so: it shows the connections
+  FTorrent has and the engine's decisions about them, not their contents
 
 ---
 

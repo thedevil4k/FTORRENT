@@ -11,6 +11,8 @@
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Secret_Input.H>
 
+#include "SecurityKeys.h"
+
 /**
  * @brief Diálogo de preferencias/configuración de FLTorrent
  * 
@@ -68,6 +70,9 @@ private:
     Fl_Secret_Input* m_virusTotalKey;
     Fl_Button* m_saveKey;
     Fl_Button* m_clearKey;
+    Fl_Secret_Input* m_malwareBazaarKey;
+    Fl_Button* m_saveBazaarKey;
+    Fl_Button* m_clearBazaarKey;
     Fl_Box* m_keyStatus;
     
     // Buttons
@@ -89,8 +94,12 @@ private:
     // Security tab
     void loadKeyIntoField();
     void refreshKeyStatus();
+    void saveKeyFromField(SecurityKeys::Provider provider, Fl_Input* field);
+    void clearKeyFor(SecurityKeys::Provider provider, Fl_Input* field);
     static void onSaveKey(Fl_Widget* w, void* data);
     static void onClearKey(Fl_Widget* w, void* data);
+    static void onSaveBazaarKey(Fl_Widget* w, void* data);
+    static void onClearBazaarKey(Fl_Widget* w, void* data);
     
     // Load/Save
     void loadSettings();
