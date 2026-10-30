@@ -24,6 +24,16 @@ Write-Host "====================================================================
 $SourceDir = Resolve-Path "$PSScriptRoot\..\..\.."
 $VcpkgToolchain = Join-Path $VcpkgRoot "scripts\buildsystems\vcpkg.cmake"
 
+# The version lives in one place. Reading it here keeps the README shipped with
+# the build from advertising a number no release ever had.
+$Version = "unknown"
+$CMakeLists = Join-Path $SourceDir "CMakeLists.txt"
+if (Test-Path $CMakeLists) {
+    $match = Select-String -Path $CMakeLists -Pattern 'project\(FTorrent VERSION ([0-9.]+)' |
+        Select-Object -First 1
+    if ($match) { $Version = $match.Matches[0].Groups[1].Value }
+}
+
 Write-Host "Source Directory: $SourceDir"
 Write-Host "Output Directory: $OutputDir"
 Write-Host "vcpkg Root: $VcpkgRoot"
@@ -156,7 +166,7 @@ Downloaded torrents will be saved to:
 
 For more information, visit: https://github.com/yourusername/FTorrent
 
-Version: 0.1.0
+Version: $Version
 Compiled: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 "@
 $ReadmeContent | Out-File -FilePath (Join-Path $OutputDir "README.txt") -Encoding utf8

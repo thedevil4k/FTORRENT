@@ -5,6 +5,7 @@
 // old events are the ones dropped -- a monitor that forgets the newest event is
 // worse than one that forgets the oldest.
 #include "SecurityEvents.h"
+#include "Version.h"
 
 #include <iostream>
 #include <string>
@@ -80,6 +81,21 @@ int main() {
         ok(events.size() == 1, "the log still accepts events after a clear");
         ok(events.snapshot().front().detail == "after clear",
            "the first event after a clear is the new one");
+    }
+
+    section("the version comes from the build");
+    {
+        // A stale or missing APP_VERSION_STRING would silently ship every user
+        // agent as "0.0.0-unknown"; this is the check that notices.
+        ok(std::string(Version::string()) != "0.0.0-unknown",
+           "CMake's project version reached src/Version.h");
+        ok(Version::httpUserAgent().rfind("FTorrent/", 0) == 0,
+           "the HTTP user agent starts with the app name");
+        ok(Version::httpUserAgent().find(Version::string()) != std::string::npos,
+           "the HTTP user agent carries the app version");
+        ok(Version::defaultTrackerUserAgent().find(Version::string()) !=
+               std::string::npos,
+           "the tracker user agent carries the app version");
     }
 
     std::cout << "\nsecurity_events checks=" << checks

@@ -1,5 +1,6 @@
 #include "Reputation.h"
 #include "HttpClient.h"
+#include "Version.h"
 
 #include <algorithm>
 #include <cctype>
@@ -10,7 +11,7 @@
 
 namespace {
 
-const char* const USER_AGENT = "FTorrent/0.6.0";
+const std::string USER_AGENT = Version::httpUserAgent();
 
 const char* const VIRUSTOTAL_FILE_API = "https://www.virustotal.com/api/v3/files/";
 const char* const MALWAREBAZAAR_API = "https://mb-api.abuse.ch/api/v1/";

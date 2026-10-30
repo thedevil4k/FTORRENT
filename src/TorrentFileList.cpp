@@ -2,6 +2,7 @@
 #include "HttpClient.h"
 #include "PathUtils.h"
 #include "SecurityHashes.h"
+#include "Version.h"
 
 #include <libtorrent/version.hpp>
 #include <libtorrent/load_torrent.hpp>
@@ -26,7 +27,7 @@ namespace lt = libtorrent;
 
 namespace {
 
-const char* USER_AGENT = "FTorrent/0.6.0";
+const std::string USER_AGENT = Version::httpUserAgent();
 
 // .torrent files are metadata; a few hundred kB at most. Anything wildly
 // bigger is a captive-portal login page or an error page, not a torrent.

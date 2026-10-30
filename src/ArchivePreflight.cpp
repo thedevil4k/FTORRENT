@@ -1,6 +1,7 @@
 #include "ArchivePreflight.h"
 #include "ArchiveInspector.h"
 #include "SystemUtils.h"
+#include "Version.h"
 
 #include <libtorrent/add_torrent_params.hpp>
 #include <libtorrent/alert_types.hpp>
@@ -28,7 +29,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-const char* const USER_AGENT = "FTorrent/0.6.0";
+const std::string USER_AGENT = Version::httpUserAgent();
 
 // A preflight is a question, not a download: if the two pieces have not
 // arrived by then, the answer is "not now" and the torrent is dropped.

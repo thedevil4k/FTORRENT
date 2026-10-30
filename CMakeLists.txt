@@ -170,12 +170,18 @@ set(HEADERS
     src/ArchivePreflight.h
     src/SecurityEvents.h
     src/NetworkMonitorDialog.h
+    src/Version.h
 )
 
 # The shared body of the app: everything except main(). An OBJECT library, so
 # the executable and every test compile each translation unit once and link the
 # same code, and a change to a source file is one rebuild rather than N.
 add_library(ftorrent_core OBJECT ${SOURCES} ${HEADERS})
+
+# One version, from project(FTorrent VERSION ...) above. src/Version.h turns it
+# into the user agents the app reports, so a release bumps one number here.
+target_compile_definitions(ftorrent_core PUBLIC
+    APP_VERSION_STRING="${PROJECT_VERSION}")
 
 target_include_directories(ftorrent_core PUBLIC
     ${FLTK_INCLUDE_DIRS}

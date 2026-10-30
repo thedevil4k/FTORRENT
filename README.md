@@ -38,7 +38,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 **Network monitor** — the globe button opens what the engine is connected to: every peer link with its torrent, address, port, direction, encryption state, client, rates and progress, plus the events libtorrent reported (peers banned, invalid requests, torrent, file and tracker errors). It shows the connections FTorrent has, not packet contents: there is no capture in this build.
 
-**Preferences** — four tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode).
+**Preferences** — five tabs: General (download path, autostart, tray, public IP), Connection (listen port, rate and connection limits), BitTorrent (DHT, PEX, LSD, UPnP, NAT-PMP), Advanced (user agent, anonymous mode), Security (VirusTotal API key, stored by the OS rather than in `settings.ini`).
 
 **Security analysis before downloading**
 - Every surface warns before the download starts: a shield next to the torrent name in search results, Add Torrent, the torrent list and Details
@@ -159,6 +159,8 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **Post-download security UI retired.** The Details window no longer offers “Open in VirusTotal” or “Inspect Archive”. `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for the pre-download analysis; no file is uploaded and no telemetry is sent.
 - **Metadata risk analysis before downloading.** A shield now sits next to the torrent name in search results, Add Torrent, the torrent list and Details. Expanding a search row shows the risk summary and per-file tags; Add Torrent analyzes the checked files and can select only non-executables; Details has a Security tab. The analysis reads names and metadata only, and says “no known indicators” rather than “safe”.
 - **Reputation and archive checks, on demand.** Clicking a shield looks the file's SHA-256 up in VirusTotal and MalwareBazaar; **Check archive** reads a RAR/ZIP index from its first and last piece in a temporary folder. Neither runs without a click, neither uploads anything, and without a whole-file hash FTorrent says so plainly instead of downloading the file.
+- **Network monitor.** The toolbar globe shows every peer link and the events the engine reported, with no packet capture and no claim to one.
+- **One version, one place.** `project(FTorrent VERSION ...)` feeds the user agents through `src/Version.h`; a release bumps one number, and the `security_events` suite fails if the definition stops reaching the code.
 - **Both checks reach every surface.** Search rows offer the archive check under the expanded file list, Details has a **Check archive** button on its Security tab, and a completed file with no metadata hash is hashed on this machine and looked up only when the user asks. The local hash is described as local in the answer.
 - **Search engines report their reachability.** A green, red or gray dot next to each engine in the dropdown, probed once per session with no new dependencies.
 - **Magnets can be picked file by file.** The Add dialog lists a magnet's already-resolved files with one checkbox each; the file rows under each result are separated so multi-file torrents read clearly.

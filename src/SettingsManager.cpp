@@ -1,13 +1,15 @@
 #include "SettingsManager.h"
 #include "SystemUtils.h"
+#include "Version.h"
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
 #include <cctype>
 #include <algorithm>
 
-// User agent reported to trackers. Bump it together with the project version.
-static const char* DEFAULT_USER_AGENT = "FTORRENT 0.6.0";
+// User agent reported to trackers. The version comes from the build, so it is
+// bumped by project(FTorrent VERSION ...) and nowhere else.
+static const std::string DEFAULT_USER_AGENT = Version::defaultTrackerUserAgent();
 
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;

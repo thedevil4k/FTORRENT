@@ -42,9 +42,9 @@ From the `build` directory:
 ```powershell
 cpack -C Release
 ```
-This will generate:
-- `FTorrent-0.1.0-win64.exe` (Installer)
-- `FTorrent-0.1.0-win64.zip` (Portable version)
+This will generate (the number is `project(FTorrent VERSION ...)`, 0.6.0 today):
+- `FTorrent-<version>-win64.exe` (Installer)
+- `FTorrent-<version>-win64.zip` (Portable version)
 
 ---
 
@@ -79,10 +79,10 @@ cmake --build .
 cpack
 ```
 
-This will generate:
-- `FTorrent-0.1.0-Linux.deb`
-- `FTorrent-0.1.0-Linux.rpm`
-- `FTorrent-0.1.0-Linux.tar.gz`
+This will generate (version from `CMakeLists.txt`, as above):
+- `FTorrent-<version>-Linux.deb`
+- `FTorrent-<version>-Linux.rpm`
+- `FTorrent-<version>-Linux.tar.gz`
 
 ### 3. Flatpak
 The Flathub manifest is `io.github.thedevil4k.FTorrent.json` at the repo root, and
@@ -109,7 +109,7 @@ cmake --build .
 ```bash
 cpack
 ```
-This will generate `FTorrent-0.1.0-Darwin.dmg`.
+This will generate `FTorrent-<version>-Darwin.dmg`.
 
 ---
 
@@ -118,6 +118,23 @@ This will generate `FTorrent-0.1.0-Darwin.dmg`.
 ### Code Signing
 - **Windows**: Use `signtool.exe` with a certificate to avoid "SmartScreen" warnings.
 - **macOS**: Use `codesign` and `notarization` to allow running without gatekeeper issues.
+
+### What the 0.6.0 binaries promise about data
+These are worth checking before a release, because a regression here is silent:
+
+- Security analysis runs before the download: metadata first, and provider lookups only when a user clicks a shield.
+- No file, name or torrent is ever uploaded. VirusTotal and MalwareBazaar receive a SHA-256 and nothing else.
+- API keys never reach `settings.ini`: Windows DPAPI, or a 0600 file under the config directory on Linux.
+- Archive preflight pieces go to a temporary directory under the config folder and are deleted when the read ends. Nothing is written to the download folder.
+- The network monitor records engine events only; there is no packet capture in this build.
+
+## ✅ Release checklist
+
+1. Bump `project(FTorrent VERSION ...)` in `CMakeLists.txt`. That number becomes the user agents through `src/Version.h`; nothing else needs editing. `security_events` fails if the definition did not reach the source.
+2. `ctest --test-dir build --output-on-failure -LE network` must be green. That is every suite except `flows`, which talks to trackers and search engines.
+3. Build the Flatpak from the manifest and check it reports libarchive: `libarchive found: internal RAR/ZIP engine enabled`.
+4. Check the packaged binary shows the right version: Preferences ▸ Advanced shows the tracker user agent, and it should read `FTORRENT <version>`.
+5. Update "What changed recently" in `README.md` and the version line in the docs that quote it.
 
 ## 📊 Summary of Packages
 
