@@ -33,7 +33,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 - Search torrents from the toolbar across SolidTorrents, BitSearch, Nyaa.si, The Pirate Bay (HTML and its apibay API), BTDig and Pirate Face — with a proxy/mirror fallback wherever the site offers one
 - A status dot next to each engine: green = reachable, red = unreachable, gray = not checked yet (checked once per session, in the background, when you first open search)
 - Picking a site in the dropdown queries **that site only**; the app never widens a search the user did not widen. **All engines** is an explicit first row that asks every enabled site at once, each in its own worker, with rows appearing as each one answers. A slow or blocked site costs its own line in the status bar and never holds up the rest, and the table is repainted once per burst of arrivals, not once per row
-- Expand any result to see the files it downloads before downloading anything; names are shown in full whenever the window has room
+- Expand any result to see the files it downloads before downloading anything; names are shown in full whenever the window has room. When the site offers a `.torrent` link it is used directly, and its info hash is checked against the magnet so a mirror serving a different file is never shown as that row; otherwise the app asks the swarm, keeping every tracker the magnet came with and adding a few public ones for the sites that publish none. Expanding more results than can run at once queues them instead of dropping the click, and a swarm that does not answer says what the trackers and the DHT did
 - Double-click a result (or press Enter) to download it; multi-file magnets offer one checkbox per file, so you fetch only what you want
 - Per-site categories and result pages, shown in a dedicated view with a **Back to my torrents** return
 
@@ -117,8 +117,13 @@ ctest --test-dir build --output-on-failure
 | `reputation` | provider parsing from canned answers, the service's states and wording, and the exact no-hash sentence |
 | `archive_preflight` | piece arithmetic, sparse head+tail assembly, and a real ZIP/RAR5 listing rebuilt from only its two ends |
 | `security_events` | the engine event log: order, the capacity cap and which end it drops |
+| `search_results` | batched rows accumulate instead of replacing, and the sorted view follows the sort column as rows land |
+| `search_scope` | picking a site asks exactly that one engine; All engines is explicit |
+| `search_parse` | a published magnet keeps its `tr=` trackers, each row gets its own `.torrent` link, and a relative link is never guessed |
+| `filelist` | the trackers and DHT nodes every probe uses, `.torrent` hashing and the sample-torrent parser |
+| `filelist_network` | against the real swarm: Nyaa's `.torrent`, the hash check that refuses a different torrent, a trackerless Pirate Bay magnet reaching its peers, and the wording of an empty swarm |
 
-`flows` touches the network and is labelled `network`; drop it with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
+`flows` and `filelist_network` touch the network and are labelled `network`; drop them with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 
 CI builds and runs the offline subset on pushes and pull requests that touch code; see [.github/workflows/build.yml](.github/workflows/build.yml).
 
@@ -167,6 +172,7 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **Magnets can be picked file by file.** The Add dialog lists a magnet's already-resolved files with one checkbox each; the file rows under each result are separated so multi-file torrents read clearly.
 - **Search results survive small windows and use wide ones.** Names ellipsize by pixels (full name when it fits), double-click and Enter both download, and cancelling the dialog keeps the results.
 - **Probe threads shut down cleanly.** Engine checks are joinable workers instead of detached threads, which fixes an exit segfault the suite caught; `FUTURE_UPDATES_IDEAS.md` parks what we evaluated and deferred.
+- **Expanding a result finds the file list again.** The generic parser was rebuilding every magnet from its info hash, which threw away the trackers the site published and left live swarms looking dead; the link is now kept as published. Nyaa.si, BitSearch and SolidTorrents also publish a `.torrent` button, which is now used first and accepted only when its info hash matches the magnet. The probe adds public trackers for trackerless magnets, bootstraps the DHT against nodes that actually answer, queues expansions beyond the four that can run at once instead of dropping the click, and names what the trackers and DHT did when nobody answers.
 
 ## License
 

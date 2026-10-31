@@ -54,13 +54,15 @@ public:
     Entry find(const std::string& key) const;
 
     // Starts fetching unless the list is already known or already on its way.
-    // Returns whether it actually started.
+    // Returns whether the request was accepted: when every slot is busy it is
+    // queued and started as soon as one frees up, rather than dropped, which
+    // is what used to lose a click made while other rows were still loading.
     bool request(const std::string& key,
                  const std::string& magnet,
                  const std::string& torrentUrl,
                  const Completion& done);
 
-    // Fetches currently running.
+    // Fetches currently running (queued requests are not counted).
     int pending() const;
 
     // Forgets every remembered list. In-flight fetches still deliver when they
@@ -72,11 +74,20 @@ private:
     // pointer, so a worker can never reach through a destroyed service: it
     // only ever touches this block, and it checks alive before delivering.
     struct Shared {
+        // One accepted request, waiting for a free slot.
+        struct Pending {
+            std::string key;
+            std::string magnet;
+            std::string torrentUrl;
+            Completion done;
+        };
+
         int maxCached = 0;             // set once, at construction
         int maxInFlight = 0;
         std::mutex mutex;
         std::unordered_map<std::string, Entry> entries;
         std::deque<std::string> order;       // insertion order, for the cap
+        std::deque<Pending> queue;           // asked for, not started yet
         std::atomic<int> inFlight{0};
         std::atomic<bool> alive{true};
     };
@@ -88,6 +99,17 @@ private:
         Entry entry;
         Completion done;
     };
+
+    // Starts queued requests until every slot is busy. Safe to call with or
+    // without the lock held; it takes the lock itself.
+    static void pump(const std::shared_ptr<Shared>& shared);
+
+    // Spawns the worker for one request. The slot must already be counted.
+    static void startWorker(std::shared_ptr<Shared> shared,
+                            const std::string& key,
+                            const std::string& magnet,
+                            const std::string& torrentUrl,
+                            const Completion& done);
 
     // Entry point for Fl::awake(), so it can reach the private members.
     static void deliver(void* data);

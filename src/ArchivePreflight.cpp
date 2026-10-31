@@ -1,6 +1,8 @@
 #include "ArchivePreflight.h"
 #include "ArchiveInspector.h"
+#include "HttpClient.h"
 #include "SystemUtils.h"
+#include "TorrentFileList.h"
 #include "Version.h"
 
 #include <libtorrent/add_torrent_params.hpp>
@@ -55,6 +57,10 @@ lt::settings_pack probeSettings() {
     sp.set_bool(lt::settings_pack::enable_outgoing_utp, false);
     sp.set_bool(lt::settings_pack::enable_incoming_utp, false);
     sp.set_str(lt::settings_pack::listen_interfaces, "0.0.0.0:0");
+    // Same bootstrap as the file-list probe: the default routers do not answer
+    // everywhere, and a magnet-only torrent then never meets a peer.
+    sp.set_str(lt::settings_pack::dht_bootstrap_nodes,
+               TorrentFileList::dhtBootstrapNodes());
     sp.set_str(lt::settings_pack::user_agent, USER_AGENT);
     sp.set_int(lt::settings_pack::active_limit, 2);
     sp.set_int(lt::settings_pack::alert_queue_size, 50000);
@@ -136,22 +142,57 @@ std::string ArchivePreflight::tempRoot() {
 }
 
 bool ArchivePreflight::fetchSnippet(const std::string& magnet,
-                                    const std::string& torrentPath,
+                                    const std::string& torrentPathOrUrl,
                                     int fileIndex, Snippet& out,
                                     std::string& error,
                                     const std::atomic<bool>* cancel,
                                     int timeoutSeconds) {
     lt::add_torrent_params atp;
-    if (!torrentPath.empty()) {
-        try {
-            atp = lt::load_torrent_file(torrentPath);
-        } catch (const std::exception& e) {
-            error = std::string("could not read the .torrent file: ") + e.what();
-            return false;
+    std::string fileError;
+    bool haveFile = false;
+
+    // A row can now offer its .torrent link, and that is the cheap path: no
+    // metadata exchange with the swarm at all.
+    if (torrentPathOrUrl.rfind("https://", 0) == 0) {
+        HttpClient::Response res =
+            HttpClient::get(torrentPathOrUrl, USER_AGENT, 15);
+        if (!res.ok) {
+            fileError = res.error;
+        } else if (res.body.empty()) {
+            fileError = "the .torrent link returned nothing";
+        } else {
+            try {
+                atp = lt::load_torrent_buffer(
+                    lt::span<char const>(res.body.data(), res.body.size()));
+                // A mirror serving a different torrent would make the probe
+                // read pieces of a file the row does not describe, so the hash
+                // has to be the one the magnet names.
+                const std::string expected = TorrentFileList::magnetHash(magnet);
+                const std::string actual =
+                    TorrentFileList::infoHashOfTorrentFile(res.body);
+                if (!expected.empty() && !actual.empty() && expected != actual) {
+                    fileError = "the .torrent link points at a different torrent";
+                } else {
+                    haveFile = true;
+                }
+            } catch (const std::exception& e) {
+                fileError = std::string("could not read the .torrent link: ") + e.what();
+            }
         }
-    } else {
+    } else if (!torrentPathOrUrl.empty()) {
+        try {
+            atp = lt::load_torrent_file(torrentPathOrUrl);
+            haveFile = true;
+        } catch (const std::exception& e) {
+            fileError = std::string("could not read the .torrent file: ") + e.what();
+        }
+    }
+
+    if (!haveFile) {
         if (magnet.empty()) {
-            error = "neither a .torrent file nor a magnet link";
+            error = fileError.empty()
+                        ? "neither a .torrent file nor a magnet link"
+                        : fileError;
             return false;
         }
         lt::error_code mec;
@@ -160,6 +201,7 @@ bool ArchivePreflight::fetchSnippet(const std::string& magnet,
             error = "bad magnet link";
             return false;
         }
+        TorrentFileList::addDefaultTrackers(atp.trackers);
     }
     return fetchSnippet(atp, fileIndex, out, error, cancel, timeoutSeconds);
 }

@@ -77,6 +77,9 @@ ftorrent_add_test(archive_preflight archive_preflight.cpp)
 ftorrent_add_test(security_events security_events.cpp)
 ftorrent_add_test(search_results search_results.cpp)
 ftorrent_add_test(search_scope search_scope.cpp)
+ftorrent_add_test(search_parse search_parse.cpp)
+ftorrent_add_test(filelist filelist.cpp)
+ftorrent_add_test(filelist_network filelist_network.cpp)
 
 # The archive reader is optional, so its test is only built when the reader is.
 # FTORRENT_HAVE_LIBARCHIVE is set by the parent CMakeLists.txt and also reaches
@@ -122,10 +125,14 @@ add_test(NAME archive_preflight COMMAND archive_preflight)
 add_test(NAME security_events COMMAND security_events)
 add_test(NAME search_results COMMAND search_results)
 add_test(NAME search_scope COMMAND search_scope)
+add_test(NAME search_parse COMMAND search_parse)
+add_test(NAME filelist COMMAND filelist)
+add_test(NAME filelist_network COMMAND filelist_network)
 
 set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
     security_analyzer security_badge security_keys reputation archive_preflight
-    security_events search_results search_scope)
+    security_events search_results search_scope search_parse filelist
+    filelist_network)
 if(FTORRENT_HAVE_LIBARCHIVE)
     add_test(NAME archive_inspector COMMAND archive_inspector)
     list(APPEND FTORRENT_TESTS archive_inspector)
@@ -148,6 +155,9 @@ set_tests_properties(toolbar_layout toolbar_clicks icons_full security_badge
     search_results PROPERTIES LABELS "ui")
 set_tests_properties(file_hash security_analyzer security_keys
     PROPERTIES LABELS "unit")
+set_tests_properties(search_parse filelist PROPERTIES LABELS "unit")
+# The swarm probe: real trackers, real DHT, real .torrent downloads.
+set_tests_properties(filelist_network PROPERTIES LABELS "network")
 # reputation drives Fl::awake() delivery, so it needs the FLTK event loop even
 # though nothing is drawn and no network is touched.
 set_tests_properties(reputation PROPERTIES LABELS "ui")

@@ -45,6 +45,7 @@ void FileListService::clear() {
     std::lock_guard<std::mutex> lk(m_shared->mutex);
     m_shared->entries.clear();
     m_shared->order.clear();
+    m_shared->queue.clear();
 }
 
 bool FileListService::request(const std::string& key,
@@ -56,33 +57,57 @@ bool FileListService::request(const std::string& key,
         auto it = m_shared->entries.find(key);
         if (it != m_shared->entries.end() &&
             (it->second.state == FileListState::Loaded ||
-             it->second.state == FileListState::Loading)) {
+             it->second.state == FileListState::Loading ||
+             it->second.state == FileListState::Queued)) {
             return false;                     // known, or already on its way
         }
         // Claim it, so a double click cannot start two probes.
         Entry& entry = m_shared->entries[key];
         entry = Entry{};
-        entry.state = FileListState::Loading;
+        entry.state = FileListState::Queued;
         if (it == m_shared->entries.end()) m_shared->order.push_back(key);
+        m_shared->queue.push_back(Shared::Pending{key, magnet, torrentUrl, done});
     }
+    // Starts it now when a slot is free, or leaves it queued when not. Either
+    // way the request is owned by the service from here on.
+    pump(m_shared);
+    return true;
+}
 
-    // Take a concurrency slot. Overflow is not queued: the claim is handed
-    // back so the row can be retried by the next click instead of the user
-    // being left with a row that says "reading" and never finishes.
-    if (m_shared->inFlight.fetch_add(1) >= m_shared->maxInFlight) {
-        m_shared->inFlight.fetch_sub(1);
-        std::lock_guard<std::mutex> lk(m_shared->mutex);
-        auto it = m_shared->entries.find(key);
-        if (it != m_shared->entries.end() &&
-            it->second.state == FileListState::Loading) {
-            it->second = Entry{};
+void FileListService::pump(const std::shared_ptr<Shared>& shared) {
+    std::vector<Shared::Pending> start;
+    {
+        std::lock_guard<std::mutex> lk(shared->mutex);
+        while (!shared->queue.empty() &&
+               shared->inFlight.load() < shared->maxInFlight) {
+            Shared::Pending pending = std::move(shared->queue.front());
+            shared->queue.pop_front();
+
+            auto it = shared->entries.find(pending.key);
+            // Forgetting the lists drops the queue with them; a request whose
+            // row no longer waits for it is not worth a probe.
+            if (it == shared->entries.end() ||
+                it->second.state != FileListState::Queued) {
+                continue;
+            }
+            it->second.state = FileListState::Loading;
+            shared->inFlight.fetch_add(1);    // taken under the lock
+            start.push_back(std::move(pending));
         }
-        return false;
     }
+    for (Shared::Pending& pending : start) {
+        startWorker(shared, pending.key, pending.magnet, pending.torrentUrl,
+                    pending.done);
+    }
+}
 
+void FileListService::startWorker(std::shared_ptr<Shared> shared,
+                                  const std::string& key,
+                                  const std::string& magnet,
+                                  const std::string& torrentUrl,
+                                  const Completion& done) {
     // The worker captures the shared block, never the service. That is what
     // makes it safe for the fetch to outlive its owner.
-    std::shared_ptr<Shared> shared = m_shared;
     std::thread([shared, key, magnet, torrentUrl, done]() {
         Delivery* d = new Delivery;
         d->shared = shared;
@@ -105,7 +130,6 @@ bool FileListService::request(const std::string& key,
         }
         Fl::awake(&FileListService::deliver, d);
     }).detach();
-    return true;
 }
 
 // Runs on the UI thread, from Fl::awake().
@@ -141,4 +165,8 @@ void FileListService::deliver(void* data) {
     // Called with no lock held: the listener repaints, and may come straight
     // back here for the next thing it wants.
     if (d->done) d->done(d->entry);
+
+    // A slot is free again: hand it to whoever was waiting. Done after the
+    // callback so this answer is on screen before the next probe starts.
+    pump(shared);
 }

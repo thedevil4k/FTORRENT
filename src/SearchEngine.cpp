@@ -145,6 +145,47 @@ std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
+// Scheme and host of an engine address, so a listing that publishes
+// "/download/123.torrent" can be turned into a link the app can open. Empty
+// when the template is not an absolute URL.
+std::string originOf(const std::string& urlTemplate) {
+    const size_t scheme = urlTemplate.find("://");
+    if (scheme == std::string::npos) return std::string();
+    const size_t hostStart = scheme + 3;
+    size_t end = urlTemplate.find_first_of("/?#", hostStart);
+    if (end == std::string::npos) end = urlTemplate.size();
+    return urlTemplate.substr(0, end);
+}
+
+// Resolves a link found in a listing. Only absolute links and root-relative
+// ones are accepted: a bare relative path is as likely to be a redirect as a
+// file, and guessing would point the fetch at the wrong place.
+std::string absoluteUrl(const std::string& origin, const std::string& link) {
+    if (link.empty()) return std::string();
+    if (link.rfind("https://", 0) == 0 || link.rfind("http://", 0) == 0) return link;
+    if (!origin.empty() && link[0] == '/') return origin + link;
+    return std::string();
+}
+
+// Applies one selector to a chunk of text and returns group 1. A plugin comes
+// from a file or a URL, so its patterns cannot be trusted: an invalid
+// expression must produce "no match", never an exception that would unwind out
+// of a worker thread.
+bool matchSelector(const std::string& chunk, const std::string& selector,
+                   std::string& out) {
+    if (selector.empty()) return false;
+    try {
+        std::regex re(selector, std::regex::ECMAScript);
+        std::smatch m;
+        if (!std::regex_search(chunk, m, re)) return false;
+        if (m.size() < 2) return false;
+        out = m[1].str();
+        return true;
+    } catch (const std::regex_error&) {
+        return false;
+    }
+}
+
 // Very small helper: minimal JSON string/number extraction by dotted path.
 // Deliberately not a full JSON parser: the engines only need flat fields.
 bool jsonField(const std::string& json, const std::string& path, std::string& out) {
@@ -323,6 +364,18 @@ static void normalizeResult(SearchResult& r) {
         }
     }
     if (r.magnet.rfind("magnet:", 0) != 0) r.magnet.clear();
+
+    // The .torrent link travels through the same markup escaping as the magnet.
+    // Left as "&amp;" it would still look right in a browser and 404 when the
+    // probe asked for it.
+    if (!r.torrentUrl.empty()) {
+        r.torrentUrl = decodeHtmlEntities(r.torrentUrl);
+        while (!r.torrentUrl.empty() &&
+               (r.torrentUrl.back() == '"' || r.torrentUrl.back() == '\'' ||
+                std::isspace(static_cast<unsigned char>(r.torrentUrl.back())))) {
+            r.torrentUrl.pop_back();
+        }
+    }
     
     // Quitar el HTML del titulo y descomprimir las entidades basicas
     std::string clean;
@@ -357,28 +410,17 @@ static void normalizeResult(SearchResult& r) {
 
 bool SearchEngine::applySelector(const std::string& chunk, const std::string& selector,
                                  std::string& out) const {
-    if (selector.empty()) return false;
-    
-    // A plugin comes from a file or a URL, so its patterns cannot be trusted:
-    // an invalid expression must produce "no match", never an exception that
-    // would unwind out of the worker thread.
-    try {
-        std::regex re(selector, std::regex::ECMAScript);
-        std::smatch m;
-        if (!std::regex_search(chunk, m, re)) return false;
-        if (m.size() < 2) return false;
-        out = m[1].str();
-        return true;
-    } catch (const std::regex_error&) {
-        return false;
-    }
+    return matchSelector(chunk, selector, out);
 }
 
 // Generic fallback for sites whose markup we do not know: collect every
 // magnet link on the page and derive the rest from its surroundings. The
-// magnet itself carries the info-hash and, most of the time, the display name
-// (dn=), so a redesigned page still yields usable results instead of nothing.
-static bool harvestMagnets(const std::string& body, std::vector<SearchResult>& out) {
+// magnet itself carries the info-hash, the display name (dn=) and, most of the
+// time, the trackers (tr=), so it is kept exactly as published: rebuilding it
+// from the hash alone dropped the trackers and made a live swarm look dead.
+static bool harvestMagnets(const std::string& body, std::vector<SearchResult>& out,
+                           const std::string& torrentSelector,
+                           const std::string& origin) {
     // The link is looked for with a permissive pattern and validated afterwards.
     // Sites disagree on how much of a magnet they escape: some write
     // "magnet:?xt=urn:btih:...", others "magnet:?xt&#x3D;urn:btih:...", so a
@@ -412,7 +454,9 @@ static bool harvestMagnets(const std::string& body, std::vector<SearchResult>& o
         
         SearchResult r;
         r.source = "";
-        r.magnet = "magnet:?xt=urn:btih:" + hash;
+        // The whole link, not a rebuilt one: the tr= entries are what tell the
+        // probe where the peers are.
+        r.magnet = link;
         
         // The name is normally in the magnet itself as dn=, already URL-encoded.
         size_t dn = link.find("&dn=");
@@ -432,6 +476,17 @@ static bool harvestMagnets(const std::string& body, std::vector<SearchResult>& o
         if (pos > prevEnd + 900) prevEnd = pos > 900 ? pos - 900 : 0;
         if (nextPos > pos + it->length(0) + 900) nextPos = pos + it->length(0) + 900;
         std::string ctx = body.substr(prevEnd, nextPos - prevEnd);
+
+        // The .torrent button belongs to this row when it sits between the
+        // previous magnet and this one: every engine prints it beside the
+        // magnet it belongs to. Looking only at that stretch keeps a row from
+        // borrowing its neighbour's link.
+        if (!torrentSelector.empty() && pos > prevEnd) {
+            std::string href;
+            if (matchSelector(ctx.substr(0, pos - prevEnd), torrentSelector, href)) {
+                r.torrentUrl = absoluteUrl(origin, href);
+            }
+        }
         
         if (r.name.empty()) {
             // Fall back to the visible text of the nearest link or heading
@@ -501,7 +556,8 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
     
     // No site-specific rules: harvest whatever magnets the page exposes.
     if (m_def.rowSelector.empty() && m_def.magnetSelector.empty()) {
-        bool found = harvestMagnets(body, out);
+        bool found = harvestMagnets(body, out, m_def.torrentSelector,
+                                    originOf(m_def.urlTemplate));
         // harvestMagnets() is a free function and cannot know which site it is
         // running on, so it leaves the source empty. Every engine that relies
         // on it (Nyaa.si, BTDig) therefore showed a blank Source column while
@@ -570,6 +626,9 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
     
     // HTML: iterate over the rows found by the row selector
     if (m_def.rowSelector.empty()) return false;
+    // The .torrent links a listing prints are relative to the site it came
+    // from, and both of a site's mirror addresses serve the same paths.
+    const std::string origin = originOf(m_def.urlTemplate);
     try {
         std::regex rowRe(m_def.rowSelector, std::regex::ECMAScript);
         auto begin = std::sregex_iterator(body.begin(), body.end(), rowRe);
@@ -581,6 +640,9 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
             std::string v;
             if (applySelector(chunk, m_def.titleSelector, v)) r.name = v;
             if (applySelector(chunk, m_def.magnetSelector, v)) r.magnet = v;
+            if (applySelector(chunk, m_def.torrentSelector, v)) {
+                r.torrentUrl = absoluteUrl(origin, v);
+            }
             if (applySelector(chunk, m_def.sizeSelector, v)) r.size = parseSize(v);
             if (applySelector(chunk, m_def.seedersSelector, v)) r.seeders = parseCount(v);
             if (applySelector(chunk, m_def.leechersSelector, v)) r.leechers = parseCount(v);
@@ -913,6 +975,7 @@ SearchEngine::Definition SearchEngine::parseDefinition(const std::string& iniTex
         else if (key == "tipo") def.type = val;
         else if (key == "fila") def.rowSelector = val;
         else if (key == "magnet") def.magnetSelector = val;
+        else if (key == "torrent") def.torrentSelector = val;
         else if (key == "titulo") def.titleSelector = val;
         else if (key == "tamano") def.sizeSelector = val;
         else if (key == "semillas") def.seedersSelector = val;
@@ -944,6 +1007,7 @@ std::string SearchEngine::serializeDefinition(const Definition& def) {
     ss << "tipo=" << def.type << "\n";
     if (!def.rowSelector.empty())      ss << "fila=" << def.rowSelector << "\n";
     if (!def.magnetSelector.empty())   ss << "magnet=" << def.magnetSelector << "\n";
+    if (!def.torrentSelector.empty())  ss << "torrent=" << def.torrentSelector << "\n";
     if (!def.titleSelector.empty())    ss << "titulo=" << def.titleSelector << "\n";
     if (!def.sizeSelector.empty())     ss << "tamano=" << def.sizeSelector << "\n";
     if (!def.seedersSelector.empty())  ss << "semillas=" << def.seedersSelector << "\n";
@@ -994,6 +1058,9 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         // swallowing the next card's magnet.
         d.rowSelector = "<h3(?:(?!<h3)[\\s\\S])*?magnet:[^\"]+\"";
         d.magnetSelector = "(magnet:[^\"]+)";
+        // The card also carries a .torrent button; the hash-only form is kept
+        // so the probe does not have to send the title back to the site.
+        d.torrentSelector = "href=\"(/download/torrent/[0-9A-Fa-f]{40})";
         d.titleSelector = "<a href=\"/torrent/[^\"]*\"[^>]*>\\s*([^<]+?)\\s*</a>";
         d.sizeSelector = "<span>([0-9][0-9.,]*\\s*[KMGT]i?B)</span>";
         d.seedersSelector = "\">([0-9][0-9.,]*)</span>\\s*<span>seeders";
@@ -1020,6 +1087,8 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         d.categories["TV"] = "4_0";
         d.categories["Movies"] = "4_0";
         d.maxPages = 3;
+        // Each row prints a /download/<id>.torrent button beside its magnet.
+        d.torrentSelector = "href=\"(/download/[0-9]+\\.torrent)\"";
         d.enabled = true;
         engines.push_back(d);
     }

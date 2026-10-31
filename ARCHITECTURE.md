@@ -193,6 +193,23 @@ The analysis runs on the UI thread because it is pure string/flag work over a
 few thousand entries. Fetching the metadata itself still runs in the
 `FileListService` worker.
 
+### How a row's file list is obtained
+
+`TorrentFileList::resolve()` tries the engine's `.torrent` link first: one HTTPS
+request, no peer needed. Its v1 info hash is compared with the magnet's, so a
+mirror serving a different torrent is refused instead of being attributed to the
+row the user clicked. When there is no link, when the download fails, or when the
+hash does not match, the probe opens a throwaway libtorrent session, keeps the
+trackers the magnet carried, appends `TorrentFileList::defaultTrackers()` for the
+sites that publish none (apibay's magnets are trackerless) and bootstraps the DHT
+against `TorrentFileList::dhtBootstrapNodes()`, because the routers libtorrent
+assumes by default do not answer from every network. Expansions beyond the four
+`FileListService` runs at once are queued and started as slots free up; the row
+keeps showing **Reading the file list...** while it waits.
+
+`ArchivePreflight` follows the same rule: it accepts the same `.torrent` link,
+checks it against the magnet, and falls back to the swarm.
+
 ## Reputation and archive preflight
 
 **`SecurityHashes`** decides whether a hash may be sent to a provider at all.

@@ -561,6 +561,7 @@ void SearchResultsWidget::updateRowHeight(int row) {
             if (archiveIndexFor(rf.files) >= 0) ++lines;
             break;
         }
+        case FileListState::Queued:
         case FileListState::Loading:
         case FileListState::Failed:
             lines = 1;
@@ -582,7 +583,9 @@ void SearchResultsWidget::drawExpandCell(int row, int x, int y, int w, int h) {
     FileListService::Entry rf = filesForRow(row);
 
     Fl_Color fg = FL_FOREGROUND_COLOR;
-    if (rf.state == FileListState::Loading) fg = fl_rgb_color(140, 140, 140);
+    if (rf.state == FileListState::Loading || rf.state == FileListState::Queued) {
+        fg = fl_rgb_color(140, 140, 140);
+    }
 
     // Centre the triangle in the top half of the cell; a row that is open is
     // taller and the triangle must stay next to the name, not in the middle.
@@ -628,7 +631,7 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
     const Fl_Color sepColor =
         darkBg ? fl_rgb_color(70, 70, 70) : fl_rgb_color(210, 210, 210);
 
-    if (rf.state == FileListState::Loading) {
+    if (rf.state == FileListState::Loading || rf.state == FileListState::Queued) {
         fl_color(fl_rgb_color(140, 140, 140));
         fl_draw("Reading the file list...", x + 24, ly, avail, FILE_LINE_HEIGHT,
                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);

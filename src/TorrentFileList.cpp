@@ -21,6 +21,7 @@
 #include <cctype>
 #include <cstring>
 #include <filesystem>
+#include <set>
 #include <thread>
 
 namespace lt = libtorrent;
@@ -32,6 +33,39 @@ const std::string USER_AGENT = Version::httpUserAgent();
 // .torrent files are metadata; a few hundred kB at most. Anything wildly
 // bigger is a captive-portal login page or an error page, not a torrent.
 const size_t MAX_TORRENT_BYTES = 8 * 1024 * 1024;
+
+// Lowercase hex of a v1 info hash, the spelling the rest of the app uses for
+// cache keys and for comparing a magnet with a .torrent file.
+std::string hexOfV1(const lt::sha1_hash& hash) {
+    static const char digits[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(40);
+    for (unsigned char byte : hash) {
+        out.push_back(digits[byte >> 4]);
+        out.push_back(digits[byte & 0x0f]);
+    }
+    return out;
+}
+
+// Turns what the probe saw into one line the user can act on. The old message
+// said the same thing whether the swarm was empty, the trackers refused or the
+// DHT never started, which made a fixable problem look like a dead torrent.
+std::string describeSwarmFailure(int trackerReplies, int trackerPeers,
+                                 int trackerErrors, bool dhtBootstrapped) {
+    std::string detail;
+    if (trackerReplies > 0) {
+        detail = "trackers answered " + std::to_string(trackerReplies) +
+                 (trackerReplies == 1 ? " time" : " times") + " with " +
+                 std::to_string(trackerPeers) +
+                 (trackerPeers == 1 ? " peer" : " peers");
+    } else if (trackerErrors > 0) {
+        detail = "every tracker failed";
+    } else {
+        detail = "no tracker answered";
+    }
+    detail += dhtBootstrapped ? ", DHT bootstrapped" : ", DHT did not start";
+    return "No peer sent the metadata (" + detail + ")";
+}
 
 // Where the throwaway leech session puts the little it downloads. It never
 // grows past a few pieces because the torrent is removed the moment the
@@ -84,7 +118,7 @@ void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out
 }
 
 bool resolveFromTorrentUrl(const std::string& url, std::vector<TorrentFileEntry>& out,
-                           std::string& error) {
+                           std::string& error, std::string* infoHashHex) {
     HttpClient::Response res = HttpClient::get(url, USER_AGENT, 15);
     if (!res.ok) {
         error = res.error;
@@ -94,7 +128,7 @@ bool resolveFromTorrentUrl(const std::string& url, std::vector<TorrentFileEntry>
         error = "Not a .torrent file";
         return false;
     }
-    return TorrentFileList::parseTorrentFile(res.body, out, error);
+    return TorrentFileList::parseTorrentFile(res.body, out, error, infoHashHex);
 }
 
 bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>& out,
@@ -109,6 +143,11 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
         error = "Magnet link carries no info hash";
         return false;
     }
+
+    // The magnet's own trackers first; the public ones fill in what it lacks.
+    // A trackerless magnet (apibay publishes them that way) has no other way
+    // to meet a peer on a network where the default DHT routers are blocked.
+    TorrentFileList::addDefaultTrackers(atp.trackers);
 
     lt::settings_pack sp;
     sp.set_int(lt::settings_pack::alert_mask,
@@ -125,6 +164,11 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
     sp.set_bool(lt::settings_pack::enable_outgoing_utp, false);
     sp.set_bool(lt::settings_pack::enable_incoming_utp, false);
     sp.set_str(lt::settings_pack::listen_interfaces, "0.0.0.0:0");
+    // A fresh session knows nobody. Without explicit nodes it relies on
+    // libtorrent's built-in routers, which do not answer from every network,
+    // and then DHT-only magnets never find a peer.
+    sp.set_str(lt::settings_pack::dht_bootstrap_nodes,
+               TorrentFileList::dhtBootstrapNodes());
     sp.set_str(lt::settings_pack::user_agent, USER_AGENT);
     // One probe at a time: this session exists only to answer one question.
     sp.set_int(lt::settings_pack::active_limit, 2);
@@ -183,11 +227,27 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
     };
 
     bool haveMetadata = false;
+    // What the probe saw, so a failure can say whether the swarm was empty,
+    // the trackers refused, or the DHT never came up.
+    int trackerReplies = 0;
+    int trackerPeers = 0;
+    int trackerErrors = 0;
+    bool dhtBootstrapped = false;
     while (std::chrono::steady_clock::now() < deadline) {
         {
             // Drain the queue so the alert mask cannot grow without bound.
             std::vector<lt::alert*> alerts;
             ses->pop_alerts(&alerts);
+            for (const lt::alert* a : alerts) {
+                if (const auto* reply = lt::alert_cast<lt::tracker_reply_alert>(a)) {
+                    ++trackerReplies;
+                    trackerPeers += reply->num_peers;
+                } else if (lt::alert_cast<lt::tracker_error_alert>(a)) {
+                    ++trackerErrors;
+                } else if (lt::alert_cast<lt::dht_bootstrap_alert>(a)) {
+                    dhtBootstrapped = true;
+                }
+            }
         }
         if (readFiles()) {
             haveMetadata = true;
@@ -196,7 +256,10 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
-    if (!haveMetadata) error = "No peers answered for this magnet";
+    if (!haveMetadata) {
+        error = describeSwarmFailure(trackerReplies, trackerPeers,
+                                     trackerErrors, dhtBootstrapped);
+    }
 
     try {
         ses->remove_torrent(handle, lt::session_handle::delete_files);
@@ -208,9 +271,50 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
 
 } // namespace
 
+const std::vector<std::string>& TorrentFileList::defaultTrackers() {
+    // Chosen because they answered from a plain network when the usual
+    // openbittorrent/exodus/demonii set did not: opentrackr over both HTTP and
+    // UDP, and two well-known fallbacks.
+    static const std::vector<std::string> trackers = {
+        "http://tracker.opentrackr.org:1337/announce",
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://open.stealth.si:80/announce",
+        "udp://tracker.torrent.eu.org:451/announce",
+    };
+    return trackers;
+}
+
+const char* TorrentFileList::dhtBootstrapNodes() {
+    // The two routers libtorrent falls back to are listed first so nothing
+    // that used to work stops working; libtorrent.org and transmissionbt are
+    // the ones that answered when the first pair was unreachable.
+    return "router.bittorrent.com:6881,router.utorrent.com:6881,"
+           "dht.libtorrent.org:25401,dht.transmissionbt.com:6881";
+}
+
+void TorrentFileList::addDefaultTrackers(std::vector<std::string>& trackers) {
+    std::set<std::string> seen(trackers.begin(), trackers.end());
+    for (const std::string& tracker : defaultTrackers()) {
+        if (seen.insert(tracker).second) trackers.push_back(tracker);
+    }
+}
+
+std::string TorrentFileList::infoHashOfTorrentFile(const std::string& body) {
+    std::vector<TorrentFileEntry> ignored;
+    std::string error;
+    std::string hash;
+    // The hash is filled before the file-list checks, so a torrent with no
+    // files still answers this question.
+    TorrentFileList::parseTorrentFile(body, ignored, error, &hash);
+    return hash;
+}
+
 bool TorrentFileList::parseTorrentFile(const std::string& body,
                                        std::vector<TorrentFileEntry>& out,
-                                       std::string& error) {
+                                       std::string& error,
+                                       std::string* infoHashHex) {
+    if (infoHashHex) infoHashHex->clear();
+
     lt::load_torrent_limits limits;
     // A peer exchange protocol message is 16 bytes; anything that claims to be
     // a torrent far beyond this is not one.
@@ -233,6 +337,9 @@ bool TorrentFileList::parseTorrentFile(const std::string& body,
     if (!atp.ti) {
         error = "The .torrent file has no metadata";
         return false;
+    }
+    if (infoHashHex && atp.info_hashes.has_v1()) {
+        *infoHashHex = hexOfV1(atp.info_hashes.v1);
     }
     if (atp.ti->num_files() <= 0) {
         error = "The .torrent file lists no files";
@@ -297,22 +404,52 @@ bool TorrentFileList::resolve(const std::string& magnet,
     out.clear();
     error.clear();
 
+    const std::string expected = magnetHash(magnet);
+    std::string torrentError;
+
     // The .torrent file first: it is exact, needs no peer connection and
     // costs one HTTP request.
     if (!torrentUrl.empty()) {
         if (!HttpClient::isSecure(torrentUrl)) {
-            error = "Only https:// .torrent links are allowed";
-            return false;
+            torrentError = "Only https:// .torrent links are allowed";
+        } else {
+            std::vector<TorrentFileEntry> fromFile;
+            std::string fileError;
+            std::string actual;
+            if (!resolveFromTorrentUrl(torrentUrl, fromFile, fileError, &actual)) {
+                torrentError = fileError;
+            } else if (expected.empty() || actual.empty() || actual == expected) {
+                // Either it matches the magnet, or there is no hash to compare
+                // (v2-only torrents carry btmh, not btih).
+                out = std::move(fromFile);
+                return true;
+            } else {
+                // A mirror serving a different file must never be shown as
+                // this row: the user would be judging someone else's listing.
+                torrentError = "the .torrent file is a different torrent";
+            }
         }
-        if (resolveFromTorrentUrl(torrentUrl, out, error)) return true;
-        // Fall through: a magnet may still work even when the .torrent
-        // mirror is down. Whatever the magnet says about itself is the more
-        // useful message, so it replaces the error left here.
+        // Fall through: a magnet may still work when the .torrent mirror is
+        // down, and the hash check above keeps a mismatch harmless.
     }
 
     if (magnet.empty()) {
-        if (error.empty()) error = "This result carries neither a .torrent link nor a magnet";
+        error = torrentError;
+        if (error.empty()) {
+            error = "This result carries neither a .torrent link nor a magnet";
+        }
         return false;
     }
-    return resolveFromMagnet(magnet, out, error, timeoutSeconds);
+
+    std::string magnetError;
+    if (resolveFromMagnet(magnet, out, magnetError, timeoutSeconds)) return true;
+    out.clear();
+
+    // Report both attempts when both were made: whichever one the user wants
+    // to blame, the other is the reason to try again.
+    error = magnetError;
+    if (!torrentError.empty()) {
+        error = "Torrent file: " + torrentError + ". Swarm: " + magnetError;
+    }
+    return false;
 }

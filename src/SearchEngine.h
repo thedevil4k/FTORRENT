@@ -22,6 +22,7 @@
  *   tipo=html            (html | json)
  *   fila=item            (html: the part of the page repeated per result)
  *   magnet=item:<a href="(/magnet:\?xt=urn:btih:[^"]+)">
+ *   torrent=item:href="(/download/[0-9]+\.torrent)"   (optional)
  *   titulo=item:<h2[^>]*>([^<]+)</h2>
  *   tamano=item:([0-9.]+)\s*([KMGT]i?B)
  *   semillas=item:([0-9,]+)\s*seeders
@@ -32,9 +33,13 @@
  */
 struct SearchResult {
     std::string name;
+    // The link as the site published it, trackers included. Rebuilding it from
+    // the info hash alone used to throw the tr= entries away, which left rows
+    // with a live swarm looking dead.
     std::string magnet;
-    // Some engines answer with a .torrent URL instead of a magnet; it is
-    // downloaded on demand when the user picks the result.
+    // The .torrent link the engine offers next to the magnet, when it offers
+    // one. It is the fast path for the file list: the metadata is read from the
+    // file instead of asking the swarm. Empty for engines that publish none.
     std::string torrentUrl;
     // Identifies the entry when the listing itself carries no magnet and the
     // link has to be asked for separately (Pirate Face returns the catalogue
@@ -65,6 +70,11 @@ public:
         // is what keeps unknown or redesigned sites working.
         std::string rowSelector;
         std::string magnetSelector;
+        // Optional selector for the row's .torrent link (group 1 is the href).
+        // Engines that publish one let the file list be read from the file
+        // instead of waiting for a peer to hand over the metadata. Relative
+        // links are resolved against the engine's own address.
+        std::string torrentSelector;
         std::string titleSelector;
         std::string sizeSelector;
         std::string seedersSelector;

@@ -52,10 +52,12 @@ public:
                                 std::string& error);
 
     // Fetches only the piece(s) holding the first and last byte of one file.
-    // 'torrentPath' may be empty when a magnet is given, in which case the
-    // metadata is fetched first.
+    // 'torrentPathOrUrl' may be an https:// .torrent link, a local .torrent
+    // path, or empty when a magnet is given (in which case the metadata is
+    // fetched first). A downloaded .torrent is checked against the magnet's
+    // info hash before its bytes are trusted.
     static bool fetchSnippet(const std::string& magnet,
-                             const std::string& torrentPath, int fileIndex,
+                             const std::string& torrentPathOrUrl, int fileIndex,
                              Snippet& out, std::string& error,
                              const std::atomic<bool>* cancelled,
                              int timeoutSeconds = 90);
