@@ -282,6 +282,16 @@ int main() {
            "a high-risk list asks for review before downloading");
     }
     {
+        // The search row draws its "compressed package" badge from this count,
+        // so the count has to cover the containers a user calls an archive and
+        // not only the two the preflight can index.
+        std::vector<SecurityFile> files = {
+            file("pack.7z"), file("pack.tar.gz"), file("disc.iso")
+        };
+        const SecurityReport r = SecurityAnalyzer::analyze(files);
+        ok(r.archives == 2, "7z and tar.gz count as archives, an ISO does not");
+    }
+    {
         SecurityFile pad = file("__pad.exe");
         pad.padFile = true;
         std::vector<SecurityFile> files = {file("readme.txt"), pad};

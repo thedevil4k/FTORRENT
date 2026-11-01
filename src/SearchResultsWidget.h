@@ -2,6 +2,7 @@
 #define SEARCHRESULTSWIDGET_H
 
 #include <FL/Fl_Table_Row.H>
+#include <FL/Fl_Image.H>
 #include "SearchEngine.h"
 #include "FileListService.h"
 #include "SecurityReputation.h"
@@ -127,6 +128,15 @@ private:
     void onShieldClicked(int row);
     void startReputationLookup(const std::string& key,
                                const std::vector<TorrentFileEntry>& files);
+
+    // Badge in the Name cell for a torrent that downloads a compressed
+    // package. Only drawn once the file list is known: before that, saying
+    // "this is an archive" would be a guess from the title. Loaded once and
+    // rebuilt when the theme changes, because the art only reads against one
+    // of the two backgrounds.
+    Fl_Image* archiveIcon();
+    Fl_Image* m_archiveIcon = nullptr;
+    bool m_darkMode = false;
 
     // Level 2 under an expanded row: one clickable line that reads the archive
     // index from its first and last piece. 'top'/'bottom' are widget

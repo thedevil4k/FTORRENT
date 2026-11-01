@@ -3,6 +3,7 @@
 #include <FL/fl_draw.H>
 #include "ArchiveInspector.h"
 #include "ArchivePreflight.h"
+#include "AssetLoader.h"
 #include "ReputationService.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
@@ -27,6 +28,40 @@ const int MAX_SHOWN_FILES = 12;
 // table usable at the 720px minimum window width and avoids a zero/negative
 // col_width() when the window is at its smallest.
 const int MIN_NAME_WIDTH = 120;
+
+// Box the archive badge is fitted into inside the Name cell. Tall enough to
+// read the zipper: at 15 px the asset below turns into a grey smudge.
+const int BADGE_WIDTH = 21;
+const int BADGE_HEIGHT = 18;
+
+// The badge asset is white-on-black line art: the shapes are filled with white
+// and outlined in black, with nothing behind them. That reads on a dark row
+// exactly as drawn, and disappears on a light one, where the white fills merge
+// with the background. The light-theme copy inverts the ink, so the same shape
+// shows as dark. Alpha is never touched, so the transparent gaps stay empty.
+Fl_Image* invertedCopy(Fl_Image* source) {
+    const Fl_RGB_Image* rgb = dynamic_cast<const Fl_RGB_Image*>(source);
+    if (!rgb || !rgb->array || rgb->w() <= 0 || rgb->h() <= 0) return nullptr;
+    const int d = rgb->d();
+    if (d != 3 && d != 4) return nullptr;
+
+    const int w = rgb->w();
+    const int h = rgb->h();
+    const size_t bytes = static_cast<size_t>(w) * static_cast<size_t>(h) *
+                         static_cast<size_t>(d);
+    unsigned char* pixels = new unsigned char[bytes];
+    for (size_t i = 0; i < bytes; i += static_cast<size_t>(d)) {
+        for (int channel = 0; channel < 3; ++channel) {
+            pixels[i + channel] =
+                static_cast<unsigned char>(255 - rgb->array[i + channel]);
+        }
+        if (d == 4) pixels[i + 3] = static_cast<unsigned char>(rgb->array[i + 3]);
+    }
+
+    Fl_RGB_Image* image = new Fl_RGB_Image(pixels, w, h, d);
+    image->alloc_array = 1;   // the image frees the buffer it was given
+    return image;
+}
 
 // Truncates back to the previous UTF-8 character boundary so an elided name
 // never ends in the middle of a multibyte sequence. Pure byte arithmetic,
@@ -112,6 +147,25 @@ SearchResultsWidget::~SearchResultsWidget() {
     // A lookup started from this table may still be running; its completion
     // must not touch rows that no longer exist.
     if (m_alive) *m_alive = false;
+    delete m_archiveIcon;
+}
+
+Fl_Image* SearchResultsWidget::archiveIcon() {
+    if (m_archiveIcon) return m_archiveIcon;
+
+    // Fitted rather than squared: the asset is wider than it is tall, and
+    // squeezing it into a square would bend the zipper.
+    std::unique_ptr<Fl_Image> loaded(
+        AssetLoader::loadFit("compressed.png", BADGE_WIDTH, BADGE_HEIGHT));
+    if (!loaded) return nullptr;   // no asset: no badge, never a blank square
+    if (!m_darkMode) {
+        // White fills on a light row are invisible; see invertedCopy().
+        m_archiveIcon = invertedCopy(loaded.get());
+        if (!m_archiveIcon) m_archiveIcon = loaded.release();
+    } else {
+        m_archiveIcon = loaded.release();
+    }
+    return m_archiveIcon;
 }
 
 std::string SearchResultsWidget::cacheKey(const SearchResult& r) {
@@ -490,6 +544,13 @@ int SearchResultsWidget::selectedRow() {
 }
 
 void SearchResultsWidget::applyTheme(bool darkMode) {
+    if (m_darkMode != darkMode) {
+        // The archive badge only reads on one background as drawn; keep the
+        // copy that suits the new one instead of a white-on-white blob.
+        m_darkMode = darkMode;
+        delete m_archiveIcon;
+        m_archiveIcon = nullptr;
+    }
     if (darkMode) {
         m_headerBg = fl_rgb_color(55, 55, 55);
         m_oddRowColor = fl_rgb_color(38, 38, 38);
@@ -825,11 +886,24 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
         // surface, so the risk is visible before the row is expanded.
         constexpr int SHIELD = 15;
         const int shieldY = y + (topH - SHIELD) / 2;
-        SecurityBadge::drawShield(x + 5, shieldY, SHIELD, SHIELD,
-                                  reportForRow(row).level);
+        const SecurityReport& report = reportForRow(row);
+        SecurityBadge::drawShield(x + 5, shieldY, SHIELD, SHIELD, report.level);
         fl_color(FL_FOREGROUND_COLOR);
         textX = x + 5 + SHIELD + 4;
-        textW = w - (SHIELD + 14);
+        int reserved = SHIELD + 14;
+
+        // Compressed package badge, at the right end of the cell so it never
+        // moves the name and never covers the shield's click target. It comes
+        // from the file list the analyzer already read, so a row whose list is
+        // still unknown simply has no badge yet.
+        if (report.archives > 0) {
+            if (Fl_Image* badge = archiveIcon()) {
+                badge->draw(x + w - 5 - badge->w(), y + (topH - badge->h()) / 2);
+                reserved += badge->w() + 6;
+                fl_color(FL_FOREGROUND_COLOR);
+            }
+        }
+        textW = w - reserved;
     }
     if (textW < 0) textW = 0;
     if (textW > 0 && !text.empty()) text = elideToWidth(text, textW);
