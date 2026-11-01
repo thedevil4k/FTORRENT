@@ -130,12 +130,13 @@ private:
                                const std::vector<TorrentFileEntry>& files);
 
     // Badge in the Name cell for a torrent that downloads a compressed
-    // package. Only drawn once the file list is known: before that, saying
-    // "this is an archive" would be a guess from the title. Loaded once and
-    // rebuilt when the theme changes, because the art only reads against one
-    // of the two backgrounds.
-    Fl_Image* archiveIcon();
-    Fl_Image* m_archiveIcon = nullptr;
+    // package. The solid version is drawn only once the file list is known;
+    // a title that merely ends in .zip gets the dimmed one, so a hint never
+    // passes for a fact. Loaded once per variant and rebuilt when the theme
+    // changes, because the art only reads against one of the backgrounds.
+    Fl_Image* archiveIcon(bool hinted);
+    Fl_Image* m_archiveIcon = nullptr;       // confirmed by the file list
+    Fl_Image* m_archiveIconHint = nullptr;   // from the title, dimmed
     bool m_darkMode = false;
 
     // Level 2 under an expanded row: one clickable line that reads the archive

@@ -292,6 +292,29 @@ int main() {
         ok(r.archives == 2, "7z and tar.gz count as archives, an ISO does not");
     }
     {
+        // The badge shown before the file list is known comes from the title.
+        // It is a hint, so the rule is deliberately narrow: the end of the name.
+        ok(SecurityAnalyzer::titleSuggestsArchive(
+               "Adobe Premiere Pro CC 2018 15.3.1.72 + Optimized.zip"),
+           "a title ending in .zip is a hint");
+        ok(SecurityAnalyzer::titleSuggestsArchive("pack.tar.gz"),
+           "so is one ending in .tar.gz");
+        ok(SecurityAnalyzer::titleSuggestsArchive("Something.RAR"),
+           "the extension is matched whatever its case");
+        ok(SecurityAnalyzer::titleSuggestsArchive("Movie 1080p.zip   "),
+           "apibay pads names with spaces and that is still the same title");
+        ok(SecurityAnalyzer::titleSuggestsArchive("Movie [repack.zip]"),
+           "a closing bracket after the extension does not hide it");
+        ok(!SecurityAnalyzer::titleSuggestsArchive("Ubuntu 22.04 LTS"),
+           "a title with no extension hints at nothing");
+        ok(!SecurityAnalyzer::titleSuggestsArchive("Some.Show.S01E01.mkv"),
+           "a video is not an archive");
+        ok(!SecurityAnalyzer::titleSuggestsArchive("zip it and ship it"),
+           "the word zip in the text is not an extension");
+        ok(!SecurityAnalyzer::titleSuggestsArchive(""),
+           "an empty title hints at nothing");
+    }
+    {
         SecurityFile pad = file("__pad.exe");
         pad.padFile = true;
         std::vector<SecurityFile> files = {file("readme.txt"), pad};

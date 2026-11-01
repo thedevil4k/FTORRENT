@@ -34,16 +34,27 @@ const int MIN_NAME_WIDTH = 120;
 const int BADGE_WIDTH = 21;
 const int BADGE_HEIGHT = 18;
 
+// How much of the badge shows when it comes from the title alone. Dimmed on
+// purpose: the title is written by the publisher, so this is a hint, and it
+// must not look like the badge the real file list produces.
+const double HINT_ALPHA = 0.35;
+
 // The badge asset is white-on-black line art: the shapes are filled with white
 // and outlined in black, with nothing behind them. That reads on a dark row
 // exactly as drawn, and disappears on a light one, where the white fills merge
 // with the background. The light-theme copy inverts the ink, so the same shape
 // shows as dark. Alpha is never touched, so the transparent gaps stay empty.
-Fl_Image* invertedCopy(Fl_Image* source) {
+//
+// 'alphaScale' fades the whole picture, which is how a badge taken from the
+// title alone is drawn: present, but visibly not the confirmed one. Returns
+// nullptr when the source cannot be transformed, and the caller falls back to
+// the picture as loaded.
+Fl_Image* variantCopy(Fl_Image* source, bool invert, double alphaScale) {
     const Fl_RGB_Image* rgb = dynamic_cast<const Fl_RGB_Image*>(source);
     if (!rgb || !rgb->array || rgb->w() <= 0 || rgb->h() <= 0) return nullptr;
     const int d = rgb->d();
     if (d != 3 && d != 4) return nullptr;
+    if (alphaScale < 1.0 && d != 4) return nullptr;   // no alpha to fade
 
     const int w = rgb->w();
     const int h = rgb->h();
@@ -52,10 +63,16 @@ Fl_Image* invertedCopy(Fl_Image* source) {
     unsigned char* pixels = new unsigned char[bytes];
     for (size_t i = 0; i < bytes; i += static_cast<size_t>(d)) {
         for (int channel = 0; channel < 3; ++channel) {
-            pixels[i + channel] =
-                static_cast<unsigned char>(255 - rgb->array[i + channel]);
+            const unsigned char value =
+                static_cast<unsigned char>(rgb->array[i + channel]);
+            pixels[i + channel] = invert
+                ? static_cast<unsigned char>(255 - value)
+                : value;
         }
-        if (d == 4) pixels[i + 3] = static_cast<unsigned char>(rgb->array[i + 3]);
+        if (d == 4) {
+            const double alpha = static_cast<unsigned char>(rgb->array[i + 3]);
+            pixels[i + 3] = static_cast<unsigned char>(alpha * alphaScale + 0.5);
+        }
     }
 
     Fl_RGB_Image* image = new Fl_RGB_Image(pixels, w, h, d);
@@ -148,24 +165,23 @@ SearchResultsWidget::~SearchResultsWidget() {
     // must not touch rows that no longer exist.
     if (m_alive) *m_alive = false;
     delete m_archiveIcon;
+    delete m_archiveIconHint;
 }
 
-Fl_Image* SearchResultsWidget::archiveIcon() {
-    if (m_archiveIcon) return m_archiveIcon;
+Fl_Image* SearchResultsWidget::archiveIcon(bool hinted) {
+    Fl_Image*& cached = hinted ? m_archiveIconHint : m_archiveIcon;
+    if (cached) return cached;
 
     // Fitted rather than squared: the asset is wider than it is tall, and
     // squeezing it into a square would bend the zipper.
     std::unique_ptr<Fl_Image> loaded(
         AssetLoader::loadFit("compressed.png", BADGE_WIDTH, BADGE_HEIGHT));
     if (!loaded) return nullptr;   // no asset: no badge, never a blank square
-    if (!m_darkMode) {
-        // White fills on a light row are invisible; see invertedCopy().
-        m_archiveIcon = invertedCopy(loaded.get());
-        if (!m_archiveIcon) m_archiveIcon = loaded.release();
-    } else {
-        m_archiveIcon = loaded.release();
-    }
-    return m_archiveIcon;
+
+    // White fills on a light row are invisible; see variantCopy().
+    cached = variantCopy(loaded.get(), !m_darkMode, hinted ? HINT_ALPHA : 1.0);
+    if (!cached) cached = loaded.release();
+    return cached;
 }
 
 std::string SearchResultsWidget::cacheKey(const SearchResult& r) {
@@ -546,10 +562,12 @@ int SearchResultsWidget::selectedRow() {
 void SearchResultsWidget::applyTheme(bool darkMode) {
     if (m_darkMode != darkMode) {
         // The archive badge only reads on one background as drawn; keep the
-        // copy that suits the new one instead of a white-on-white blob.
+        // copies that suit the new one instead of a white-on-white blob.
         m_darkMode = darkMode;
         delete m_archiveIcon;
         m_archiveIcon = nullptr;
+        delete m_archiveIconHint;
+        m_archiveIconHint = nullptr;
     }
     if (darkMode) {
         m_headerBg = fl_rgb_color(55, 55, 55);
@@ -893,11 +911,14 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
         int reserved = SHIELD + 14;
 
         // Compressed package badge, at the right end of the cell so it never
-        // moves the name and never covers the shield's click target. It comes
-        // from the file list the analyzer already read, so a row whose list is
-        // still unknown simply has no badge yet.
-        if (report.archives > 0) {
-            if (Fl_Image* badge = archiveIcon()) {
+        // moves the name and never covers the shield's click target. A known
+        // file list draws it solid; a title that only ends in .zip draws it
+        // dimmed, so the hint is visible without pretending to be the fact.
+        const bool confirmed = report.archives > 0;
+        const bool hinted =
+            !confirmed && SecurityAnalyzer::titleSuggestsArchive(r->name);
+        if (confirmed || hinted) {
+            if (Fl_Image* badge = archiveIcon(hinted)) {
                 badge->draw(x + w - 5 - badge->w(), y + (topH - badge->h()) / 2);
                 reserved += badge->w() + 6;
                 fl_color(FL_FOREGROUND_COLOR);

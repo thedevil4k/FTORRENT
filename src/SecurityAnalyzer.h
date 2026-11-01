@@ -39,6 +39,12 @@ public:
     static bool isArchivePath(const std::string& path);
     static bool isDiskImagePath(const std::string& path);
 
+    // True when a torrent's own title ends in an archive extension
+    // ("...Optimized.zip", "show.tar.gz"). Only a hint: the title is written by
+    // whoever published the torrent, so the search row draws this badge dimmed
+    // until the real file list confirms it.
+    static bool titleSuggestsArchive(const std::string& title);
+
     // Lowercased extension including the dot, empty when there is none.
     // Backslashes and forward slashes are both treated as separators.
     static std::string extensionLower(const std::string& path);

@@ -288,6 +288,25 @@ bool SecurityAnalyzer::isDiskImagePath(const std::string& path) {
     });
 }
 
+bool SecurityAnalyzer::titleSuggestsArchive(const std::string& title) {
+    // Only the end of the title is looked at: an archive named in the middle
+    // says little about what the torrent actually contains. Publishers pad
+    // their names with spaces (apibay does) and sometimes close a bracket after
+    // them, neither of which is part of the extension.
+    std::size_t end = title.size();
+    while (end > 0) {
+        const char last = title[end - 1];
+        if (std::isspace(static_cast<unsigned char>(last)) ||
+            last == ']' || last == ')') {
+            --end;
+        } else {
+            break;
+        }
+    }
+    if (end == 0) return false;
+    return isArchivePath(title.substr(0, end));
+}
+
 std::string SecurityAnalyzer::extensionLower(const std::string& path) {
     const std::size_t separator = path.find_last_of("/\\");
     const std::size_t dot = path.find_last_of('.');
