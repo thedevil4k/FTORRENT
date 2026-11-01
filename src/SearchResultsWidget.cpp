@@ -37,7 +37,7 @@ const int BADGE_HEIGHT = 18;
 // How much of the badge shows when it comes from the title alone. Dimmed on
 // purpose: the title is written by the publisher, so this is a hint, and it
 // must not look like the badge the real file list produces.
-const double HINT_ALPHA = 0.35;
+const double HINT_ALPHA = 0.55;
 
 // The badge asset is white-on-black line art: the shapes are filled with white
 // and outlined in black, with nothing behind them. That reads on a dark row
@@ -910,17 +910,20 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
         textX = x + 5 + SHIELD + 4;
         int reserved = SHIELD + 14;
 
-        // Compressed package badge, at the right end of the cell so it never
-        // moves the name and never covers the shield's click target. A known
-        // file list draws it solid; a title that only ends in .zip draws it
-        // dimmed, so the hint is visible without pretending to be the fact.
+        // Compressed package badge, immediately after the shield: the two
+        // indicators read as one tag group, so the risk colour and the content
+        // type are seen together. A known file list draws it solid; a title
+        // that only ends in .zip draws it dimmed, so the hint is visible
+        // without pretending to be the fact.
         const bool confirmed = report.archives > 0;
         const bool hinted =
             !confirmed && SecurityAnalyzer::titleSuggestsArchive(r->name);
         if (confirmed || hinted) {
             if (Fl_Image* badge = archiveIcon(hinted)) {
-                badge->draw(x + w - 5 - badge->w(), y + (topH - badge->h()) / 2);
-                reserved += badge->w() + 6;
+                constexpr int GAP = 4;
+                badge->draw(textX, y + (topH - badge->h()) / 2);
+                textX += badge->w() + GAP;
+                reserved += badge->w() + GAP;
                 fl_color(FL_FOREGROUND_COLOR);
             }
         }
