@@ -39,11 +39,38 @@ const int BADGE_HEIGHT = 18;
 // must not look like the badge the real file list produces.
 const double HINT_ALPHA = 0.55;
 
-// The badge asset is white-on-black line art: the shapes are filled with white
-// and outlined in black, with nothing behind them. That reads on a dark row
-// exactly as drawn, and disappears on a light one, where the white fills merge
-// with the background. The light-theme copy inverts the ink, so the same shape
-// shows as dark. Alpha is never touched, so the transparent gaps stay empty.
+// A picture made of white or grey strokes has no colour of its own: max(r,g,b)
+// and min(r,g,b) stay close on every visible pixel. A coloured icon such as a
+// green archive fill does not. The 5% allowance keeps antialiased edges from
+// classifying a coloured picture as ink.
+bool isInkArt(const Fl_RGB_Image* rgb) {
+    if (!rgb || !rgb->array || rgb->w() <= 0 || rgb->h() <= 0) return false;
+    const int d = rgb->d();
+    if (d != 3 && d != 4) return false;
+
+    long visible = 0;
+    long coloured = 0;
+    for (int y = 0; y < rgb->h(); ++y) {
+        for (int x = 0; x < rgb->w(); ++x) {
+            const size_t i = (static_cast<size_t>(y) * rgb->w() + x) * d;
+            if (d == 4 && rgb->array[i + 3] < 16) continue;
+            const int r = rgb->array[i];
+            const int g = rgb->array[i + 1];
+            const int b = rgb->array[i + 2];
+            const int high = std::max({r, g, b});
+            const int low = std::min({r, g, b});
+            if (high - low > 32) ++coloured;
+            ++visible;
+        }
+    }
+    return visible > 0 && coloured * 20 < visible;
+}
+
+// The badge asset may be neutral ink (white-on-black line art) or a coloured
+// icon that carries its own fills. Ink art vanishes on a light row and has to
+// be flipped; a coloured icon must be left exactly as designed, because
+// inverting a green fill would turn it magenta. isInkArt() tells the two apart
+// and variantCopy() applies the flip and/or the fade.
 //
 // 'alphaScale' fades the whole picture, which is how a badge taken from the
 // title alone is drawn: present, but visibly not the confirmed one. Returns
@@ -178,8 +205,11 @@ Fl_Image* SearchResultsWidget::archiveIcon(bool hinted) {
         AssetLoader::loadFit("compressed.png", BADGE_WIDTH, BADGE_HEIGHT));
     if (!loaded) return nullptr;   // no asset: no badge, never a blank square
 
-    // White fills on a light row are invisible; see variantCopy().
-    cached = variantCopy(loaded.get(), !m_darkMode, hinted ? HINT_ALPHA : 1.0);
+    // Ink art needs its strokes flipped on a light row; a coloured icon is
+    // drawn as designed on both. See isInkArt() and variantCopy().
+    const Fl_RGB_Image* rgb = dynamic_cast<const Fl_RGB_Image*>(loaded.get());
+    const bool invert = !m_darkMode && isInkArt(rgb);
+    cached = variantCopy(loaded.get(), invert, hinted ? HINT_ALPHA : 1.0);
     if (!cached) cached = loaded.release();
     return cached;
 }
@@ -561,8 +591,9 @@ int SearchResultsWidget::selectedRow() {
 
 void SearchResultsWidget::applyTheme(bool darkMode) {
     if (m_darkMode != darkMode) {
-        // The archive badge only reads on one background as drawn; keep the
-        // copies that suit the new one instead of a white-on-white blob.
+        // Ink art has to be flipped for a light row, so the cached copies no
+        // longer suit the new background. A coloured icon comes out the same
+        // either way, but rebuilding it costs nothing.
         m_darkMode = darkMode;
         delete m_archiveIcon;
         m_archiveIcon = nullptr;
