@@ -29,10 +29,11 @@ const int MAX_SHOWN_FILES = 12;
 // col_width() when the window is at its smallest.
 const int MIN_NAME_WIDTH = 120;
 
-// Every content badge occupies the same square slot, whatever its own aspect
-// ratio. The assets are not all square (the archive art is landscape, the video
-// art is portrait), so fitting each into the same box and centring it keeps the
-// icons looking even instead of one being 16 px wide and the next 21 px.
+// Every content badge is drawn at exactly the same size. The source art does
+// not share an aspect ratio (the archive art is landscape, the video art is
+// landscape, the executable art is nearly square), and the row must look even
+// regardless, so each PNG is stretched into this square slot instead of being
+// fitted by its own proportions.
 const int BADGE_BOX = 18;
 const int BADGE_GAP = 4;
 
@@ -229,11 +230,11 @@ Fl_Image* SearchResultsWidget::badgeIcon(ContentBadge badge, bool hinted) {
     }
     if (!asset) return nullptr;
 
-    // Fitted rather than squared: the assets have their own aspect ratio, and
-    // squeezing one would distort it. The caller centres the result in the
-    // fixed slot, so different ratios still line up.
+    // Squared on purpose: the row must look even regardless of the asset's
+    // aspect ratio. load() copies the PNG into exactly BADGE_BOX x BADGE_BOX,
+    // so a landscape film strip and a square disc end up the same size.
     std::unique_ptr<Fl_Image> loaded(
-        AssetLoader::loadFit(asset, BADGE_BOX, BADGE_BOX));
+        AssetLoader::load(asset, BADGE_BOX));
     if (!loaded) return nullptr;   // no asset: no badge, never a blank square
 
     // Ink art needs its strokes flipped on a light row; a coloured icon is
@@ -1002,9 +1003,8 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
             if (!badge) continue;
             const int needed = BADGE_BOX + BADGE_GAP;
             if (w - (reserved + needed) < MIN_BADGED_NAME_WIDTH) break;
-            // Centre the fitted picture in the slot: a portrait icon and a
-            // landscape one then take exactly the same room and the group
-            // stays evenly spaced.
+            // The picture is already squared to the slot; centring only
+            // matters if a source asset is smaller than BADGE_BOX.
             const int badgeX = textX + (BADGE_BOX - badge->w()) / 2;
             badge->draw(badgeX, y + (topH - badge->h()) / 2);
             textX += needed;

@@ -29,11 +29,6 @@ const std::string& dir();
 // it were the icon.
 Fl_Image* load(const std::string& file, int size);
 
-// Same, but keeps the picture's own aspect ratio: the result fits inside
-// width x height and is as large as that box allows. Icons that are wider than
-// they are tall (the archive badge is) look wrong when squeezed into a square.
-Fl_Image* loadFit(const std::string& file, int width, int height);
-
 }  // namespace AssetLoader
 
 #endif  // FTORRENT_ASSETLOADER_H
