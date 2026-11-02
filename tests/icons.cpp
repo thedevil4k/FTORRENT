@@ -233,7 +233,7 @@ int main(int argc, char** argv) {
             // compressed package. Fitted, not squared: the asset is wider than
             // it is tall and stretching it would bend the zipper.
             std::unique_ptr<Fl_Image> badge(
-                AssetLoader::loadFit("compressed.png", 21, 18));
+                AssetLoader::loadFit("compressed.png", 18, 18));
             ok(badge != nullptr, "compressed.png is installed and decodes");
             ok(badge && badge->w() <= 21 && badge->h() <= 18 && badge->h() > 0,
                "the archive badge fits the box the name cell reserves");
@@ -256,7 +256,7 @@ int main(int argc, char** argv) {
             };
             for (const BadgeAsset& asset : assets) {
                 std::unique_ptr<Fl_Image> badge(
-                    AssetLoader::loadFit(asset.file, 21, 18));
+                    AssetLoader::loadFit(asset.file, 18, 18));
                 ok(badge != nullptr, asset.what);
                 ok(badge && badge->w() > 0 && badge->w() <= 21 &&
                    badge->h() > 0 && badge->h() <= 18,
@@ -274,13 +274,13 @@ int main(int argc, char** argv) {
         ok(search->image() != nullptr, "search button still has an icon");
         ok(AssetLoader::load("find.png", ToolbarLayout::kIconSize) == nullptr,
            "find.png really is absent, so this variant is exercising the fallback");
-        ok(AssetLoader::loadFit("compressed.png", 21, 18) == nullptr,
+        ok(AssetLoader::loadFit("compressed.png", 18, 18) == nullptr,
            "the archive badge asset is absent too, so no blank square is drawn");
-        ok(AssetLoader::loadFit("iso.png", 21, 18) == nullptr,
+        ok(AssetLoader::loadFit("iso.png", 18, 18) == nullptr,
            "the disc-image badge asset is absent too");
-        ok(AssetLoader::loadFit("video.png", 21, 18) == nullptr,
+        ok(AssetLoader::loadFit("video.png", 18, 18) == nullptr,
            "the video badge asset is absent too");
-        ok(AssetLoader::loadFit("executable.png", 21, 18) == nullptr,
+        ok(AssetLoader::loadFit("executable.png", 18, 18) == nullptr,
            "the executable badge asset is absent too");
         ok(search->image() && samePixels(search->image(), Resources::getSearchIcon()),
            "search button draws the compiled-in magnifier's pixels");

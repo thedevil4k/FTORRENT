@@ -317,11 +317,14 @@ int main() {
         // only a native binary may draw the executable badge.
         std::vector<SecurityFile> files = {
             file("movie.mkv"), file("disc.iso"), file("setup.exe"),
-            file("lib.dll"), file("tool.py"), file("notes.txt")
+            file("bundle.rar"), file("lib.dll"), file("tool.py"),
+            file("notes.txt")
         };
         const SecurityReport r = SecurityAnalyzer::analyze(files);
         ok(r.videos == 1, "one video is counted");
         ok(r.discImages == 1, "one disc image is counted");
+        ok(r.archives == 1,
+           "one archive is counted alongside the other content types");
         ok(r.nativeExecutables == 1,
            "only the native binary counts, not the dll or the script");
         ok(r.executables == 2,
