@@ -46,11 +46,6 @@ public:
     static PieceRange computeRange(std::int64_t fileOffset, std::int64_t fileSize,
                                    int pieceLength, std::int64_t torrentSize);
 
-    // Writes a file of the full size with only the head and tail filled. The
-    // gap is left unwritten, so it stays sparse on disk.
-    static bool writeSparseFile(const std::string& path, const Snippet& snippet,
-                                std::string& error);
-
     // Fetches only the piece(s) holding the first and last byte of one file.
     // 'torrentPathOrUrl' may be an https:// .torrent link, a local .torrent
     // path, or empty when a magnet is given (in which case the metadata is
@@ -60,14 +55,14 @@ public:
                              const std::string& torrentPathOrUrl, int fileIndex,
                              Snippet& out, std::string& error,
                              const std::atomic<bool>* cancelled,
-                             int timeoutSeconds = 90);
+                             int timeoutSeconds = 120);
 
     // Same, for a torrent already known to the app (Details). Passing its
     // metadata means no second metadata exchange with the swarm.
     static bool fetchSnippet(const lt::add_torrent_params& params,
                              int fileIndex, Snippet& out, std::string& error,
                              const std::atomic<bool>* cancelled,
-                             int timeoutSeconds = 90);
+                             int timeoutSeconds = 120);
 
     // Fetch, assemble, list the entries, delete everything it created.
     // 'entries' receives every regular file name the index exposed.
@@ -75,12 +70,12 @@ public:
                         const std::string& torrentPath, int fileIndex,
                         std::vector<SecurityFile>& entries, std::string& error,
                         const std::atomic<bool>* cancelled,
-                        int timeoutSeconds = 90);
+                        int timeoutSeconds = 120);
 
     static bool inspect(const lt::add_torrent_params& params, int fileIndex,
                         std::vector<SecurityFile>& entries,
                         std::string& error, const std::atomic<bool>* cancelled,
-                        int timeoutSeconds = 90);
+                        int timeoutSeconds = 120);
 
     // Same, from the bytes of a .torrent the app already holds: the file list
     // the search row resolved keeps them, so a check pays no metadata exchange
@@ -90,7 +85,7 @@ public:
                                std::vector<SecurityFile>& entries,
                                std::string& error,
                                const std::atomic<bool>* cancelled,
-                               int timeoutSeconds = 90);
+                               int timeoutSeconds = 120);
 
     // Root of the temporary directories. Cleaned up by inspect().
     static std::string tempRoot();

@@ -73,6 +73,80 @@ bool openArchive(archive* value, const std::string& path, std::string& error)
     return true;
 }
 
+// An archive that exists only as the bytes the pre-download check fetched: the
+// first and last window of a file of a known size. Between them the stream
+// reads as zeros, which is what the file looks like to a header walk, and no
+// part of it is ever written anywhere. On NTFS the alternative -- a file of the
+// real size with a hole -- is not free: extending a normal file zero-fills the
+// gap, so listing a 21 GB RAR meant writing 21 GB first.
+struct WindowStream {
+    std::int64_t size = 0;
+    std::string head;   // At offset 0
+    std::string tail;   // At offset size - tail.size()
+    std::int64_t pos = 0;
+    char zeros[64 * 1024] = {};
+};
+
+la_ssize_t windowRead(archive*, void* client, const void** buffer)
+{
+    WindowStream* stream = static_cast<WindowStream*>(client);
+    if (stream->size <= 0 || stream->pos >= stream->size) return 0;
+
+    const std::int64_t remaining = stream->size - stream->pos;
+    const std::int64_t headSize = static_cast<std::int64_t>(stream->head.size());
+    if (stream->pos < headSize) {
+        const std::int64_t available = headSize - stream->pos;
+        const la_ssize_t take = static_cast<la_ssize_t>(
+            available < remaining ? available : remaining);
+        *buffer = stream->head.data() + stream->pos;
+        stream->pos += take;
+        return take;
+    }
+
+    const std::int64_t tailSize = static_cast<std::int64_t>(stream->tail.size());
+    const std::int64_t tailStart = stream->size - tailSize;
+    if (stream->pos >= tailStart) {
+        const std::int64_t available = stream->size - stream->pos;
+        const la_ssize_t take = static_cast<la_ssize_t>(available);
+        *buffer = stream->tail.data() + (stream->pos - tailStart);
+        stream->pos += take;
+        return take;
+    }
+
+    // The gap: zeros, handed out in one fixed buffer.
+    const std::int64_t gap = tailStart - stream->pos;
+    const la_ssize_t take = static_cast<la_ssize_t>(
+        gap < static_cast<std::int64_t>(sizeof(stream->zeros))
+            ? gap
+            : static_cast<std::int64_t>(sizeof(stream->zeros)));
+    *buffer = stream->zeros;
+    stream->pos += take;
+    return take;
+}
+
+la_int64_t windowSkip(archive*, void* client, la_int64_t request)
+{
+    WindowStream* stream = static_cast<WindowStream*>(client);
+    if (request <= 0) return 0;
+    const std::int64_t remaining = stream->size - stream->pos;
+    const std::int64_t take = request < remaining ? request : remaining;
+    stream->pos += take > 0 ? take : 0;
+    return take;
+}
+
+la_int64_t windowSeek(archive*, void* client, la_int64_t offset, int whence)
+{
+    WindowStream* stream = static_cast<WindowStream*>(client);
+    std::int64_t target = offset;
+    if (whence == SEEK_CUR) target = stream->pos + offset;
+    else if (whence == SEEK_END) target = stream->size + offset;
+    if (target < 0) target = 0;
+    if (target > stream->size) target = stream->size;
+    stream->pos = target;
+    return stream->pos;
+}
+
+
 std::string entryName(archive_entry* entry)
 {
     const char* name = archive_entry_pathname_utf8(entry);
@@ -97,6 +171,79 @@ bool isEncrypted(archive_entry* entry)
     (void)entry;
     return false;
 #endif
+}
+
+// The .exe rule, for the walk below, which is not a member function. Same
+// logic as ArchiveInspector::isExecutableName(), which cannot be called here.
+bool isExecutableEntryName(const std::string& path)
+{
+    const size_t separator = path.find_last_of("/\\");
+    const size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos ||
+        (separator != std::string::npos && dot < separator)) {
+        return false;
+    }
+    std::string extension = path.substr(dot);
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return extension == ".exe";
+}
+
+// The header walk, shared by a file on disk and by the two-window stream. The
+// reader must already be open.
+bool readOpenArchive(archive* reader, bool executablesOnly,
+                     std::vector<ArchiveInspector::Entry>& out,
+                     std::string& error, const std::atomic<bool>* cancelled)
+{
+    archive_entry* entry = nullptr;
+    int entryIndex = 0;
+    int status = ARCHIVE_OK;
+
+    while ((status = archive_read_next_header(reader, &entry)) == ARCHIVE_OK) {
+        ++entryIndex;
+
+        if (cancelled && cancelled->load()) {
+            error = "cancelled";
+            break;
+        }
+        if (entryIndex > MAX_ENTRIES) {
+            error = "archive has too many entries";
+            break;
+        }
+
+        if (isRegularFileEntry(entry)) {
+            const std::string name = entryName(entry);
+            if (!name.empty() &&
+                (!executablesOnly || isExecutableEntryName(name))) {
+                ArchiveInspector::Entry found;
+                found.index = entryIndex;
+                found.path = name;
+
+                const la_int64_t size = archive_entry_size(entry);
+                if (archive_entry_size_is_set(entry) && size >= 0) {
+                    found.size = static_cast<std::uint64_t>(size);
+                    found.sizeKnown = true;
+                }
+                found.encrypted = isEncrypted(entry);
+                out.push_back(std::move(found));
+
+                if (executablesOnly && out.size() > MAX_EXECUTABLES) {
+                    error = "archive has too many .exe files";
+                    break;
+                }
+            }
+        }
+
+        if (archive_read_data_skip(reader) != ARCHIVE_OK) {
+            error = archiveError(reader, "could not skip archive data");
+            break;
+        }
+    }
+
+    if (error.empty() && status != ARCHIVE_EOF) {
+        error = archiveError(reader, "could not read archive");
+    }
+    return error.empty();
 }
 
 #endif // FTORRENT_HAVE_LIBARCHIVE
@@ -171,57 +318,66 @@ bool ArchiveInspector::readEntries(const std::string& archivePath,
     if (!openArchive(archive.get(), archivePath, error)) {
         return false;
     }
+    return readOpenArchive(archive.get(), executablesOnly, out, error,
+                           cancelled);
+#endif
+}
 
-    archive_entry* entry = nullptr;
-    int entryIndex = 0;
-    int status = ARCHIVE_OK;
-
-    while ((status = archive_read_next_header(archive.get(), &entry)) == ARCHIVE_OK) {
-        ++entryIndex;
-
-        if (cancelled && cancelled->load()) {
-            error = "cancelled";
-            break;
-        }
-        if (entryIndex > MAX_ENTRIES) {
-            error = "archive has too many entries";
-            break;
-        }
-
-        if (isRegularFileEntry(entry)) {
-            const std::string name = entryName(entry);
-            if (!name.empty() &&
-                (!executablesOnly || isExecutableName(name))) {
-                Entry found;
-                found.index = entryIndex;
-                found.path = name;
-
-                const la_int64_t size = archive_entry_size(entry);
-                if (archive_entry_size_is_set(entry) && size >= 0) {
-                    found.size = static_cast<std::uint64_t>(size);
-                    found.sizeKnown = true;
-                }
-                found.encrypted = isEncrypted(entry);
-                out.push_back(std::move(found));
-
-                if (executablesOnly && out.size() > MAX_EXECUTABLES) {
-                    error = "archive has too many .exe files";
-                    break;
-                }
-            }
-        }
-
-        if (archive_read_data_skip(archive.get()) != ARCHIVE_OK) {
-            error = archiveError(archive.get(), "could not skip archive data");
-            break;
-        }
+ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
+    std::int64_t fileSize, const std::string& head, const std::string& tail,
+    const std::atomic<bool>* cancelled)
+{
+    ListingAll result;
+#ifndef FTORRENT_HAVE_LIBARCHIVE
+    (void)fileSize;
+    (void)head;
+    (void)tail;
+    (void)cancelled;
+    result.error = "archive support is not available in this build";
+    return result;
+#else
+    if (fileSize <= 0) {
+        result.error = "the file is empty";
+        return result;
+    }
+    if (static_cast<std::int64_t>(head.size()) > fileSize ||
+        static_cast<std::int64_t>(tail.size()) > fileSize) {
+        result.error = "the fetched bytes do not fit the file";
+        return result;
+    }
+    if (cancelled && cancelled->load()) {
+        result.error = "cancelled";
+        return result;
     }
 
-    if (error.empty() && status != ARCHIVE_EOF) {
-        error = archiveError(archive.get(), "could not read archive");
+    ArchivePtr archive(archive_read_new());
+    if (!archive) {
+        result.error = "could not create the archive reader";
+        return result;
     }
+    archive_read_support_filter_none(archive.get());
+    archive_read_support_format_rar(archive.get());
+#if ARCHIVE_VERSION_NUMBER >= 3004000
+    archive_read_support_format_rar5(archive.get());
+#endif
+    archive_read_support_format_zip(archive.get());
 
-    return error.empty();
+    WindowStream stream;
+    stream.size = fileSize;
+    stream.head = head;
+    stream.tail = tail;
+    archive_read_set_seek_callback(archive.get(), &windowSeek);
+    if (archive_read_open2(archive.get(), &stream, nullptr, &windowRead,
+                           &windowSkip, nullptr) != ARCHIVE_OK) {
+        result.error = archiveError(archive.get(), "could not open archive");
+        return result;
+    }
+    if (!readOpenArchive(archive.get(), false, result.entries, result.error,
+                         cancelled)) {
+        return result;
+    }
+    result.ok = true;
+    return result;
 #endif
 }
 

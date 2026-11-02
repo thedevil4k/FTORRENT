@@ -67,6 +67,20 @@ public:
                                   const std::atomic<bool>* cancelled = nullptr);
 
     /**
+     * @brief List every regular file from the first and last bytes of an
+     *        archive, which is all the pre-download check fetches.
+     *
+     * The archive never touches the disk: 'head' is served at offset 0, 'tail'
+     * at the end of a file of 'fileSize' bytes, and the gap between them reads
+     * as zeros. That is exactly what a header walk needs, and it avoids writing
+     * a file of the real size first (on NTFS extending a normal file
+     * zero-fills the gap, so a 21 GB RAR meant 21 GB of writes).
+     */
+    static ListingAll listEntriesFromWindows(
+        std::int64_t fileSize, const std::string& head, const std::string& tail,
+        const std::atomic<bool>* cancelled = nullptr);
+
+    /**
      * @brief Hash one .exe entry by its position in the archive.
      *
      * The entry is decompressed in memory, chunk by chunk. No temporary file

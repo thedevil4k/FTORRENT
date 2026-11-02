@@ -90,80 +90,53 @@ int main() {
            "an empty file produces no ranges");
     }
 
-    section("sparse assembly");
-    {
-        ArchivePreflight::Snippet snippet;
-        snippet.fileSize = 100000;
-        snippet.head = "HEAD";
-        snippet.tail = "TAIL";
-        const fs::path path = scratch("sparse.bin");
-        std::string error;
-        ok(ArchivePreflight::writeSparseFile(path.string(), snippet, error),
-           "the sparse file is written: " + error);
-        ok(fs::file_size(path) == 100000,
-           "the sparse file has the original length");
-
-        const std::string bytes = readFile(path);
-        ok(bytes.size() == 100000, "the bytes read back match the length");
-        ok(bytes.compare(0, 4, "HEAD") == 0, "the head lands at the start");
-        ok(bytes.compare(99996, 4, "TAIL") == 0, "the tail lands at the end");
-        ok(bytes[50000] == '\0', "the middle is left empty");
-        std::error_code ec;
-        fs::remove(path, ec);
-    }
-
 #ifdef FTORRENT_HAVE_LIBARCHIVE
-    section("head and tail are enough to list an archive");
+    section("listing from two windows, with no file on disk");
     {
-        struct Case {
-            const char* file;
-            bool expectOk;
+        // What the pre-download check does: the index is read straight from
+        // the first and last bytes, so a 21 GB archive costs two pieces of
+        // memory and nothing else. On NTFS the old sparse file cost a
+        // full-length write, which is what made the check hang after the
+        // pieces had already arrived.
+        const char* fixtures[] = {
+            "setup.zip",
+            "test_read_format_rar5_stored.rar",
+            "test_read_format_rar5_compressed.rar",
         };
-        // 64 KiB each way is one piece at the smallest v2 piece size and far
-        // more than any of these fixtures needs.
-        const std::size_t WINDOW = 64 * 1024;
-        const Case cases[] = {
-            {"setup.zip", true},
-            {"test_read_format_rar5_stored.rar", true},
-            {"test_read_format_rar5_compressed.rar", true},
-        };
-
-        for (const Case& c : cases) {
-            const fs::path full = fs::path(FTORRENT_ARCHIVE_FIXTURES) / c.file;
+        const std::size_t window = 65536;
+        for (const char* name : fixtures) {
+            const fs::path full = fs::path(FTORRENT_ARCHIVE_FIXTURES) / name;
             const std::string bytes = readFile(full);
-            ok(!bytes.empty(), std::string("fixture is present: ") + c.file);
+            ok(!bytes.empty(), std::string("fixture is present: ") + name);
             if (bytes.empty()) continue;
 
-            ArchivePreflight::Snippet snippet;
-            snippet.fileSize = static_cast<std::int64_t>(bytes.size());
-            snippet.head = bytes.substr(0, std::min(WINDOW, bytes.size()));
-            snippet.tail = bytes.substr(bytes.size() > WINDOW ? bytes.size() - WINDOW : 0);
-
-            const fs::path partial = scratch(std::string("partial-") + c.file);
-            std::string error;
-            ok(ArchivePreflight::writeSparseFile(partial.string(), snippet, error),
-               std::string("the partial archive is written: ") + c.file);
-
-            const ArchiveInspector::ListingAll fromPartial =
-                ArchiveInspector::listEntries(partial.string());
             const ArchiveInspector::ListingAll fromFull =
                 ArchiveInspector::listEntries(full.string());
-
-            ok(fromFull.ok, std::string("the full archive lists: ") + c.file);
-            ok(fromPartial.ok == c.expectOk,
-               std::string("the partial archive lists as expected: ") + c.file);
-            if (fromPartial.ok && fromFull.ok) {
-                ok(namesOf(fromPartial.entries) == namesOf(fromFull.entries),
-                   std::string("the head and tail see the same entries as the "
-                               "whole archive: ") +
-                       c.file);
-                ok(!fromPartial.entries.empty(),
-                   std::string("the listing is not empty: ") + c.file);
+            const ArchiveInspector::ListingAll fromWindows =
+                ArchiveInspector::listEntriesFromWindows(
+                    static_cast<std::int64_t>(bytes.size()),
+                    bytes.substr(0, std::min(window, bytes.size())),
+                    bytes.substr(bytes.size() > window ? bytes.size() - window
+                                                      : 0));
+            ok(fromFull.ok, std::string("the whole file lists: ") + name);
+            ok(fromWindows.ok == fromFull.ok,
+               std::string("the two windows list it too: ") + name);
+            if (fromWindows.ok && fromFull.ok) {
+                ok(namesOf(fromWindows.entries) == namesOf(fromFull.entries),
+                   std::string("and see the same entries: ") + name);
+                ok(!fromWindows.entries.empty(),
+                   std::string("the listing is not empty: ") + name);
             }
-
-            std::error_code ec;
-            fs::remove(partial, ec);
         }
+
+        ok(!ArchiveInspector::listEntriesFromWindows(0, "", "").ok,
+           "an empty file is refused");
+        ok(!ArchiveInspector::listEntriesFromWindows(
+                   100, std::string(200, 'x'), std::string()).ok,
+           "windows larger than the file are refused");
+        ok(!ArchiveInspector::listEntriesFromWindows(16, "not an archive",
+                                                     "").ok,
+           "bytes that are not an archive are refused");
     }
 
     section("a check from torrent bytes");
@@ -186,7 +159,8 @@ int main() {
         ok(entries.empty(), "a refused check lists nothing");
     }
 
-    section("what the tail adds");    {
+    section("what the tail adds");
+    {
         // libarchive can stream a ZIP from its local headers alone, so a head
         // never makes things worse; the tail is what recovers the entries the
         // local headers cannot describe. Asserting "at least as many" is the
@@ -196,31 +170,20 @@ int main() {
         const std::string bytes = readFile(full);
         if (!bytes.empty()) {
             const std::size_t window = 65536;
-            ArchivePreflight::Snippet headOnly;
-            headOnly.fileSize = static_cast<std::int64_t>(bytes.size());
-            headOnly.head = bytes.substr(0, std::min(window, bytes.size()));
-
-            ArchivePreflight::Snippet headAndTail = headOnly;
-            headAndTail.tail =
-                bytes.substr(bytes.size() > window ? bytes.size() - window : 0);
-
-            const fs::path headPath = scratch("head-only.zip");
-            const fs::path bothPath = scratch("head-and-tail.zip");
-            std::string error;
-            ArchivePreflight::writeSparseFile(headPath.string(), headOnly, error);
-            ArchivePreflight::writeSparseFile(bothPath.string(), headAndTail, error);
-
             const ArchiveInspector::ListingAll headListing =
-                ArchiveInspector::listEntries(headPath.string());
+                ArchiveInspector::listEntriesFromWindows(
+                    static_cast<std::int64_t>(bytes.size()),
+                    bytes.substr(0, std::min(window, bytes.size())),
+                    std::string());
             const ArchiveInspector::ListingAll bothListing =
-                ArchiveInspector::listEntries(bothPath.string());
+                ArchiveInspector::listEntriesFromWindows(
+                    static_cast<std::int64_t>(bytes.size()),
+                    bytes.substr(0, std::min(window, bytes.size())),
+                    bytes.substr(bytes.size() > window ? bytes.size() - window
+                                                      : 0));
             ok(!bothListing.ok || !headListing.ok ||
                    bothListing.entries.size() >= headListing.entries.size(),
                "adding the tail never hides entries the head already showed");
-
-            std::error_code ec;
-            fs::remove(headPath, ec);
-            fs::remove(bothPath, ec);
         }
     }
 #else
