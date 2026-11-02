@@ -33,9 +33,11 @@
 #include "SettingsManager.h"
 #include "Resources.h"
 #include "AssetLoader.h"
+#include "SecurityBadge.h"
 #include "test_support.h"
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -170,6 +172,61 @@ static Rendered renderWidget(Fl_Widget* w) {
     return r;
 }
 
+// Extent of what a paint call actually covers on a black backdrop, in pixels.
+// The badge group is judged on this rather than on the decoded image size: a
+// PNG whose art fills its box and the shield inside the same box do not paint
+// the same area, and the difference is what the eye reads as "bigger".
+struct InkBox {
+    int w = 0, h = 0;
+    bool ok = false;
+};
+
+static InkBox inkOfPaint(int side, const std::function<void()>& paint) {
+    InkBox box;
+    Fl_Image_Surface surf(side, side);
+    Fl_RGB_Image* img = nullptr;
+    {
+        testsupport::SurfaceScope here(&surf);
+        fl_color(FL_BLACK);
+        fl_rectf(0, 0, side, side);
+        paint();
+        img = surf.image();
+    }
+    if (!img || !img->array || img->d() != 3) {
+        if (img) delete img;
+        return box;
+    }
+    const unsigned char* px = img->array;
+    int x0 = side, y0 = side, x1 = -1, y1 = -1;
+    for (int y = 0; y < side; y++) {
+        for (int x = 0; x < side; x++) {
+            const unsigned char* q = px + (y * side + x) * 3;
+            if (!q[0] && !q[1] && !q[2]) continue;
+            if (x < x0) x0 = x;
+            if (y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+        }
+    }
+    delete img;
+    if (x1 < 0) return box;
+    box.w = x1 - x0 + 1;
+    box.h = y1 - y0 + 1;
+    box.ok = true;
+    return box;
+}
+
+// The risk shield as the Name cell draws it: a 15 px square.
+static InkBox inkOfShield(int side) {
+    return inkOfPaint(side + 8, [side] {
+        SecurityBadge::drawShield(0, 0, side, side, RiskLevel::Medium);
+    });
+}
+
+static InkBox inkOfImage(int w, int h, Fl_Image* img) {
+    return inkOfPaint((w > h ? w : h) + 8, [img] { img->draw(0, 0); });
+}
+
 int main(int argc, char** argv) {
     std::string mode = (argc > 1) ? argv[1] : "full";
     printf("  [assets=%s]\n", mode.c_str());
@@ -260,6 +317,40 @@ int main(int argc, char** argv) {
                 ok(badge != nullptr, asset.what);
                 ok(badge && badge->w() == 15 && badge->h() == 15,
                    "and fills the exact square shared with the shield");
+            }
+        }
+        {
+            // What the row actually paints, which is the only thing the user
+            // compares: the shield beside the name and every content badge next
+            // to it must cover the same area. Measuring the decoded image is
+            // not enough -- it would pass even when the art fills the box and
+            // the shield, inset by its own outline, does not.
+            const InkBox shield = inkOfShield(15);
+            ok(shield.ok, "the shield renders");
+            if (shield.ok) {
+                struct BadgeArt {
+                    const char* file;
+                    const char* what;
+                };
+                const BadgeArt arts[] = {
+                    {"compressed.png", "the archive badge is the shield's size"},
+                    {"iso.png", "the disc-image badge is the shield's size"},
+                    {"video.png", "the video badge is the shield's size"},
+                    {"executable.png",
+                     "the executable badge is the shield's size"},
+                };
+                for (const BadgeArt& art : arts) {
+                    std::unique_ptr<Fl_Image> badge(
+                        AssetLoader::load(art.file, 15));
+                    if (!badge) continue;   // covered by the checks above
+                    const InkBox ink = inkOfImage(badge->w(), badge->h(), badge.get());
+                    // One pixel of slack: the shield's polygon is inset by its
+                    // outline, so a badge with no transparent padding paints
+                    // one row and one column more. Anything wider than that is
+                    // the rag the group must not have.
+                    ok(ink.ok && ink.w <= shield.w + 1 && ink.h <= shield.h + 1,
+                       art.what);
+                }
             }
         }
     } else {
