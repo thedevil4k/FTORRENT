@@ -29,12 +29,11 @@ const int MAX_SHOWN_FILES = 12;
 // col_width() when the window is at its smallest.
 const int MIN_NAME_WIDTH = 120;
 
-// Every content badge is drawn at exactly the same size. The source art does
-// not share an aspect ratio (the archive art is landscape, the video art is
-// landscape, the executable art is nearly square), and the row must look even
-// regardless, so each PNG is stretched into this square slot instead of being
-// fitted by its own proportions.
-const int BADGE_BOX = 18;
+// The shield and every content badge share one box, so the tag group reads as
+// a single size. The shield's polygon is inset one pixel; the badge art keeps
+// its own transparent padding, so both end up visually the same height.
+const int SHIELD_BOX = 15;
+const int BADGE_BOX = SHIELD_BOX;
 const int BADGE_GAP = 4;
 
 // The badges may not eat the name: below this many pixels the row stops adding
@@ -230,9 +229,10 @@ Fl_Image* SearchResultsWidget::badgeIcon(ContentBadge badge, bool hinted) {
     }
     if (!asset) return nullptr;
 
-    // Squared on purpose: the row must look even regardless of the asset's
-    // aspect ratio. load() copies the PNG into exactly BADGE_BOX x BADGE_BOX,
-    // so a landscape film strip and a square disc end up the same size.
+    // Squared on purpose: every content badge and the shield share one 15x15
+    // box, whatever the asset's aspect ratio. load() copies the PNG into
+    // exactly BADGE_BOX x BADGE_BOX, so a landscape film strip and a square
+    // disc end up the same size as the risk shield beside them.
     std::unique_ptr<Fl_Image> loaded(
         AssetLoader::load(asset, BADGE_BOX));
     if (!loaded) return nullptr;   // no asset: no badge, never a blank square
@@ -290,9 +290,8 @@ bool SearchResultsWidget::shieldHit(int row, int x, int y) {
     (void)cellW;
     (void)cellH;
     // Same 15 px box the shield is drawn in, in the top slice of the row.
-    constexpr int SHIELD = 15;
-    return x >= cellX + 5 && x <= cellX + 5 + SHIELD && y >= cellY &&
-           y <= cellY + SHIELD + 4;
+    return x >= cellX + 5 && x <= cellX + 5 + SHIELD_BOX && y >= cellY &&
+           y <= cellY + SHIELD_BOX + 4;
 }
 
 int SearchResultsWidget::archiveIndexFor(
@@ -962,13 +961,13 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
     if (col == COL_NAME) {
         // The shield sits immediately before the torrent name on every
         // surface, so the risk is visible before the row is expanded.
-        constexpr int SHIELD = 15;
-        const int shieldY = y + (topH - SHIELD) / 2;
+        const int shieldY = y + (topH - SHIELD_BOX) / 2;
         const SecurityReport& report = reportForRow(row);
-        SecurityBadge::drawShield(x + 5, shieldY, SHIELD, SHIELD, report.level);
+        SecurityBadge::drawShield(x + 5, shieldY, SHIELD_BOX, SHIELD_BOX,
+                                  report.level);
         fl_color(FL_FOREGROUND_COLOR);
-        textX = x + 5 + SHIELD + 4;
-        int reserved = SHIELD + 14;
+        textX = x + 5 + SHIELD_BOX + 4;
+        int reserved = SHIELD_BOX + 14;
 
         // Content badges, immediately after the shield: the indicators read as
         // one tag group, so risk colour and content type are seen together. A

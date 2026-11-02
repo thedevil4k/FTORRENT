@@ -230,19 +230,19 @@ int main(int argc, char** argv) {
            "the two buttons do not share one picture");
         {
             // The badge the search rows draw when a torrent contains a
-            // compressed package. Squared on purpose: the row must look even
-            // regardless of each PNG's aspect ratio, so the asset is stretched
-            // into the same 18x18 slot as every other content badge.
+            // compressed package. Squared on purpose: it is stretched into the
+            // same 15x15 box as the shield, so the tag group has one size
+            // regardless of each PNG's aspect ratio.
             std::unique_ptr<Fl_Image> badge(
-                AssetLoader::load("compressed.png", 18));
+                AssetLoader::load("compressed.png", 15));
             ok(badge != nullptr, "compressed.png is installed and decodes");
-            ok(badge && badge->w() == 18 && badge->h() == 18,
-               "the archive badge fills the exact square the name cell reserves");
+            ok(badge && badge->w() == 15 && badge->h() == 15,
+               "the archive badge fills the exact square shared with the shield");
         }
         {
             // The other content badges: disc image, video and native binary.
-            // They share the archive box, so each one has to decode and fill
-            // exactly 18x18, never collapse to a blank square or a different
+            // They share the shield's box, so each one has to decode and fill
+            // exactly 15x15, never collapse to a blank square or a different
             // size that would make the group look ragged.
             struct BadgeAsset {
                 const char* file;
@@ -256,10 +256,10 @@ int main(int argc, char** argv) {
             };
             for (const BadgeAsset& asset : assets) {
                 std::unique_ptr<Fl_Image> badge(
-                    AssetLoader::load(asset.file, 18));
+                    AssetLoader::load(asset.file, 15));
                 ok(badge != nullptr, asset.what);
-                ok(badge && badge->w() == 18 && badge->h() == 18,
-                   "and fills the exact square the name cell reserves");
+                ok(badge && badge->w() == 15 && badge->h() == 15,
+                   "and fills the exact square shared with the shield");
             }
         }
     } else {
@@ -273,13 +273,13 @@ int main(int argc, char** argv) {
         ok(search->image() != nullptr, "search button still has an icon");
         ok(AssetLoader::load("find.png", ToolbarLayout::kIconSize) == nullptr,
            "find.png really is absent, so this variant is exercising the fallback");
-        ok(AssetLoader::load("compressed.png", 18) == nullptr,
+        ok(AssetLoader::load("compressed.png", 15) == nullptr,
            "the archive badge asset is absent too, so no blank square is drawn");
-        ok(AssetLoader::load("iso.png", 18) == nullptr,
+        ok(AssetLoader::load("iso.png", 15) == nullptr,
            "the disc-image badge asset is absent too");
-        ok(AssetLoader::load("video.png", 18) == nullptr,
+        ok(AssetLoader::load("video.png", 15) == nullptr,
            "the video badge asset is absent too");
-        ok(AssetLoader::load("executable.png", 18) == nullptr,
+        ok(AssetLoader::load("executable.png", 15) == nullptr,
            "the executable badge asset is absent too");
         ok(search->image() && samePixels(search->image(), Resources::getSearchIcon()),
            "search button draws the compiled-in magnifier's pixels");
