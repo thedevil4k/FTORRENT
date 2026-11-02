@@ -87,6 +87,9 @@ private:
     // Level 2: the answer from reading the archive's two ends.
     std::string m_archiveLine;
     bool m_archiveRunning = false;
+    // Every entry that answer listed, in archive order. Names and sizes only:
+    // the check reads headers, never file data.
+    std::vector<SecurityFile> m_archiveEntries;
     std::shared_ptr<std::atomic<bool>> m_archiveCancel;
     // Level 3 fallback: a file that is already complete on disk is hashed
     // locally, never uploaded, and only after the user asked.

@@ -1,4 +1,6 @@
 #include "SecurityBadge.h"
+#include "SecurityAnalyzer.h"
+#include "TorrentItem.h"   // formatSize, so an entry reads like the size column
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -114,6 +116,24 @@ std::string SecurityBadge::displayText(const std::string& text) {
         ++i;
     }
     return out;
+}
+
+std::string SecurityBadge::archiveEntryLine(const SecurityFile& file) {
+    std::string line = "- " + displayText(file.path) +
+                       "  (" + TorrentItem::formatSize(file.size) + ")";
+
+    // The same tags the torrent tables show, capped at two so a hostile name
+    // carrying every marker cannot push the size off the row.
+    const std::vector<std::string> tags = SecurityAnalyzer::tagsForFile(file);
+    if (!tags.empty()) {
+        line += "  [";
+        for (std::size_t i = 0; i < tags.size() && i < 2; ++i) {
+            if (i) line += ", ";
+            line += tags[i];
+        }
+        line += "]";
+    }
+    return line;
 }
 
 void SecurityBadge::drawShield(int x, int y, int w, int h, RiskLevel level) {

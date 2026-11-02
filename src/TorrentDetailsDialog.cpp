@@ -406,6 +406,27 @@ void TorrentDetailsDialog::updateSecurity() {
                        ? "Reading the first and last piece of the archive..."
                        : m_archiveLine)
             << "\n";
+        // The entries the index lists, one per line. Names and sizes only:
+        // nothing inside the archive is read. The list is long, so it goes at
+        // the end of this buffer where the user can scroll it.
+        if (!m_archiveRunning && !m_archiveEntries.empty()) {
+            out << "\n";
+            const std::size_t cap = 200;
+            const std::size_t listed = m_archiveEntries.size() > cap
+                                           ? cap
+                                           : m_archiveEntries.size();
+            for (std::size_t i = 0; i < listed; ++i) {
+                out << "  "
+                    << SecurityBadge::displayText(
+                           SecurityBadge::archiveEntryLine(
+                               m_archiveEntries[i]))
+                    << "\n";
+            }
+            if (m_archiveEntries.size() > listed) {
+                out << "  ... and "
+                    << (m_archiveEntries.size() - listed) << " more\n";
+            }
+        }
     }
 
     m_securityBuffer->text(out.str().c_str());
@@ -452,6 +473,7 @@ void TorrentDetailsDialog::checkArchive() {
     }
     if (!archive) {
         m_archiveLine = "Archive: this torrent holds no RAR or ZIP.";
+        m_archiveEntries.clear();
         updateSecurity();
         return;
     }
@@ -462,6 +484,7 @@ void TorrentDetailsDialog::checkArchive() {
         m_archiveLine =
             "Archive: the metadata is not here yet, so its pieces cannot be "
             "located.";
+        m_archiveEntries.clear();
         updateSecurity();
         return;
     }
@@ -475,6 +498,7 @@ void TorrentDetailsDialog::checkArchive() {
     const std::string path = archive->path;
     m_archiveRunning = true;
     m_archiveLine.clear();
+    m_archiveEntries.clear();
     auto cancel = std::make_shared<std::atomic<bool>>(false);
     m_archiveCancel = cancel;
     updateSecurity();
@@ -483,6 +507,7 @@ void TorrentDetailsDialog::checkArchive() {
         TorrentDetailsDialog* dialog = nullptr;
         std::shared_ptr<bool> alive;
         std::string line;
+        std::vector<SecurityFile> entries;
     };
 
     std::shared_ptr<bool> alive = m_alive;
@@ -498,6 +523,7 @@ void TorrentDetailsDialog::checkArchive() {
         delivery->line =
             ok ? archiveSummary(path, entries)
                : "Archive: the index could not be read (" + error + ").";
+        if (ok) delivery->entries = std::move(entries);
         Fl::awake([](void* data) {
             std::unique_ptr<Delivery> delivery(
                 static_cast<Delivery*>(data));
@@ -505,6 +531,7 @@ void TorrentDetailsDialog::checkArchive() {
             TorrentDetailsDialog* dialog = delivery->dialog;
             dialog->m_archiveRunning = false;
             dialog->m_archiveLine = delivery->line;
+            dialog->m_archiveEntries = std::move(delivery->entries);
             dialog->updateSecurity();
         }, delivery);
     }).detach();

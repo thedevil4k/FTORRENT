@@ -37,6 +37,13 @@ public:
     // else, including valid UTF-8, is left byte-for-byte intact.
     static std::string displayText(const std::string& text);
 
+    // One line for a file listed inside an archive the user just indexed, so
+    // the search row and the Details panel cannot word it differently:
+    // "- docs/readme.txt  (1.2 KB)  [ENCRYPTED]".
+    // The name is sanitised, the size is formatted exactly like the tables
+    // format theirs, and at most two tags are appended.
+    static std::string archiveEntryLine(const SecurityFile& file);
+
     // Draws a shield into the given rectangle. Used by the tables directly and
     // by SecurityShieldBox.
     static void drawShield(int x, int y, int w, int h, RiskLevel level);

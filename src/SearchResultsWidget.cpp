@@ -24,6 +24,9 @@ const int BASE_ROW_HEIGHT = 25;      // matches initializeColumns()
 const int FILE_LINE_HEIGHT = 16;
 // Enough to see what is inside without turning a row into a wall of text.
 const int MAX_SHOWN_FILES = 12;
+// Same idea for the entries an archive check lists: the row shows this many and
+// summarises the rest, which stay visible in Details.
+const int MAX_SHOWN_ARCHIVE_ENTRIES = 8;
 // Minimum pixel width the Name column is allowed to shrink to. Keeps the
 // table usable at the 720px minimum window width and avoids a zero/negative
 // col_width() when the window is at its smallest.
@@ -314,6 +317,17 @@ int SearchResultsWidget::encryptedForRow(int row) {
     return action == m_archive.end() ? 0 : action->second.encrypted;
 }
 
+int SearchResultsWidget::archiveEntryRows(const ArchiveAction& action) {
+    if (action.running || action.line.empty() || action.entries.empty()) {
+        return 0;
+    }
+    const int shown = static_cast<int>(action.entries.size());
+    const int listed = shown > MAX_SHOWN_ARCHIVE_ENTRIES
+                           ? MAX_SHOWN_ARCHIVE_ENTRIES
+                           : shown;
+    return listed + (shown > listed ? 1 : 0);   // +1 for "... and N more"
+}
+
 bool SearchResultsWidget::archiveLineHit(int row, int x, int y) {
     const SearchResult* result = getResultAt(row);
     if (!result) return false;
@@ -344,6 +358,9 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
 
     entry.running = true;
     entry.line.clear();
+    // A new check answers the old question: the previous entries go with it.
+    entry.encrypted = 0;
+    entry.entries.clear();
 
     struct Delivery {
         SearchResultsWidget* widget = nullptr;
@@ -351,6 +368,7 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
         std::string key;
         std::string line;
         int encrypted = 0;
+        std::vector<SecurityFile> entries;
     };
 
     const int index = entry.fileIndex;
@@ -380,6 +398,9 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
             for (const SecurityFile& entry : entries) {
                 if (entry.encrypted) ++delivery->encrypted;
             }
+            // Kept for the row's list. This is the same vector the summary was
+            // built from, so the two cannot disagree about what is inside.
+            delivery->entries = std::move(entries);
         }
         Fl::awake([](void* data) {
             std::unique_ptr<Delivery> delivery(static_cast<Delivery*>(data));
@@ -390,6 +411,7 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
                 found->second.running = false;
                 found->second.line = delivery->line;
                 found->second.encrypted = delivery->encrypted;
+                found->second.entries = std::move(delivery->entries);
             }
             widget->forEachRow([&](int row, const SearchResult& r) {
                 if (SearchResultsWidget::cacheKey(r) == delivery->key) {
@@ -714,8 +736,15 @@ void SearchResultsWidget::updateRowHeight(int row) {
             if (lines > 1 + maxFiles) lines = 1 + maxFiles;
             // A reputation answer the user asked for gets its own line.
             if (m_reputation.find(cacheKey(*r)) != m_reputation.end()) ++lines;
-            // An archive line is always offered, and grows when it answers.
-            if (archiveIndexFor(rf.files) >= 0) ++lines;
+            // An archive line is always offered, and grows when it answers:
+            // the entries it listed are drawn under it.
+            if (archiveIndexFor(rf.files) >= 0) {
+                ++lines;
+                auto action = m_archive.find(cacheKey(*r));
+                if (action != m_archive.end()) {
+                    lines += archiveEntryRows(action->second);
+                }
+            }
             break;
         }
         case FileListState::Queued:
@@ -935,6 +964,48 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         ly += FILE_LINE_HEIGHT;
     } else {
         action.visible = false;
+    }
+
+    // What the index holds, one line per entry: names and sizes only, because
+    // the check reads headers, never file data. The rows and the height of the
+    // row both come from archiveEntryRows(), so they cannot disagree.
+    if (action.running || action.line.empty() || action.entries.empty()) return;
+
+    const int shownEntries = static_cast<int>(action.entries.size());
+    const int listed = shownEntries > MAX_SHOWN_ARCHIVE_ENTRIES
+                           ? MAX_SHOWN_ARCHIVE_ENTRIES
+                           : shownEntries;
+    for (int i = 0; i < listed && ly + FILE_LINE_HEIGHT <= limit + 1; ++i) {
+        const SecurityFile& entry = action.entries[static_cast<std::size_t>(i)];
+        const FileAssessment assessment = SecurityAnalyzer::assessFile(entry);
+        fl_font(FL_HELVETICA, 11);
+        // The same rule as the torrent's own file list: a real warning gets
+        // the risk colour, everything else stays plain. Being encrypted is an
+        // indicator (tag and answer line), not a verdict, so it is not painted
+        // as one.
+        fl_color(SecurityBadge::hasWarning(assessment.level)
+                     ? SecurityBadge::riskColor(assessment.level)
+                     : FL_FOREGROUND_COLOR);
+        const std::string line =
+            elideToWidth(SecurityBadge::archiveEntryLine(entry), avail);
+        fl_draw(line.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+        int x2 = x + w - 6;
+        if (x2 < x + 24) x2 = x + 24;
+        fl_color(sepColor);
+        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2,
+                ly + FILE_LINE_HEIGHT - 1);
+        ly += FILE_LINE_HEIGHT;
+    }
+    if (shownEntries > listed && ly + FILE_LINE_HEIGHT <= limit + 1) {
+        fl_color(fl_rgb_color(140, 140, 140));
+        fl_font(FL_HELVETICA, 11);
+        std::string more =
+            "... and " + std::to_string(shownEntries - listed) + " more";
+        more = elideToWidth(more, avail);
+        fl_draw(more.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+        ly += FILE_LINE_HEIGHT;
     }
 }
 

@@ -154,6 +154,48 @@ int main() {
            std::string("caf\xC3\xA9"),
        "valid UTF-8 is left byte-for-byte intact");
 
+    section("archive entry line");
+    {
+        // What a row and the Details panel print for one entry of an archive
+        // the user just indexed: name, size, and the short tags.
+        SecurityFile readme;
+        readme.path = "docs/readme.txt";
+        readme.size = 1234;
+        const std::string line = SecurityBadge::archiveEntryLine(readme);
+        ok(line.rfind("- docs/readme.txt", 0) == 0,
+           "the line starts with a bullet and the entry path");
+        ok(line.find("(1.21 KB)") != std::string::npos,
+           "the size is formatted the same way the tables format it");
+        ok(line.find('[') == std::string::npos,
+           "a plain entry carries no tags");
+
+        SecurityFile tool;
+        // Inside a folder, so the root-executable tag does not join the list:
+        // this check is about the EXE tag reaching the line.
+        tool.path = "bin/setup.exe";
+        tool.size = 5 * 1024 * 1024;
+        const std::string exe = SecurityBadge::archiveEntryLine(tool);
+        ok(exe.find("(5.00 MB)") != std::string::npos,
+           "a larger size keeps its unit");
+        ok(exe.find("[EXE]") != std::string::npos,
+           "an executable inside the archive is tagged");
+
+        SecurityFile locked;
+        locked.path = "private/photo.jpg";
+        locked.size = 10;
+        locked.encrypted = true;
+        ok(SecurityBadge::archiveEntryLine(locked).find("[ENCRYPTED]") !=
+               std::string::npos,
+           "a password-protected entry says so in the same line");
+
+        SecurityFile hostile;
+        hostile.path = std::string("evi\xE2\x80\xAEl.exe");
+        hostile.size = 1;
+        const std::string safe = SecurityBadge::archiveEntryLine(hostile);
+        ok(safe.find('\xE2') == std::string::npos,
+           "a bidi override from the archive never reaches the row");
+    }
+
     section("drawing");
     for (RiskLevel level : {RiskLevel::Unknown, RiskLevel::Low,
                             RiskLevel::Medium, RiskLevel::High,

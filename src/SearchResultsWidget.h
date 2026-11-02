@@ -168,6 +168,10 @@ private:
         // How many entries the last successful walk found password-protected.
         // Drives the lock badge; 0 until a check completes.
         int encrypted = 0;
+        // Every entry the last successful walk listed, in archive order. Kept
+        // so the row can show the contents without asking the swarm again;
+        // empty until a check completes.
+        std::vector<SecurityFile> entries;
         int top = 0;
         int bottom = 0;
     };
@@ -176,6 +180,10 @@ private:
     // Password-protected entries found by the last archive check for this row,
     // 0 when none was run or the index held none.
     int encryptedForRow(int row);
+    // Lines the entry list under the archive answer takes, including the
+    // "... and N more" line. Used by both the draw and the height so the row
+    // can never reserve a different number of lines from the one it paints.
+    static int archiveEntryRows(const ArchiveAction& action);
     void startArchiveCheck(const std::string& key);
     bool archiveLineHit(int row, int x, int y);
 
