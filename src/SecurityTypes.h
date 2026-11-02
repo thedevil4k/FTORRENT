@@ -102,6 +102,14 @@ struct SecurityReport {
     int archives = 0;
     int shortcuts = 0;
     int symlinks = 0;
+    // Content badges for the search rows. These are narrower than the risk
+    // counters above on purpose: 'discImages' only covers the formats a user
+    // calls a disc image, 'videos' is purely informational, and
+    // 'nativeExecutables' leaves out scripts and bytecode even though the
+    // risk analysis still flags those.
+    int discImages = 0;
+    int videos = 0;
+    int nativeExecutables = 0;
     int suspiciousNameCount = 0;
     std::string summary;
 

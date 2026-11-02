@@ -39,11 +39,26 @@ public:
     static bool isArchivePath(const std::string& path);
     static bool isDiskImagePath(const std::string& path);
 
+    // Content-badge classifications. They are deliberately narrower than the
+    // risk predicates above:
+    //  - isDiscImagePath() only matches .iso/.dmg/.img, the formats a user
+    //    recognises as a disc image; VM disks and WIM/ESD stay risk-only.
+    //  - isVideoPath() leaves .ts out so a TypeScript file is not badged.
+    //  - isNativeExecutablePath() matches binaries the OS runs directly and
+    //    excludes .dll/.sys/.jar/.class and every script extension.
+    static bool isDiscImagePath(const std::string& path);
+    static bool isVideoPath(const std::string& path);
+    static bool isNativeExecutablePath(const std::string& path);
+
     // True when a torrent's own title ends in an archive extension
     // ("...Optimized.zip", "show.tar.gz"). Only a hint: the title is written by
     // whoever published the torrent, so the search row draws this badge dimmed
-    // until the real file list confirms it.
+    // until the real file list confirms it. The disc-image and native-binary
+    // variants follow the same rule; video has no title hint because a normal
+    // title does not end in .mkv and guessing from "1080p" would be a guess.
     static bool titleSuggestsArchive(const std::string& title);
+    static bool titleSuggestsDiscImage(const std::string& title);
+    static bool titleSuggestsNativeExecutable(const std::string& title);
 
     // Lowercased extension including the dot, empty when there is none.
     // Backslashes and forward slashes are both treated as separators.

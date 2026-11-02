@@ -129,14 +129,25 @@ private:
     void startReputationLookup(const std::string& key,
                                const std::vector<TorrentFileEntry>& files);
 
-    // Badge in the Name cell for a torrent that downloads a compressed
-    // package. The solid version is drawn only once the file list is known;
-    // a title that merely ends in .zip gets the dimmed one, so a hint never
-    // passes for a fact. Loaded once per variant and rebuilt when the theme
-    // changes, because ink art has to be flipped for a light row.
-    Fl_Image* archiveIcon(bool hinted);
-    Fl_Image* m_archiveIcon = nullptr;       // confirmed by the file list
-    Fl_Image* m_archiveIconHint = nullptr;   // from the title, dimmed
+    // Content badge drawn in the Name cell right after the shield. The solid
+    // version is used only once the file list is known; a title that merely
+    // ends in the matching extension gets the dimmed one, so a hint never
+    // passes for a fact. Loaded once per type and variant, and rebuilt when the
+    // theme changes because ink art has to be flipped for a light row.
+    enum class ContentBadge {
+        Archive = 0,      // compressed.png
+        DiscImage,        // iso.png (.iso/.dmg/.img)
+        Video,            // video.png, only from the real file list
+        NativeExecutable, // executable.png, native Windows/Linux binaries
+        Count
+    };
+    struct BadgeArt {
+        Fl_Image* confirmed = nullptr;
+        Fl_Image* hint = nullptr;
+    };
+    Fl_Image* badgeIcon(ContentBadge badge, bool hinted);
+    void clearBadgeIcons();
+    BadgeArt m_badgeArt[static_cast<int>(ContentBadge::Count)];
     bool m_darkMode = false;
 
     // Level 2 under an expanded row: one clickable line that reads the archive

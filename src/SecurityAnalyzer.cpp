@@ -233,6 +233,23 @@ void addTag(std::vector<std::string>& tags, const char* tag) {
     tags.emplace_back(tag);
 }
 
+// The end of a title, ignoring the padding publishers add after the file name
+// (apibay pads with spaces) and a closing bracket that wraps it ("[repack.zip]").
+// Returns the offset just past the last character that can belong to a name.
+std::size_t titlePathEnd(const std::string& title) {
+    std::size_t end = title.size();
+    while (end > 0) {
+        const char last = title[end - 1];
+        if (std::isspace(static_cast<unsigned char>(last)) ||
+            last == ']' || last == ')') {
+            --end;
+        } else {
+            break;
+        }
+    }
+    return end;
+}
+
 } // namespace
 
 bool SecurityAnalyzer::isExecutablePath(const std::string& path) {
@@ -288,23 +305,43 @@ bool SecurityAnalyzer::isDiskImagePath(const std::string& path) {
     });
 }
 
+bool SecurityAnalyzer::isDiscImagePath(const std::string& path) {
+    const std::string extension = extensionLower(path);
+    return extensionIn(extension, {".iso", ".dmg", ".img"});
+}
+
+bool SecurityAnalyzer::isVideoPath(const std::string& path) {
+    const std::string extension = extensionLower(path);
+    return extensionIn(extension, {
+        ".mp4", ".m4v", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm",
+        ".mpg", ".mpeg", ".m2ts", ".mts", ".vob", ".ogv", ".3gp", ".3g2",
+        ".divx", ".rm", ".rmvb", ".asf", ".f4v", ".mxf"
+    });
+}
+
+bool SecurityAnalyzer::isNativeExecutablePath(const std::string& path) {
+    const std::string extension = extensionLower(path);
+    return extensionIn(extension, {
+        ".exe", ".com", ".scr", ".pif", ".cpl",
+        ".appimage", ".run", ".elf"
+    });
+}
+
 bool SecurityAnalyzer::titleSuggestsArchive(const std::string& title) {
     // Only the end of the title is looked at: an archive named in the middle
-    // says little about what the torrent actually contains. Publishers pad
-    // their names with spaces (apibay does) and sometimes close a bracket after
-    // them, neither of which is part of the extension.
-    std::size_t end = title.size();
-    while (end > 0) {
-        const char last = title[end - 1];
-        if (std::isspace(static_cast<unsigned char>(last)) ||
-            last == ']' || last == ')') {
-            --end;
-        } else {
-            break;
-        }
-    }
-    if (end == 0) return false;
-    return isArchivePath(title.substr(0, end));
+    // says little about what the torrent actually contains.
+    const std::size_t end = titlePathEnd(title);
+    return end > 0 && isArchivePath(title.substr(0, end));
+}
+
+bool SecurityAnalyzer::titleSuggestsDiscImage(const std::string& title) {
+    const std::size_t end = titlePathEnd(title);
+    return end > 0 && isDiscImagePath(title.substr(0, end));
+}
+
+bool SecurityAnalyzer::titleSuggestsNativeExecutable(const std::string& title) {
+    const std::size_t end = titlePathEnd(title);
+    return end > 0 && isNativeExecutablePath(title.substr(0, end));
 }
 
 std::string SecurityAnalyzer::extensionLower(const std::string& path) {
@@ -521,6 +558,9 @@ SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files)
         }
         if (isScriptPath(file.path)) ++report.scripts;
         if (isArchivePath(file.path)) ++report.archives;
+        if (isDiscImagePath(file.path)) ++report.discImages;
+        if (isVideoPath(file.path)) ++report.videos;
+        if (isNativeExecutablePath(file.path)) ++report.nativeExecutables;
         if (isShortcutPath(file.path)) ++report.shortcuts;
         if (file.symlink || !file.symlinkPath.empty()) ++report.symlinks;
 

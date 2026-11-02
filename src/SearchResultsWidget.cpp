@@ -29,10 +29,16 @@ const int MAX_SHOWN_FILES = 12;
 // col_width() when the window is at its smallest.
 const int MIN_NAME_WIDTH = 120;
 
-// Box the archive badge is fitted into inside the Name cell. Tall enough to
-// read the zipper: at 15 px the asset below turns into a grey smudge.
+// Box the content badges are fitted into inside the Name cell. Tall enough to
+// read the artwork: at 15 px the assets turn into a smudge.
 const int BADGE_WIDTH = 21;
 const int BADGE_HEIGHT = 18;
+const int BADGE_GAP = 4;
+
+// The badges may not eat the name: below this many pixels the row stops adding
+// them, so a narrow column still shows the torrent it is describing. Distinct
+// from MIN_NAME_WIDTH, which is the column's own floor.
+const int MIN_BADGED_NAME_WIDTH = 40;
 
 // How much of the badge shows when it comes from the title alone. Dimmed on
 // purpose: the title is written by the publisher, so this is a hint, and it
@@ -191,18 +197,41 @@ SearchResultsWidget::~SearchResultsWidget() {
     // A lookup started from this table may still be running; its completion
     // must not touch rows that no longer exist.
     if (m_alive) *m_alive = false;
-    delete m_archiveIcon;
-    delete m_archiveIconHint;
+    clearBadgeIcons();
 }
 
-Fl_Image* SearchResultsWidget::archiveIcon(bool hinted) {
-    Fl_Image*& cached = hinted ? m_archiveIconHint : m_archiveIcon;
+void SearchResultsWidget::clearBadgeIcons() {
+    for (BadgeArt& art : m_badgeArt) {
+        delete art.confirmed;
+        art.confirmed = nullptr;
+        delete art.hint;
+        art.hint = nullptr;
+    }
+}
+
+Fl_Image* SearchResultsWidget::badgeIcon(ContentBadge badge, bool hinted) {
+    const int index = static_cast<int>(badge);
+    if (index < 0 || index >= static_cast<int>(ContentBadge::Count)) {
+        return nullptr;
+    }
+    BadgeArt& art = m_badgeArt[index];
+    Fl_Image*& cached = hinted ? art.hint : art.confirmed;
     if (cached) return cached;
 
-    // Fitted rather than squared: the asset is wider than it is tall, and
-    // squeezing it into a square would bend the zipper.
+    const char* asset = nullptr;
+    switch (badge) {
+        case ContentBadge::Archive:          asset = "compressed.png"; break;
+        case ContentBadge::DiscImage:        asset = "iso.png"; break;
+        case ContentBadge::Video:            asset = "video.png"; break;
+        case ContentBadge::NativeExecutable: asset = "executable.png"; break;
+        case ContentBadge::Count:            break;
+    }
+    if (!asset) return nullptr;
+
+    // Fitted rather than squared: the assets have their own aspect ratio, and
+    // squeezing one into a square would distort it.
     std::unique_ptr<Fl_Image> loaded(
-        AssetLoader::loadFit("compressed.png", BADGE_WIDTH, BADGE_HEIGHT));
+        AssetLoader::loadFit(asset, BADGE_WIDTH, BADGE_HEIGHT));
     if (!loaded) return nullptr;   // no asset: no badge, never a blank square
 
     // Ink art needs its strokes flipped on a light row; a coloured icon is
@@ -595,10 +624,7 @@ void SearchResultsWidget::applyTheme(bool darkMode) {
         // longer suit the new background. A coloured icon comes out the same
         // either way, but rebuilding it costs nothing.
         m_darkMode = darkMode;
-        delete m_archiveIcon;
-        m_archiveIcon = nullptr;
-        delete m_archiveIconHint;
-        m_archiveIconHint = nullptr;
+        clearBadgeIcons();
     }
     if (darkMode) {
         m_headerBg = fl_rgb_color(55, 55, 55);
@@ -941,23 +967,44 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
         textX = x + 5 + SHIELD + 4;
         int reserved = SHIELD + 14;
 
-        // Compressed package badge, immediately after the shield: the two
-        // indicators read as one tag group, so the risk colour and the content
-        // type are seen together. A known file list draws it solid; a title
-        // that only ends in .zip draws it dimmed, so the hint is visible
-        // without pretending to be the fact.
-        const bool confirmed = report.archives > 0;
-        const bool hinted =
-            !confirmed && SecurityAnalyzer::titleSuggestsArchive(r->name);
-        if (confirmed || hinted) {
-            if (Fl_Image* badge = archiveIcon(hinted)) {
-                constexpr int GAP = 4;
-                badge->draw(textX, y + (topH - badge->h()) / 2);
-                textX += badge->w() + GAP;
-                reserved += badge->w() + GAP;
-                fl_color(FL_FOREGROUND_COLOR);
-            }
+        // Content badges, immediately after the shield: the indicators read as
+        // one tag group, so risk colour and content type are seen together. A
+        // known file list draws them solid; until it is known, a title that
+        // ends in the matching extension draws the dimmed hint. Once the list
+        // is loaded the title can no longer add anything, so a hint can never
+        // contradict the files the row actually downloads.
+        const bool fileListKnown =
+            m_files.state(cacheKey(*r)) == FileListState::Loaded;
+        struct BadgePlan {
+            ContentBadge badge;
+            bool confirmed;
+            bool hinted;
+        };
+        const BadgePlan plan[] = {
+            {ContentBadge::Archive, report.archives > 0,
+             !fileListKnown &&
+                 SecurityAnalyzer::titleSuggestsArchive(r->name)},
+            {ContentBadge::DiscImage, report.discImages > 0,
+             !fileListKnown &&
+                 SecurityAnalyzer::titleSuggestsDiscImage(r->name)},
+            // Video is never inferred from a title: a real video file proves
+            // it, "1080p" in a name does not.
+            {ContentBadge::Video, report.videos > 0, false},
+            {ContentBadge::NativeExecutable, report.nativeExecutables > 0,
+             !fileListKnown &&
+                 SecurityAnalyzer::titleSuggestsNativeExecutable(r->name)}
+        };
+        for (const BadgePlan& item : plan) {
+            if (!item.confirmed && !item.hinted) continue;
+            Fl_Image* badge = badgeIcon(item.badge, item.hinted);
+            if (!badge) continue;
+            const int needed = badge->w() + BADGE_GAP;
+            if (w - (reserved + needed) < MIN_BADGED_NAME_WIDTH) break;
+            badge->draw(textX, y + (topH - badge->h()) / 2);
+            textX += needed;
+            reserved += needed;
         }
+        fl_color(FL_FOREGROUND_COLOR);
         textW = w - reserved;
     }
     if (textW < 0) textW = 0;

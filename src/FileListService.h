@@ -53,6 +53,11 @@ public:
     // What is known right now. Starts nothing.
     Entry find(const std::string& key) const;
 
+    // Just the state of one list, without copying its files. Safe to call from
+    // any thread; the search table uses it on every paint to tell a hint from a
+    // confirmed badge.
+    FileListState state(const std::string& key) const;
+
     // Starts fetching unless the list is already known or already on its way.
     // Returns whether the request was accepted: when every slot is busy it is
     // queued and started as soon as one frees up, rather than dropped, which

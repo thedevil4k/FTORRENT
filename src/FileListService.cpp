@@ -37,6 +37,13 @@ FileListService::Entry FileListService::find(const std::string& key) const {
     return it == m_shared->entries.end() ? Entry{} : it->second;
 }
 
+FileListState FileListService::state(const std::string& key) const {
+    std::lock_guard<std::mutex> lk(m_shared->mutex);
+    auto it = m_shared->entries.find(key);
+    return it == m_shared->entries.end() ? FileListState::NotRequested
+                                         : it->second.state;
+}
+
 int FileListService::pending() const {
     return m_shared->inFlight.load();
 }

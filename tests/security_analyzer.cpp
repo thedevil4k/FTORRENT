@@ -78,6 +78,26 @@ int main() {
     ok(SecurityAnalyzer::isMacroDocumentPath("a.docm"), "docm is a macro document");
     ok(SecurityAnalyzer::isArchivePath("a.RAR"), "rar is an archive");
     ok(SecurityAnalyzer::isDiskImagePath("a.iso"), "iso is a disk image");
+    ok(SecurityAnalyzer::isDiscImagePath("a.ISO"),
+       "iso also gets the disc-image content badge");
+    ok(SecurityAnalyzer::isDiscImagePath("a.dmg"), "dmg is a disc image");
+    ok(SecurityAnalyzer::isDiscImagePath("a.img"), "img is a disc image");
+    ok(!SecurityAnalyzer::isDiscImagePath("a.vmdk"),
+       "a VM disk stays a risk finding, not a disc badge");
+    ok(SecurityAnalyzer::isVideoPath("a.MKV"), "mkv is video");
+    ok(SecurityAnalyzer::isVideoPath("a.mp4"), "mp4 is video");
+    ok(!SecurityAnalyzer::isVideoPath("a.ts"),
+       "ts is not badged as video, so TypeScript is never mistaken for one");
+    ok(SecurityAnalyzer::isNativeExecutablePath("a.EXE"),
+       "exe is a native binary");
+    ok(SecurityAnalyzer::isNativeExecutablePath("tool.appimage"),
+       "appimage is a native Linux binary");
+    ok(!SecurityAnalyzer::isNativeExecutablePath("lib.dll"),
+       "a dll is not a native executable badge");
+    ok(!SecurityAnalyzer::isNativeExecutablePath("app.jar"),
+       "a jar is bytecode, not a native binary");
+    ok(!SecurityAnalyzer::isNativeExecutablePath("script.py"),
+       "a python script is not a native binary");
     ok(!SecurityAnalyzer::isExecutablePath("a.txt"), "txt is not executable");
 
     section("runnable files");
@@ -292,6 +312,22 @@ int main() {
         ok(r.archives == 2, "7z and tar.gz count as archives, an ISO does not");
     }
     {
+        // The content badges use their own counters, narrower than the risk
+        // ones: a dll or a script is still an executable for risk purposes, but
+        // only a native binary may draw the executable badge.
+        std::vector<SecurityFile> files = {
+            file("movie.mkv"), file("disc.iso"), file("setup.exe"),
+            file("lib.dll"), file("tool.py"), file("notes.txt")
+        };
+        const SecurityReport r = SecurityAnalyzer::analyze(files);
+        ok(r.videos == 1, "one video is counted");
+        ok(r.discImages == 1, "one disc image is counted");
+        ok(r.nativeExecutables == 1,
+           "only the native binary counts, not the dll or the script");
+        ok(r.executables == 2,
+           "the risk counter still counts the dll, as it always did");
+    }
+    {
         // The badge shown before the file list is known comes from the title.
         // It is a hint, so the rule is deliberately narrow: the end of the name.
         ok(SecurityAnalyzer::titleSuggestsArchive(
@@ -313,6 +349,24 @@ int main() {
            "the word zip in the text is not an extension");
         ok(!SecurityAnalyzer::titleSuggestsArchive(""),
            "an empty title hints at nothing");
+    }
+    {
+        ok(SecurityAnalyzer::titleSuggestsDiscImage("Ubuntu 24.04.iso"),
+           "a title ending in .iso is a disc-image hint");
+        ok(SecurityAnalyzer::titleSuggestsDiscImage("Game [repack.dmg]"),
+           "bracket and case do not hide the disc-image hint");
+        ok(!SecurityAnalyzer::titleSuggestsDiscImage("Movie 1080p.mkv"),
+           "a video is not a disc image");
+        ok(!SecurityAnalyzer::titleSuggestsDiscImage("Ubuntu 24.04"),
+           "a title with no extension hints at nothing");
+        ok(SecurityAnalyzer::titleSuggestsNativeExecutable("Setup.exe"),
+           "a title ending in .exe is an executable hint");
+        ok(SecurityAnalyzer::titleSuggestsNativeExecutable("Tool.exe   "),
+           "padding is ignored");
+        ok(!SecurityAnalyzer::titleSuggestsNativeExecutable("Setup.msi"),
+           "an installer is not the native-binary badge");
+        ok(!SecurityAnalyzer::titleSuggestsNativeExecutable("script.py"),
+           "a script is not the native-binary badge");
     }
     {
         SecurityFile pad = file("__pad.exe");
