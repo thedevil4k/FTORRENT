@@ -65,6 +65,19 @@ std::string archiveSummary(const std::string& archivePath,
     } else {
         message += "no known indicators in their names.";
     }
+    // A password-protected entry still shows its name, but nothing behind it
+    // can be read or hashed before the download. That is a fact about the
+    // archive, not a guess, and it is stated next to the counts without
+    // turning it into a verdict.
+    if (report.encrypted > 0) {
+        message += " ";
+        message += std::to_string(report.encrypted);
+        message += report.encrypted == 1
+                       ? " entry is password-protected"
+                       : " entries are password-protected";
+        message += ", so the content behind it cannot be inspected before "
+                   "downloading.";
+    }
     return message;
 }
 

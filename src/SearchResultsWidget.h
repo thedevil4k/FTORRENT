@@ -134,8 +134,12 @@ private:
     // ends in the matching extension gets the dimmed one, so a hint never
     // passes for a fact. Loaded once per type and variant, and rebuilt when the
     // theme changes because ink art has to be flipped for a light row.
+    // The lock is different from the rest: it never comes from a title and
+    // never from the torrent's file list, only from a completed level-2 walk of
+    // an archive index that found password-protected entries.
     enum class ContentBadge {
         Archive = 0,      // compressed.png
+        Encrypted,        // encrypted.png, archive entries that need a password
         DiscImage,        // iso.png (.iso/.dmg/.img)
         Video,            // video.png, only from the real file list
         NativeExecutable, // executable.png, native Windows/Linux binaries
@@ -161,11 +165,17 @@ private:
         std::string line;      // result, empty until asked
         bool running = false;
         bool visible = false;
+        // How many entries the last successful walk found password-protected.
+        // Drives the lock badge; 0 until a check completes.
+        int encrypted = 0;
         int top = 0;
         int bottom = 0;
     };
     std::unordered_map<std::string, ArchiveAction> m_archive;
     int archiveIndexFor(const std::vector<TorrentFileEntry>& files) const;
+    // Password-protected entries found by the last archive check for this row,
+    // 0 when none was run or the index held none.
+    int encryptedForRow(int row);
     void startArchiveCheck(const std::string& key);
     bool archiveLineHit(int row, int x, int y);
 

@@ -256,6 +256,16 @@ int main() {
             ok(encrypted.executables[0].encrypted,
                "the encrypted entry is marked as password-protected");
 
+            // The pre-download check lists every entry, not only the .exe
+            // files, and the lock badge is drawn from that listing: it has to
+            // carry the same flag.
+            const ArchiveInspector::ListingAll all =
+                ArchiveInspector::listEntries(encryptedPath.string());
+            ok(all.ok && all.entries.size() == 1,
+               "the encrypted ZIP lists its entries for the preflight");
+            ok(!all.entries.empty() && all.entries[0].encrypted,
+               "the preflight listing keeps the password-protected flag");
+
             std::string digest = "stale";
             std::string error;
             ok(!ArchiveInspector::hashExecutable(
@@ -305,6 +315,20 @@ int main() {
         ok(rar.ok, "a RAR5 fixture lists cleanly");
         if (!rar.ok) std::cout << "      " << name << ": " << rar.error << '\n';
         ok(rar.executables.empty(), "the RAR5 fixture has no .exe entries");
+    }
+
+    // The RAR case the lock badge exists for: rar5 marks each entry that needs
+    // a password, and the preflight listing has to carry that through.
+    {
+        const ArchiveInspector::ListingAll guarded = ArchiveInspector::listEntries(
+            (fixtures / "test_read_format_rar5_encrypted.rar").string());
+        ok(guarded.ok, "the encrypted RAR5 fixture lists its entries");
+        int locked = 0;
+        for (const ArchiveInspector::Entry& entry : guarded.entries) {
+            if (entry.encrypted) ++locked;
+        }
+        ok(locked > 0,
+           "the encrypted RAR5 fixture's entries are marked password-protected");
     }
 
     // A ZIP built for this suite: one plain .exe, one double-extension .exe and

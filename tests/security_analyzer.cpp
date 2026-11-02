@@ -331,6 +331,27 @@ int main() {
            "the risk counter still counts the dll, as it always did");
     }
     {
+        // A password-protected entry still lists its name, but nothing behind
+        // that name can be read or hashed before the download. The lock badge
+        // is drawn from this counter, so it must follow the archive header and
+        // nothing else.
+        SecurityFile locked = file("album/photo.jpg");
+        locked.encrypted = true;
+        std::vector<SecurityFile> files = {locked, file("readme.txt")};
+        const SecurityReport r = SecurityAnalyzer::analyze(files);
+        ok(r.encrypted == 1, "only the password-protected entry is counted");
+        const FileAssessment assessment = SecurityAnalyzer::assessFile(locked);
+        ok(hasTag(assessment, "ENCRYPTED"),
+           "the per-file row marks the entry as encrypted");
+        ok(!hasTag(SecurityAnalyzer::assessFile(file("readme.txt")),
+                   "ENCRYPTED"),
+           "a plain entry is not marked as encrypted");
+
+        const SecurityReport plain = SecurityAnalyzer::analyze({file("readme.txt")});
+        ok(plain.encrypted == 0,
+           "a file list with no archive headers reports nothing encrypted");
+    }
+    {
         // The badge shown before the file list is known comes from the title.
         // It is a hint, so the rule is deliberately narrow: the end of the name.
         ok(SecurityAnalyzer::titleSuggestsArchive(

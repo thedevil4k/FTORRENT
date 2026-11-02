@@ -222,6 +222,7 @@ Fl_Image* SearchResultsWidget::badgeIcon(ContentBadge badge, bool hinted) {
     const char* asset = nullptr;
     switch (badge) {
         case ContentBadge::Archive:          asset = "compressed.png"; break;
+        case ContentBadge::Encrypted:        asset = "encrypted.png"; break;
         case ContentBadge::DiscImage:        asset = "iso.png"; break;
         case ContentBadge::Video:            asset = "video.png"; break;
         case ContentBadge::NativeExecutable: asset = "executable.png"; break;
@@ -304,6 +305,15 @@ int SearchResultsWidget::archiveIndexFor(
     return -1;
 }
 
+int SearchResultsWidget::encryptedForRow(int row) {
+    const SearchResult* r = getResultAt(row);
+    if (!r) return 0;
+    // find(), not operator[]: drawing must not create an entry for a row whose
+    // archive was never checked.
+    auto action = m_archive.find(cacheKey(*r));
+    return action == m_archive.end() ? 0 : action->second.encrypted;
+}
+
 bool SearchResultsWidget::archiveLineHit(int row, int x, int y) {
     const SearchResult* result = getResultAt(row);
     if (!result) return false;
@@ -340,6 +350,7 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
         std::shared_ptr<bool> alive;
         std::string key;
         std::string line;
+        int encrypted = 0;
     };
 
     const int index = entry.fileIndex;
@@ -363,6 +374,13 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
         delivery->line =
             ok ? archiveSummary(path, entries)
                : "Archive: the index could not be read (" + error + ").";
+        // The lock badge is driven by this count, and only by it: a failed or
+        // skipped check leaves it at zero rather than guessing.
+        if (ok) {
+            for (const SecurityFile& entry : entries) {
+                if (entry.encrypted) ++delivery->encrypted;
+            }
+        }
         Fl::awake([](void* data) {
             std::unique_ptr<Delivery> delivery(static_cast<Delivery*>(data));
             if (!delivery->alive || !*delivery->alive) return;
@@ -371,6 +389,7 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
             if (found != widget->m_archive.end()) {
                 found->second.running = false;
                 found->second.line = delivery->line;
+                found->second.encrypted = delivery->encrypted;
             }
             widget->forEachRow([&](int row, const SearchResult& r) {
                 if (SearchResultsWidget::cacheKey(r) == delivery->key) {
@@ -986,6 +1005,10 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
             {ContentBadge::Archive, report.archives > 0,
              !fileListKnown &&
                  SecurityAnalyzer::titleSuggestsArchive(r->name)},
+            // The lock never comes from the title or from the torrent's file
+            // list: only a completed archive check that found entries asking
+            // for a password can raise it.
+            {ContentBadge::Encrypted, encryptedForRow(row) > 0, false},
             {ContentBadge::DiscImage, report.discImages > 0,
              !fileListKnown &&
                  SecurityAnalyzer::titleSuggestsDiscImage(r->name)},

@@ -310,6 +310,8 @@ int main(int argc, char** argv) {
                 {"video.png", "the video badge is installed and decodes"},
                 {"executable.png",
                  "the executable badge is installed and decodes"},
+                {"encrypted.png",
+                 "the password-protected badge is installed and decodes"},
             };
             for (const BadgeAsset& asset : assets) {
                 std::unique_ptr<Fl_Image> badge(
@@ -334,6 +336,7 @@ int main(int argc, char** argv) {
                 };
                 const BadgeArt arts[] = {
                     {"compressed.png", "the archive badge is the shield's size"},
+                    {"encrypted.png", "the lock badge is the shield's size"},
                     {"iso.png", "the disc-image badge is the shield's size"},
                     {"video.png", "the video badge is the shield's size"},
                     {"executable.png",
@@ -372,6 +375,8 @@ int main(int argc, char** argv) {
            "the video badge asset is absent too");
         ok(AssetLoader::load("executable.png", 15) == nullptr,
            "the executable badge asset is absent too");
+        ok(AssetLoader::load("encrypted.png", 15) == nullptr,
+           "the lock badge asset is absent too");
         ok(search->image() && samePixels(search->image(), Resources::getSearchIcon()),
            "search button draws the compiled-in magnifier's pixels");
         ok(search->image() && search->image()->w() == ToolbarLayout::kIconSize &&

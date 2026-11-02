@@ -415,6 +415,10 @@ bool listSnippet(const ArchivePreflight::Snippet& snippet,
                 SecurityFile file;
                 file.path = entry.path;
                 file.size = static_cast<std::int64_t>(entry.size);
+                // Carried through so the row can say the archive is
+                // password-protected: this is the only point in the app where
+                // an archive header is actually read before a download.
+                file.encrypted = entry.encrypted;
                 entries.push_back(std::move(file));
             }
         }

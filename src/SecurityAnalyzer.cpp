@@ -507,6 +507,7 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
     else if (executable) addTag(tags, "EXE");
     if (archive) addTag(tags, "ARCHIVE");
     if (disk) addTag(tags, "DISK");
+    if (file.encrypted) addTag(tags, "ENCRYPTED");
 
     for (const Finding& finding : findings) {
         switch (finding.code) {
@@ -561,6 +562,7 @@ SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files)
         if (isDiscImagePath(file.path)) ++report.discImages;
         if (isVideoPath(file.path)) ++report.videos;
         if (isNativeExecutablePath(file.path)) ++report.nativeExecutables;
+        if (file.encrypted) ++report.encrypted;
         if (isShortcutPath(file.path)) ++report.shortcuts;
         if (file.symlink || !file.symlinkPath.empty()) ++report.symlinks;
 

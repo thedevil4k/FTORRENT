@@ -447,6 +447,27 @@ int main() {
         ok(contains(loud, "1 executable"), "an executable inside is counted");
         ok(contains(loud, "Review before downloading"),
            "an executable inside asks for review");
+
+        // The lock badge and this line answer the same question: the index
+        // says the entry needs a password, so what is behind it cannot be
+        // checked before the download.
+        SecurityFile locked;
+        locked.path = "private/photo.jpg";
+        locked.encrypted = true;
+        const std::string guarded = archiveSummary("pack.zip", {readme, locked});
+        ok(contains(guarded, "1 entry is password-protected"),
+           "a password-protected entry is stated in the summary");
+        ok(contains(guarded, "cannot be inspected"),
+           "and the summary says its content cannot be checked");
+        ok(!contains(guarded, "safe"),
+           "an encrypted archive is never called safe");
+
+        SecurityFile locked2 = locked;
+        locked2.path = "private/notes.txt";
+        const std::string two =
+            archiveSummary("pack.zip", {locked, locked2});
+        ok(contains(two, "2 entries are password-protected"),
+           "the plural wording follows the count");
     }
 
     section("what may be hashed locally");

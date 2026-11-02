@@ -39,6 +39,11 @@ struct SecurityFile {
     bool symlink = false;
     bool absolutePath = false;
     std::string symlinkPath;  // Target when symlink is true
+    // True when the container's own index says this entry needs a password to
+    // be read (a RAR/ZIP file header carrying the encryption flag). Only the
+    // level-2 archive check can know this: a torrent's file list lists names,
+    // not archive headers, so it stays false everywhere else.
+    bool encrypted = false;
     // Whole-file SHA-256, lowercase hex, when the metadata itself carries it.
     // A BitTorrent v2 pieces root is the SHA-256 of the file only when the file
     // is a single 16 KiB block; for anything larger it is a Merkle root and
@@ -106,10 +111,13 @@ struct SecurityReport {
     // counters above on purpose: 'discImages' only covers the formats a user
     // calls a disc image, 'videos' is purely informational, and
     // 'nativeExecutables' leaves out scripts and bytecode even though the
-    // risk analysis still flags those.
+    // risk analysis still flags those. 'encrypted' counts entries whose own
+    // archive header says they are password-protected, which only the level-2
+    // walk of an archive index can supply.
     int discImages = 0;
     int videos = 0;
     int nativeExecutables = 0;
+    int encrypted = 0;
     int suspiciousNameCount = 0;
     std::string summary;
 
