@@ -428,6 +428,19 @@ std::string readableIndexError(const std::string& raw) {
     return raw;
 }
 
+// The signature bytes decide which archive this is before libarchive has to say
+// something cryptic about it. RAR 1.5-4.x keeps every header interleaved with
+// the file data, so a two-piece listing can never see past the first few
+// entries: that is a property of the format, not of the check.
+const char* OLD_RAR_SIGNATURE = "\x52\x61\x72\x21\x1a\x07\x00";
+const std::size_t OLD_RAR_SIGNATURE_SIZE = 7;
+
+bool isOldRar(const ArchivePreflight::Snippet& snippet) {
+    if (snippet.head.size() < OLD_RAR_SIGNATURE_SIZE) return false;
+    return snippet.head.compare(0, OLD_RAR_SIGNATURE_SIZE, OLD_RAR_SIGNATURE,
+                                OLD_RAR_SIGNATURE_SIZE) == 0;
+}
+
 // Lists the index straight from the two windows. Nothing is written anywhere:
 // the sparse file this used to build cost a full-size write on NTFS (21 GB of
 // zeros for a 21 GB archive), which is where the check used to sit after the
@@ -435,6 +448,13 @@ std::string readableIndexError(const std::string& raw) {
 bool listSnippet(const ArchivePreflight::Snippet& snippet,
                  std::vector<SecurityFile>& entries, std::string& error,
                  const std::atomic<bool>* cancel) {
+    if (isOldRar(snippet)) {
+        error = "this is a RAR 1.5-4.x archive: it keeps its headers spread "
+                "through the file, so it cannot be listed from its first and "
+                "last piece";
+        return false;
+    }
+
     const ArchiveInspector::ListingAll listing =
         ArchiveInspector::listEntriesFromWindows(snippet.fileSize, snippet.head,
                                                  snippet.tail, cancel);
