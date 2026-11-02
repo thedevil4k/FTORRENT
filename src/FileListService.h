@@ -38,6 +38,11 @@ public:
         FileListState state = FileListState::NotRequested;
         std::vector<TorrentFileEntry> files;
         std::string error;
+        // The .torrent bytes the list was read from, when the fetcher got
+        // them (downloaded, or rebuilt from the swarm's metadata). The archive
+        // check reuses them so it never has to ask the swarm for the same
+        // metadata a second time.
+        std::string torrentBody;
     };
 
     // Runs on the UI thread when a request finishes, and never after this

@@ -166,8 +166,27 @@ int main() {
         }
     }
 
-    section("what the tail adds");
+    section("a check from torrent bytes");
     {
+        // The search row hands the metadata it already fetched to the check.
+        // What is pinned here is the contract when those bytes are missing or
+        // are not a torrent: refuse quickly and say why, never fall through to
+        // an empty answer.
+        std::vector<SecurityFile> entries;
+        std::string error;
+        ok(!ArchivePreflight::inspectTorrent("", 0, entries, error, nullptr),
+           "an empty body is refused");
+        ok(!error.empty(), "the empty-body refusal explains itself");
+
+        error.clear();
+        ok(!ArchivePreflight::inspectTorrent("this is not a torrent", 0,
+                                             entries, error, nullptr),
+           "bytes that are not a torrent are refused");
+        ok(!error.empty(), "the refusal explains itself");
+        ok(entries.empty(), "a refused check lists nothing");
+    }
+
+    section("what the tail adds");    {
         // libarchive can stream a ZIP from its local headers alone, so a head
         // never makes things worse; the tail is what recovers the entries the
         // local headers cannot describe. Asserting "at least as many" is the

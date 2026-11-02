@@ -125,7 +125,9 @@ void FileListService::startWorker(std::shared_ptr<Shared> shared,
             // resolve() never throws, but a bad_alloc in a worker must not take
             // the process down either.
             if (TorrentFileList::resolve(magnet, torrentUrl, d->entry.files,
-                                         d->entry.error)) {
+                                         d->entry.error,
+                                         TorrentFileList::DEFAULT_TIMEOUT_SECONDS,
+                                         &d->entry.torrentBody)) {
                 d->entry.state = FileListState::Loaded;
             }
         } catch (const std::exception& e) {

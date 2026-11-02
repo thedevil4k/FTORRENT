@@ -7,6 +7,7 @@
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Check_Browser.H>
+#include <FL/Fl_Hold_Browser.H>
 #include <FL/Fl_Box.H>
 #include "TorrentFileList.h"   // TorrentFileEntry, for pre-filling magnets
 #include "SecurityBadge.h"
@@ -55,6 +56,11 @@ public:
     // every box checked, so the user unchecks what to skip. Same order as
     // getFilePriorities() returns, and as libtorrent expects them.
     void setFileList(const std::vector<TorrentFileEntry>& files);
+    // The .torrent link and bytes the search row already resolved. Either one
+    // lets Check archive read its two pieces without a second metadata
+    // exchange with the swarm; without them it falls back to the magnet.
+    void setTorrentUrl(const std::string& url) { m_torrentUrl = url; }
+    void setTorrentBody(const std::string& body) { m_torrentBody = body; }
     
 private:
     
@@ -85,10 +91,19 @@ private:
     Fl_Box* m_securityHint;
     Fl_Box* m_reputationLabel;
     Fl_Button* m_checkArchive;
+    // What the last archive check listed, one line per entry. Hidden until a
+    // check answers, so the dialog stays compact while nothing is known.
+    Fl_Hold_Browser* m_archiveBrowser = nullptr;
     // Result of the last extra check, whichever ran last. Both are explicit
     // user actions and share one line so the dialog stays compact.
     std::string m_checkLine;
     bool m_archiveRunning = false;
+    // Where the check can read metadata without touching the swarm: the bytes
+    // the search row already resolved, or the .torrent link it came from.
+    std::string m_torrentBody;
+    std::string m_torrentUrl;
+    std::vector<SecurityFile> m_archiveEntries;
+    void showArchiveEntries();
     
     // Buttons
     Fl_Button* m_okButton;

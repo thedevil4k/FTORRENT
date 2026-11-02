@@ -15,6 +15,7 @@
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/alert_types.hpp>
+#include <libtorrent/write_resume_data.hpp>   // write_torrent_file_buf
 
 #include <algorithm>
 #include <chrono>
@@ -118,7 +119,8 @@ void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out
 }
 
 bool resolveFromTorrentUrl(const std::string& url, std::vector<TorrentFileEntry>& out,
-                           std::string& error, std::string* infoHashHex) {
+                           std::string& error, std::string* infoHashHex,
+                           std::string* torrentBody) {
     HttpClient::Response res = HttpClient::get(url, USER_AGENT, 15);
     if (!res.ok) {
         error = res.error;
@@ -128,11 +130,18 @@ bool resolveFromTorrentUrl(const std::string& url, std::vector<TorrentFileEntry>
         error = "Not a .torrent file";
         return false;
     }
-    return TorrentFileList::parseTorrentFile(res.body, out, error, infoHashHex);
+    std::string parseError;
+    if (!TorrentFileList::parseTorrentFile(res.body, out, parseError, infoHashHex)) {
+        error = parseError;
+        return false;
+    }
+    if (torrentBody) *torrentBody = res.body;
+    return true;
 }
 
 bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>& out,
-                       std::string& error, int timeoutSeconds) {
+                       std::string& error, int timeoutSeconds,
+                       std::string* torrentBody) {
     lt::error_code ec;
     lt::add_torrent_params atp = lt::parse_magnet_uri(magnet, ec);
     if (ec) {
@@ -222,6 +231,24 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
         if (out.empty()) {
             out.clear();
             return false;
+        }
+        // The metadata came from a peer, so the row has no .torrent file to
+        // hand on. Rebuilding it here is what lets the archive check read its
+        // pieces later without asking the swarm for the same metadata again.
+        if (torrentBody) {
+            torrentBody->clear();
+            try {
+                lt::add_torrent_params rebuilt;
+                rebuilt.ti = std::const_pointer_cast<lt::torrent_info>(ti);
+                const std::vector<char> bytes = lt::write_torrent_file_buf(
+                    rebuilt, lt::write_flags::allow_missing_piece_layer);
+                if (!bytes.empty()) {
+                    torrentBody->assign(bytes.data(), bytes.size());
+                }
+            } catch (...) {
+                // A listing does not depend on this; the check simply falls
+                // back to exchanging metadata when it is missing.
+            }
         }
         return true;
     };
@@ -400,9 +427,11 @@ bool TorrentFileList::resolve(const std::string& magnet,
                               const std::string& torrentUrl,
                               std::vector<TorrentFileEntry>& out,
                               std::string& error,
-                              int timeoutSeconds) {
+                              int timeoutSeconds,
+                              std::string* torrentBody) {
     out.clear();
     error.clear();
+    if (torrentBody) torrentBody->clear();
 
     const std::string expected = magnetHash(magnet);
     std::string torrentError;
@@ -416,7 +445,8 @@ bool TorrentFileList::resolve(const std::string& magnet,
             std::vector<TorrentFileEntry> fromFile;
             std::string fileError;
             std::string actual;
-            if (!resolveFromTorrentUrl(torrentUrl, fromFile, fileError, &actual)) {
+            if (!resolveFromTorrentUrl(torrentUrl, fromFile, fileError, &actual,
+                                       torrentBody)) {
                 torrentError = fileError;
             } else if (expected.empty() || actual.empty() || actual == expected) {
                 // Either it matches the magnet, or there is no hash to compare
@@ -442,8 +472,11 @@ bool TorrentFileList::resolve(const std::string& magnet,
     }
 
     std::string magnetError;
-    if (resolveFromMagnet(magnet, out, magnetError, timeoutSeconds)) return true;
+    if (resolveFromMagnet(magnet, out, magnetError, timeoutSeconds, torrentBody)) {
+        return true;
+    }
     out.clear();
+    if (torrentBody) torrentBody->clear();
 
     // Report both attempts when both were made: whichever one the user wants
     // to blame, the other is the reason to try again.

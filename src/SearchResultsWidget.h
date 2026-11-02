@@ -67,7 +67,8 @@ public:
     // never expanded or the fetch failed), in torrent order, so the Add
     // dialog can offer one checkbox per file.
     using DownloadCallback =
-        std::function<void(const SearchResult&, const std::vector<TorrentFileEntry>&)>;
+        std::function<void(const SearchResult&, const std::vector<TorrentFileEntry>&,
+                           const std::string& torrentBody)>;
     void setOnDownloadCallback(DownloadCallback cb) { m_onDownload = cb; }
 
 protected:
@@ -172,6 +173,10 @@ private:
         // so the row can show the contents without asking the swarm again;
         // empty until a check completes.
         std::vector<SecurityFile> entries;
+        // The .torrent bytes the row's file list was read from. When present,
+        // the check reads its two pieces straight away instead of exchanging
+        // metadata with the swarm a second time.
+        std::string torrentBody;
         int top = 0;
         int bottom = 0;
     };

@@ -439,8 +439,11 @@ void MainWindow::createSearchView() {
     // where the dialog is the whole download affordance). The row's file list
     // travels along so a multi-file magnet offers one checkbox per file.
     m_searchResults->setOnDownloadCallback(
-        [this](const SearchResult& r, const std::vector<TorrentFileEntry>& files) {
-            if (showAddTorrentDialog("", r.magnet, files)) switchView(false);
+        [this](const SearchResult& r, const std::vector<TorrentFileEntry>& files,
+               const std::string& body) {
+            if (showAddTorrentDialog("", r.magnet, files, r.torrentUrl, body)) {
+                switchView(false);
+            }
         });
     
     m_searchView->hide();   // Torrent list is what you see first
@@ -976,11 +979,19 @@ std::string MainWindow::formatStatusBar() const {
 }
 
 bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const std::string& prefilledMagnet,
-                                       const std::vector<TorrentFileEntry>& prefilledFiles) {
+                                       const std::vector<TorrentFileEntry>& prefilledFiles,
+                                       const std::string& prefilledTorrentUrl,
+                                       const std::string& prefilledBody) {
     AddTorrentDialog* dlg = new AddTorrentDialog();
 
     if (!prefilledPath.empty()) {
         dlg->setTorrentPath(prefilledPath);
+    }
+    if (!prefilledTorrentUrl.empty()) {
+        dlg->setTorrentUrl(prefilledTorrentUrl);
+    }
+    if (!prefilledBody.empty()) {
+        dlg->setTorrentBody(prefilledBody);
     }
     if (!prefilledMagnet.empty()) {
         dlg->setMagnetLink(prefilledMagnet);

@@ -241,6 +241,11 @@ bool ArchivePreflight::fetchSnippet(const lt::add_torrent_params& params,
     lt::add_torrent_params atp = params;
     // The probe owns where the pieces go; whatever the caller had is replaced.
     atp.save_path = workDir.string();
+    // A .torrent rebuilt from metadata carries no announce list, and a torrent
+    // with none can only find peers over DHT. The public trackers are added the
+    // same way the magnet path adds them, so a check does not depend on the DHT
+    // alone.
+    if (atp.trackers.empty()) TorrentFileList::addDefaultTrackers(atp.trackers);
     // Nothing but the two pieces below is wanted: every file starts at zero
     // priority, so no other piece is ever requested.
     atp.flags &= ~(lt::torrent_flags::auto_managed | lt::torrent_flags::paused);
@@ -473,4 +478,33 @@ bool ArchivePreflight::inspect(const lt::add_torrent_params& params,
         return false;
     }
     return listSnippet(snippet, entries, error, cancel);
+}
+
+bool ArchivePreflight::inspectTorrent(const std::string& torrentBody,
+                                      int fileIndex,
+                                      std::vector<SecurityFile>& entries,
+                                      std::string& error,
+                                      const std::atomic<bool>* cancel,
+                                      int timeoutSeconds) {
+    entries.clear();
+    error.clear();
+
+    if (torrentBody.empty()) {
+        error = "no torrent metadata to check";
+        return false;
+    }
+
+    lt::add_torrent_params atp;
+    try {
+        atp = lt::load_torrent_buffer(
+            lt::span<char const>(torrentBody.data(), torrentBody.size()));
+    } catch (const std::exception& e) {
+        error = std::string("could not read the torrent metadata: ") + e.what();
+        return false;
+    }
+    if (!atp.ti) {
+        error = "the torrent metadata carries no file list";
+        return false;
+    }
+    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds);
 }

@@ -75,11 +75,18 @@ public:
 
     // Fills 'out' with every file of the torrent. Returns false and fills
     // 'error' with a short reason when the metadata could not be obtained.
+    //
+    // When 'torrentBody' is given it receives the .torrent bytes the metadata
+    // came from: the file that was downloaded, or the one rebuilt from the
+    // swarm's own metadata. A later archive check can then read the pieces it
+    // needs without a second metadata exchange, which is what made "Check
+    // archive" wait on the swarm for a torrent the row had already resolved.
     static bool resolve(const std::string& magnet,
                         const std::string& torrentUrl,
                         std::vector<TorrentFileEntry>& out,
                         std::string& error,
-                        int timeoutSeconds = DEFAULT_TIMEOUT_SECONDS);
+                        int timeoutSeconds = DEFAULT_TIMEOUT_SECONDS,
+                        std::string* torrentBody = nullptr);
 
     // Turns the bytes of a .torrent file into its file list. Exposed on its
     // own because it is the part that can be checked without a network. When

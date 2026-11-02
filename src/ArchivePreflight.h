@@ -82,6 +82,16 @@ public:
                         std::string& error, const std::atomic<bool>* cancelled,
                         int timeoutSeconds = 90);
 
+    // Same, from the bytes of a .torrent the app already holds: the file list
+    // the search row resolved keeps them, so a check pays no metadata exchange
+    // for a torrent it has already seen. Returns false and fills 'error' when
+    // the bytes are not a torrent.
+    static bool inspectTorrent(const std::string& torrentBody, int fileIndex,
+                               std::vector<SecurityFile>& entries,
+                               std::string& error,
+                               const std::atomic<bool>* cancelled,
+                               int timeoutSeconds = 90);
+
     // Root of the temporary directories. Cleaned up by inspect().
     static std::string tempRoot();
 };

@@ -375,15 +375,27 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
     const std::string path = entry.path;
     const std::string magnet = entry.magnet;
     const std::string torrentUrl = entry.torrentUrl;
+    // The file list the row already resolved carries the .torrent bytes, so
+    // the check can go straight to the two pieces instead of repeating the
+    // metadata exchange with the swarm.
+    const FileListService::Entry known = m_files.find(key);
+    const std::string torrentBody = known.state == FileListState::Loaded
+                                        ? known.torrentBody
+                                        : std::string();
     std::shared_ptr<bool> alive = m_alive;
     SearchResultsWidget* self = this;
 
-    std::thread([self, alive, key, index, path, magnet, torrentUrl]() {
+    std::thread([self, alive, key, index, path, magnet, torrentUrl,
+                 torrentBody]() {
         std::vector<SecurityFile> entries;
         std::string error;
         std::atomic<bool> cancelled{false};
-        const bool ok = ArchivePreflight::inspect(magnet, torrentUrl, index,
-                                                  entries, error, &cancelled);
+        const bool ok = !torrentBody.empty()
+                            ? ArchivePreflight::inspectTorrent(
+                                  torrentBody, index, entries, error, &cancelled)
+                            : ArchivePreflight::inspect(magnet, torrentUrl,
+                                                        index, entries, error,
+                                                        &cancelled);
 
         Delivery* delivery = new Delivery;
         delivery->widget = self;
@@ -1267,8 +1279,12 @@ int SearchResultsWidget::handle(int event) {
                 // or failed): same order the dialog and libtorrent use.
                 FileListService::Entry rf = filesForRow(clicked);
                 std::vector<TorrentFileEntry> files;
-                if (rf.state == FileListState::Loaded) files = rf.files;
-                m_onDownload(copy, files);
+                if (rf.state == FileListState::Loaded) {
+                    files = rf.files;
+                    m_onDownload(copy, files, rf.torrentBody);
+                } else {
+                    m_onDownload(copy, files, std::string());
+                }
                 return 1;
             }
         }
@@ -1288,7 +1304,7 @@ int SearchResultsWidget::handle(int event) {
                 FileListService::Entry rf = filesForRow(sel);
                 std::vector<TorrentFileEntry> files;
                 if (rf.state == FileListState::Loaded) files = rf.files;
-                m_onDownload(copy, files);
+                m_onDownload(copy, files, rf.torrentBody);
                 return 1;
             }
         }

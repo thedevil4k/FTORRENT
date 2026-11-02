@@ -31,6 +31,7 @@ struct ArchiveCheckDelivery {
     AddTorrentDialog* dialog = nullptr;
     std::shared_ptr<bool> alive;
     std::string message;
+    std::vector<SecurityFile> entries;
 };
 
 // The green dot that sits at the right end of the magnet field. Drawn rather
@@ -49,7 +50,7 @@ public:
 } // namespace
 
 AddTorrentDialog::AddTorrentDialog()
-    : Fl_Window(500, 690, "Add Torrent")
+    : Fl_Window(500, 760, "Add Torrent")
     , m_okClicked(false)
 {
     m_startImmediatelyResult = true;
@@ -180,10 +181,16 @@ void AddTorrentDialog::createUI() {
         "Downloads only the first and last piece of the archive to list what "
         "is inside. Saved to a temporary folder and deleted afterwards.");
     m_checkArchive->deactivate();
+
+    // What the last check listed, under the panel. Hidden until there is
+    // something to show: the dialog keeps its size while nothing is known.
+    m_archiveBrowser = new Fl_Hold_Browser(30, y + 152, 440, 76);
+    m_archiveBrowser->textsize(11);
+    m_archiveBrowser->hide();
 }
 
 void AddTorrentDialog::createButtons() {
-    int btn_y = 645;
+    int btn_y = 712;
     int btn_w = 80;
     int btn_h = 30;
     
@@ -617,7 +624,22 @@ void AddTorrentDialog::checkArchive() {
         m_filePathInput && m_filePathInput->value() ? m_filePathInput->value() : "";
     const std::string magnet =
         m_magnetInput && m_magnetInput->value() ? m_magnetInput->value() : "";
-    if (torrentPath.empty() && magnet.empty()) {
+    // The bytes the search row already resolved come first: reading two pieces
+    // of a torrent whose metadata is in hand needs no exchange with the swarm.
+    // Then the .torrent link, then the magnet.
+    std::string body = m_torrentBody;
+    // A body that describes a different torrent than the magnet on screen must
+    // never be used: the answer would be about someone else's files.
+    if (!body.empty() && !magnet.empty()) {
+        const std::string expected = TorrentFileList::magnetHash(magnet);
+        const std::string actual = TorrentFileList::infoHashOfTorrentFile(body);
+        if (!expected.empty() && !actual.empty() && expected != actual) {
+            body.clear();
+        }
+    }
+    const std::string torrentUrl = m_torrentUrl;
+    if (torrentPath.empty() && body.empty() && torrentUrl.empty() &&
+        magnet.empty()) {
         m_checkLine = "Archive: open a .torrent file or a magnet first.";
         refreshReputationLabel();
         return;
@@ -627,16 +649,32 @@ void AddTorrentDialog::checkArchive() {
     m_checkArchive->deactivate();
     m_checkLine = "Archive: reading the first and last piece...";
     refreshReputationLabel();
+    // The previous answer described a check that is no longer the last word.
+    m_archiveEntries.clear();
+    if (m_archiveBrowser) {
+        m_archiveBrowser->clear();
+        m_archiveBrowser->hide();
+    }
 
     const int index = archive->fileIndex;
     const std::string path = archive->path;
     std::shared_ptr<bool> alive = m_alive;
-    std::thread([this, alive, index, path, torrentPath, magnet]() {
+    std::thread([this, alive, index, path, torrentPath, magnet, torrentUrl,
+                 body]() {
         std::vector<SecurityFile> entries;
         std::string error;
         std::atomic<bool> cancelled{false};
-        const bool ok = ArchivePreflight::inspect(magnet, torrentPath, index,
-                                                  entries, error, &cancelled);
+        bool ok = false;
+        if (!body.empty()) {
+            ok = ArchivePreflight::inspectTorrent(body, index, entries, error,
+                                                  &cancelled);
+        }
+        if (!ok && body.empty()) {
+            ok = ArchivePreflight::inspect(magnet, torrentPath.empty()
+                                                        ? torrentUrl
+                                                        : torrentPath,
+                                           index, entries, error, &cancelled);
+        }
 
         ArchiveCheckDelivery* delivery = new ArchiveCheckDelivery;
         delivery->dialog = this;
@@ -646,9 +684,27 @@ void AddTorrentDialog::checkArchive() {
                 "Archive: the index could not be read (" + error + ").";
         } else {
             delivery->message = archiveSummary(path, entries);
+            delivery->entries = std::move(entries);
         }
         Fl::awake(&AddTorrentDialog::deliverArchiveCheck, delivery);
     }).detach();
+}
+
+void AddTorrentDialog::showArchiveEntries() {
+    if (!m_archiveBrowser) return;
+    m_archiveBrowser->clear();
+    if (m_archiveEntries.empty()) {
+        m_archiveBrowser->hide();
+        return;
+    }
+    // Every entry, in archive order. The browser scrolls, so the list is not
+    // cut here the way the search row cuts it at eight.
+    for (const SecurityFile& entry : m_archiveEntries) {
+        m_archiveBrowser->add(
+            SecurityBadge::archiveEntryLine(entry).c_str());
+    }
+    m_archiveBrowser->show();
+    redraw();
 }
 
 void AddTorrentDialog::deliverArchiveCheck(void* data) {
@@ -657,13 +713,16 @@ void AddTorrentDialog::deliverArchiveCheck(void* data) {
     AddTorrentDialog* dialog = delivery->dialog;
     const bool alive = delivery->alive && *delivery->alive;
     const std::string message = delivery->message;
+    std::vector<SecurityFile> entries = std::move(delivery->entries);
     delete delivery;
 
     if (!alive || !dialog) return;
     dialog->m_archiveRunning = false;
     dialog->m_checkLine = message;
+    dialog->m_archiveEntries = std::move(entries);
     dialog->refreshReputationLabel();
     dialog->updateSecurityPanel();
+    dialog->showArchiveEntries();
 }
 
 void AddTorrentDialog::checkReputation() {

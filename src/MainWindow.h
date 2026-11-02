@@ -74,8 +74,15 @@ public:    MainWindow(int w, int h, const char* title);
     // Callers may ignore the result; search uses it to stay on the results
     // when the dialog is cancelled. prefilledFiles lists the magnet's files in
     // torrent order (empty when unknown): the dialog shows one checkbox each.
-    bool showAddTorrentDialog(const std::string& prefilledPath = "", const std::string& prefilledMagnet = "",
-                              const std::vector<TorrentFileEntry>& prefilledFiles = {});
+    // prefilledTorrentUrl and prefilledBody are the .torrent link and bytes the
+    // search row already holds, so the dialog's archive check needs no second
+    // metadata exchange.
+    bool showAddTorrentDialog(
+        const std::string& prefilledPath = "",
+        const std::string& prefilledMagnet = "",
+        const std::vector<TorrentFileEntry>& prefilledFiles = {},
+        const std::string& prefilledTorrentUrl = "",
+        const std::string& prefilledBody = "");
     void showCreateTorrentDialog();
     void showPreferencesDialog();
     void showAboutDialog();
