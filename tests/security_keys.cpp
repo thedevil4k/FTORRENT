@@ -69,6 +69,18 @@ int main() {
     const std::string key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     const SecurityKeys::Provider vt = SecurityKeys::Provider::VirusTotal;
 
+    section("normalizing a pasted key");
+    {
+        ok(SecurityKeys::normalize("  abc123  ") == "abc123",
+           "spaces around a key are dropped");
+        ok(SecurityKeys::normalize("abc\t12\r\n3") == "abc123",
+           "tabs and a line break inside a key are dropped");
+        ok(SecurityKeys::normalize(" \t\r\n ") == "",
+           "whitespace alone is not a key");
+        ok(SecurityKeys::normalize(key) == key,
+           "a clean key is left exactly as it is");
+    }
+
     section("empty store");
     ok(!SecurityKeys::exists(vt), "no key before one is saved");
     {

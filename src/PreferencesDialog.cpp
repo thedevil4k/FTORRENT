@@ -1,6 +1,7 @@
 #include "PreferencesDialog.h"
 #include "SettingsManager.h"
 #include "SecurityKeys.h"
+#include "SystemUtils.h"
 #include <FL/Fl.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/fl_ask.H>
@@ -183,6 +184,15 @@ void PreferencesDialog::createSecurityTab() {
     m_virusTotalKey->tooltip(
         "A free VirusTotal API key. Used only when you click a shield.");
 
+    // One click takes the user to the page that issues the key: the point of
+    // this button is that nobody has to search for it. The key itself is still
+    // the user's own and is never shipped with the program.
+    m_getVirusTotalKey = new Fl_Button(430, 66, 130, 28, "Get free key");
+    m_getVirusTotalKey->callback(onGetVirusTotalKey, this);
+    m_getVirusTotalKey->tooltip(
+        "Opens virustotal.com to create a free account and copy your own API "
+        "key. FTorrent never ships or shares a key.");
+
     m_saveKey = new Fl_Button(20, 100, 120, 26, "Save key");
     m_saveKey->callback(onSaveKey, this);
 
@@ -196,6 +206,12 @@ void PreferencesDialog::createSecurityTab() {
     m_malwareBazaarKey = new Fl_Secret_Input(20, 158, 400, 28);
     m_malwareBazaarKey->tooltip(
         "The abuse.ch Auth-Key. MalwareBazaar answers HTTP 401 without one.");
+
+    m_getBazaarKey = new Fl_Button(430, 158, 130, 28, "Get free key");
+    m_getBazaarKey->callback(onGetBazaarKey, this);
+    m_getBazaarKey->tooltip(
+        "Opens auth.abuse.ch to create the free Auth-Key MalwareBazaar asks "
+        "for. FTorrent never ships or shares a key.");
 
     m_saveBazaarKey = new Fl_Button(20, 192, 120, 26, "Save key");
     m_saveBazaarKey->callback(onSaveBazaarKey, this);
@@ -237,18 +253,21 @@ void PreferencesDialog::refreshKeyStatus() {
     const bool vt = SecurityKeys::exists(SecurityKeys::Provider::VirusTotal);
     const bool bazaar = SecurityKeys::exists(SecurityKeys::Provider::MalwareBazaar);
 
-    std::string text;
+    // The state of each provider first, so the answer to "what is missing?"
+    // does not depend on reading a paragraph.
+    std::string text = std::string("VirusTotal: ") +
+                       (vt ? "key saved" : "no key") + "   |   " +
+                       "MalwareBazaar: " + (bazaar ? "key saved" : "no key") +
+                       "\n";
     if (vt && bazaar) {
-        text = "Both keys are saved. A lookup asks VirusTotal and MalwareBazaar.";
+        text += "A shield check asks both providers.";
     } else if (vt) {
-        text = "Only the VirusTotal key is saved; MalwareBazaar is skipped "
-               "until its Auth-Key is added.";
+        text += "MalwareBazaar is skipped until its Auth-Key is added.";
     } else if (bazaar) {
-        text = "Only the MalwareBazaar Auth-Key is saved; VirusTotal is skipped "
-               "until its API key is added.";
+        text += "VirusTotal is skipped until its API key is added.";
     } else {
-        text = "No keys saved. Clicking a shield cannot ask either provider "
-               "until one is added here.";
+        text += "A shield check cannot ask either provider until one key is "
+                "added; Get free key opens the page that issues it.";
     }
     m_keyStatus->copy_label(text.c_str());
     m_keyStatus->labelcolor(vt && bazaar ? FL_FOREGROUND_COLOR
@@ -259,12 +278,11 @@ void PreferencesDialog::saveKeyFromField(SecurityKeys::Provider provider,
                                          Fl_Input* field) {
     if (!field) return;
 
-    std::string key = field->value() ? field->value() : "";
-    // Trim the whitespace a copy/paste usually brings along.
-    const std::size_t first = key.find_first_not_of(" \t\r\n");
-    const std::size_t last = key.find_last_not_of(" \t\r\n");
-    key = first == std::string::npos ? std::string()
-                                     : key.substr(first, last - first + 1);
+    // A key pasted from a web page or an email often carries spaces, tabs or a
+    // line break in the middle. None of them are part of any key, so every one
+    // is dropped instead of asking the user to clean it up.
+    const std::string key =
+        SecurityKeys::normalize(field->value() ? field->value() : "");
 
     if (key.empty()) {
         fl_alert("Paste the key first, or use Remove key.");
@@ -276,6 +294,8 @@ void PreferencesDialog::saveKeyFromField(SecurityKeys::Provider provider,
         fl_alert("The key could not be saved: %s", error.c_str());
         return;
     }
+    // Show what was actually stored, without the paste noise.
+    field->value(key.c_str());
     refreshKeyStatus();
 }
 
@@ -314,6 +334,19 @@ void PreferencesDialog::onClearBazaarKey(Fl_Widget* w, void* data) {
     if (!dlg) return;
     dlg->clearKeyFor(SecurityKeys::Provider::MalwareBazaar,
                      dlg->m_malwareBazaarKey);
+}
+
+// The key pages, not the home page: the user lands where the key is issued.
+void PreferencesDialog::onGetVirusTotalKey(Fl_Widget* w, void* data) {
+    (void)w;
+    (void)data;
+    SystemUtils::openUrl("https://www.virustotal.com/gui/my-apikey");
+}
+
+void PreferencesDialog::onGetBazaarKey(Fl_Widget* w, void* data) {
+    (void)w;
+    (void)data;
+    SystemUtils::openUrl("https://auth.abuse.ch/");
 }
 
 void PreferencesDialog::createButtons() {

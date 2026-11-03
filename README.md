@@ -49,10 +49,27 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 - The analysis is metadata only: names, executable/hidden/symlink flags and symlink targets. No file contents are read, nothing is uploaded and no telemetry is sent
 - A clean report says **no known indicators**, never “safe”. When there is no file list yet, the shield stays **Unknown** instead of guessing
 - **Reputation by hash, on request.** Clicking a shield asks VirusTotal and MalwareBazaar about the file's SHA-256, and only then. The hash comes from the torrent metadata; when the metadata does not carry a whole-file hash and the file is already complete on disk, FTorrent hashes it locally and asks about that, without uploading anything. Otherwise it says exactly `VT no disponible antes de descargar el archivo completo.` instead of downloading the file to compute one
-- **Archives without the archive.** For a RAR or ZIP, **Check archive** fetches only the first and last piece, lists the entries from a temporary folder that is deleted immediately, and reports whether anything inside can run; the answer comes with the entry list itself (path, size and tags such as `[EXE]` or `[ENCRYPTED]`), eight lines in the search row and all of them in Details. Available from a search row, Add Torrent and Details
-- Both providers need a key: VirusTotal's API key and the abuse.ch Auth-Key that MalwareBazaar now requires (it answers HTTP 401 without one). Keys never live in `settings.ini`: they are stored with Windows DPAPI, or in 0600 files on Linux, from Preferences ▸ Security. A provider without a key is skipped and the other is still asked
+- **Archives without the archive.** For a RAR or ZIP, **Check archive** reads the archive index from a temporary folder that is deleted immediately, lists the entries and reports whether anything inside can run; the answer comes with the entry list itself (path, size and tags such as `[EXE]` or `[ENCRYPTED]`), eight lines in the search row and all of them in Details. Available from a search row, Add Torrent and Details
+- Both providers need a key: VirusTotal's API key and the abuse.ch Auth-Key that MalwareBazaar now requires (it answers HTTP 401 without one). Keys never live in `settings.ini`: they are stored with Windows DPAPI, or in 0600 files on Linux, from Preferences ▸ Security, which also has a **Get free key** button for each provider. A provider without a key is skipped and the other is still asked. No key is ever shipped with FTorrent: a key inside a distributed binary is extracted in seconds, and both providers issue them per account
 - The former post-download VirusTotal and RAR/ZIP inspection actions remain retired; `FileHash`, `ArchiveInspector` and `VirusTotal` stay as internal engines for the pre-download analysis
 - Archive support is optional at build time
+
+### Archive formats
+
+**Check archive** never downloads the archive itself, so what it can list depends on where the format keeps its index:
+
+| Format | What you get | How it is read | Enabled today |
+| :--- | :--- | :--- | :--- |
+| ZIP | the complete list | central directory at the end (two pieces) | yes |
+| RAR5 (RAR 5.0 and later) | the complete list | headers at both ends (two pieces) | yes |
+| RAR 1.5–4.x | a **partial** list, labelled as such | headers walked one by one, packed data skipped, bounded to a tenth of the archive's pieces (64 at most) or to the deadline | yes |
+| 7z | candidate for a complete list | metadata sits at the end and may be compressed, so it needs its own bounded read rather than two pieces | no |
+| CAB | candidate for a complete list | file entries follow the header at the start | no |
+| TAR (uncompressed), ARJ, LZH | partial, like old RAR | headers interleaved with the data | no |
+| single-file `.gz`, `.bz2`, `.xz`, `.zst` | not listable | one stream, no index | no |
+
+The extension only says `.rar`; the version comes from the file's signature (`RAR!` plus `0x01 0x00` is RAR5), which is why the variant is named after the index has been read. An archive whose headers are encrypted cannot be listed at all and is reported as password-protected, not as broken.
+
 
 **Interface**
 - Dark and light themes; dark is the default and theme choice is per session
@@ -166,7 +183,7 @@ Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 - **Metadata risk analysis before downloading.** A shield now sits next to the torrent name in search results, Add Torrent, the torrent list and Details. Expanding a search row shows the risk summary and per-file tags; Add Torrent analyzes the checked files and can select only non-executables; Details has a Security tab. The analysis reads names and metadata only, and says “no known indicators” rather than “safe”.
 - **The hash is always on show.** Every expanded result, the Security tab of Details and the Add Torrent panel print the whole-file **SHA-256** the metadata carries, with the file it belongs to, or say plainly that the metadata has none and that the file is never downloaded just to compute one. That line does not depend on a provider answering: the user is entitled to know which hash was used
 
-- **Reputation and archive checks, on demand.** Clicking a shield looks the file's SHA-256 up in VirusTotal and MalwareBazaar; **Check archive** reads a RAR/ZIP index from its first and last piece in a temporary folder. Neither runs without a click, neither uploads anything, and without a whole-file hash FTorrent says so plainly instead of downloading the file.
+- **Reputation and archive checks, on demand.** Clicking a shield looks the file's SHA-256 up in VirusTotal and MalwareBazaar; **Check archive** reads a ZIP or RAR index without downloading the archive. Neither runs without a click, neither uploads anything, and without a whole-file hash FTorrent says so plainly instead of downloading the file.
 - **Network monitor.** The toolbar globe shows every peer link and the events the engine reported, with no packet capture and no claim to one.
 - **One version, one place.** `project(FTorrent VERSION ...)` feeds the user agents through `src/Version.h`; a release bumps one number, and the `security_events` suite fails if the definition stops reaching the code.
 - **Both checks reach every surface.** Search rows offer the archive check under the expanded file list, Details has a **Check archive** button on its Security tab, and a completed file with no metadata hash is hashed on this machine and looked up only when the user asks. The local hash is described as local in the answer.

@@ -33,6 +33,10 @@ public:
     // Stable identifier, also used as the file name.
     static const char* providerId(Provider provider);
 
+    // Drops the whitespace a copy/paste can bring along: a key is one token, so
+    // no key contains a space or a line break. Applied by save() itself.
+    static std::string normalize(const std::string& key);
+
     // Stores the key, replacing any previous one. An empty key removes it.
     // Returns false and fills 'error' when the key cannot be written safely.
     static bool save(Provider provider, const std::string& key,

@@ -1,6 +1,7 @@
 #include "SecurityKeys.h"
 #include "SystemUtils.h"
 
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -64,6 +65,19 @@ const char* SecurityKeys::providerId(Provider provider) {
     }
 }
 
+std::string SecurityKeys::normalize(const std::string& key) {
+    // Keys are issued as a single token. A copy from a web page or an email can
+    // bring a line break in the middle or a trailing space, and neither is part
+    // of any key, so every whitespace character is dropped instead of asking
+    // the user to clean the paste.
+    std::string cleaned;
+    cleaned.reserve(key.size());
+    for (const char c : key) {
+        if (!std::isspace(static_cast<unsigned char>(c))) cleaned.push_back(c);
+    }
+    return cleaned;
+}
+
 std::string SecurityKeys::storagePath(Provider provider) {
     return keyPath(provider).string();
 }
@@ -113,11 +127,13 @@ DATA_BLOB entropyBlob() {
 
 bool SecurityKeys::save(Provider provider, const std::string& key,
                         std::string& error) {
-    if (key.empty()) return remove(provider);
+    const std::string cleaned = normalize(key);
+    if (cleaned.empty()) return remove(provider);
 
     if (!ensureDirectory(error)) return false;
 
-    std::string plain = std::string(MAGIC) + providerId(provider) + "\n" + key;
+    std::string plain =
+        std::string(MAGIC) + providerId(provider) + "\n" + cleaned;
     DATA_BLOB in;
     in.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(plain.data()));
     in.cbData = static_cast<DWORD>(plain.size());
@@ -183,13 +199,14 @@ bool SecurityKeys::load(Provider provider, std::string& key) {
 
 bool SecurityKeys::save(Provider provider, const std::string& key,
                         std::string& error) {
-    if (key.empty()) return remove(provider);
+    const std::string cleaned = normalize(key);
+    if (cleaned.empty()) return remove(provider);
 
     if (!ensureDirectory(error)) return false;
 
     const std::filesystem::path path = keyPath(provider);
     const std::string plain = std::string(MAGIC) + providerId(provider) + "\n" +
-                              key;
+                              cleaned;
 
     // 0600 at creation time, not after the fact: a chmod that follows the
     // write leaves a window in which the key is world-readable.

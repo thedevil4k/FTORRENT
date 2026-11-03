@@ -68,9 +68,11 @@ private:
     // Windows, a 0600 file on Linux), never in settings.ini.
     Fl_Group* m_securityTab;
     Fl_Secret_Input* m_virusTotalKey;
+    Fl_Button* m_getVirusTotalKey;
     Fl_Button* m_saveKey;
     Fl_Button* m_clearKey;
     Fl_Secret_Input* m_malwareBazaarKey;
+    Fl_Button* m_getBazaarKey;
     Fl_Button* m_saveBazaarKey;
     Fl_Button* m_clearBazaarKey;
     Fl_Box* m_keyStatus;
@@ -100,6 +102,8 @@ private:
     static void onClearKey(Fl_Widget* w, void* data);
     static void onSaveBazaarKey(Fl_Widget* w, void* data);
     static void onClearBazaarKey(Fl_Widget* w, void* data);
+    static void onGetVirusTotalKey(Fl_Widget* w, void* data);
+    static void onGetBazaarKey(Fl_Widget* w, void* data);
     
     // Load/Save
     void loadSettings();
