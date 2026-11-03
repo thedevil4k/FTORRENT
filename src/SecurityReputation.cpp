@@ -40,14 +40,18 @@ std::string reputationLine(const ReputationResult& result) {
     }
 }
 
-std::string reputationHashLine(const ReputationResult& result) {
-    if (!isSha256Hex(result.sha256)) {
-        // The user has the right to know the check had no hash to ask about,
-        // not only that no provider answered.
-        return "SHA-256: not in the metadata; it can only be computed from "
-               "the whole file.";
+std::string hashSmallPrint(const std::string& sha256Hex,
+                           const std::string& path) {
+    if (!sha256Hex.empty()) {
+        std::string line = "SHA-256: " + sha256Hex;
+        if (!path.empty()) line += "  (" + path + ")";
+        return line;
     }
-    return "SHA-256: " + result.sha256;
+    // No whole-file hash in the metadata. Saying which one is missing is the
+    // point: the user is entitled to know that nothing was hashed for them,
+    // not only that no provider answered.
+    return "SHA-256: none in the torrent metadata, and the file is never "
+           "downloaded just to compute one.";
 }
 
 bool reputationHasDetections(const ReputationResult& result) {

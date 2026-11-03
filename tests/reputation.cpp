@@ -470,6 +470,29 @@ int main() {
            "the plural wording follows the count");
     }
 
+    section("the hash in the small print");
+    {
+        // The user is entitled to know which hash was used, or that none was
+        // found. This line never depends on a provider having answered.
+        const std::string shown = hashSmallPrint(HASH, "setup.exe");
+        ok(contains(shown, HASH),
+           "the whole hash is printed, not a truncated one");
+        ok(contains(shown, "setup.exe"),
+           "and it names the file it belongs to");
+        ok(!contains(shown, "safe"),
+           "the small print never claims anything is safe");
+
+        const std::string withPath = hashSmallPrint(HASH);
+        ok(contains(withPath, HASH), "a hash with no path still prints");
+
+        const std::string none = hashSmallPrint("", "");
+        ok(contains(none, "none in the torrent metadata"),
+           "with no whole-file hash the line says so");
+        ok(contains(none, "never downloaded just to compute one"),
+           "and says the file is not downloaded to obtain it");
+        ok(!contains(none, "safe"), "and never says safe either");
+    }
+
     section("what may be hashed locally");
     {
         SecurityFile doneExe;
@@ -538,25 +561,6 @@ int main() {
         verdict.total = 70;
         hit.verdicts.push_back(verdict);
         ok(reputationHasDetections(hit), "a detection is reported as such");
-
-        // The small print: the user sees the value that was looked up, or the
-        // reason there was nothing to look up.
-        const std::string noHash = reputationHashLine(ReputationResult{});
-        ok(contains(noHash, "SHA-256"), "the hash line names the algorithm");
-        ok(contains(noHash, "not in the metadata"),
-           "and says the metadata carried none");
-        ok(!contains(noHash, "safe"), "the hash line never says safe");
-
-        ReputationResult hashed;
-        hashed.sha256 =
-            "be1307d1e38db0d22f03095558630f1c748ca3451b48d0f252dce4ac2226b97d";
-        const std::string shownHash = reputationHashLine(hashed);
-        ok(contains(shownHash, hashed.sha256),
-           "the whole hash is shown, not a truncated one");
-
-        hashed.sha256 = "not-a-hash";
-        ok(contains(reputationHashLine(hashed), "not in the metadata"),
-           "a value that is not a SHA-256 is not shown as one");
 
         ReputationResult miss;
         miss.state = ReputationState::Unknown;

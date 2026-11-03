@@ -746,11 +746,10 @@ void SearchResultsWidget::updateRowHeight(int row) {
             lines = 1 + static_cast<int>(rf.files.size());
             const int maxFiles = MAX_SHOWN_FILES + 1;
             if (lines > 1 + maxFiles) lines = 1 + maxFiles;
-            // A reputation answer the user asked for gets its own line, and
-            // the hash it was about gets the small print under it.
-            if (m_reputation.find(cacheKey(*r)) != m_reputation.end()) {
-                lines += 2;
-            }
+            // A reputation answer the user asked for gets its own line.
+            if (m_reputation.find(cacheKey(*r)) != m_reputation.end()) ++lines;
+            // The small print always shows the hash, or says there is none.
+            ++lines;
             // An archive line is always offered, and grows when it answers:
             // the entries it listed are drawn under it.
             if (archiveIndexFor(rf.files) >= 0) {
@@ -868,20 +867,6 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
             fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2,
                     ly + FILE_LINE_HEIGHT - 1);
             ly += FILE_LINE_HEIGHT;
-
-            // The small print: which hash was looked up, or that there was
-            // none to look up. Dimmed, because it is reference, not a verdict.
-            const std::string hash =
-                elideToWidth(reputationHashLine(asked->second), avail);
-            fl_color(fl_rgb_color(140, 140, 140));
-            fl_font(FL_HELVETICA, 10);
-            fl_draw(hash.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
-                    FL_ALIGN_LEFT | FL_ALIGN_CLIP);
-            fl_font(FL_HELVETICA, 11);
-            fl_color(sepColor);
-            fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2,
-                    ly + FILE_LINE_HEIGHT - 1);
-            ly += FILE_LINE_HEIGHT;
         }
     }
 
@@ -901,6 +886,24 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         if (x2 < x + 24) x2 = x + 24;
         fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2, ly + FILE_LINE_HEIGHT - 1);
         ly += FILE_LINE_HEIGHT;
+    }
+
+    // The small print: which whole-file hash the metadata actually carries.
+    // The user is entitled to know whether a hash was found, whether or not a
+    // provider was ever asked about it.
+    {
+        const std::string note = elideToWidth(
+            hashSmallPrint(report.sha256, report.sha256Path), avail);
+        fl_color(fl_rgb_color(140, 140, 140));
+        fl_font(FL_HELVETICA, 10);
+        fl_draw(note.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+        fl_color(sepColor);
+        int x2 = x + w - 6;
+        if (x2 < x + 24) x2 = x + 24;
+        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2, ly + FILE_LINE_HEIGHT - 1);
+        ly += FILE_LINE_HEIGHT;
+        fl_font(FL_HELVETICA, 11);
     }
 
     int shown = static_cast<int>(rf.files.size());
