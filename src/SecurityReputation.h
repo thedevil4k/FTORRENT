@@ -29,12 +29,11 @@ ReputationTarget findReputationTarget(const std::vector<SecurityFile>& files);
 // when no whole-file hash exists, and never claims a file is safe.
 std::string reputationLine(const ReputationResult& result);
 
-// The small print under a reputation answer: the hash itself, so the user can
-// check it on their own, or an honest "none" when the torrent metadata carries
-// no whole-file SHA-256. It is never tied to a provider having answered: the
-// right to know which hash was used does not depend on an API key.
-std::string hashSmallPrint(const std::string& sha256Hex,
-                           const std::string& path = std::string());
+// The hash itself, for the small print under that line: the user asked to see
+// which value was looked up, not only what the providers said about it. When
+// there is none it says so in one line, because "no provider answered" and
+// "there was nothing to ask about" are different facts.
+std::string reputationHashLine(const ReputationResult& result);
 
 // True only when a provider reported detections for the hash.
 bool reputationHasDetections(const ReputationResult& result);

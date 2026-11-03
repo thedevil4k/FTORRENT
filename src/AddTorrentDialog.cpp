@@ -168,7 +168,7 @@ void AddTorrentDialog::createUI() {
 
     // Reputation lives below the metadata analysis: it is a second, explicit
     // step, and it says why it cannot run when there is no whole-file hash.
-    m_reputationLabel = new Fl_Box(30, y + 108, 440, 34);
+    m_reputationLabel = new Fl_Box(30, y + 106, 440, 44);
     m_reputationLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
     m_reputationLabel->labelsize(11);
     m_reputationLabel->copy_label(reputationLine(ReputationResult{}).c_str());
@@ -518,10 +518,6 @@ void AddTorrentDialog::updateSecurityPanel() {
             m_reputationSha = target.sha256;
             m_reputation = ReputationResult{};
         }
-        // The small print is not tied to a provider: it says which hash the
-        // metadata carries as soon as the selection is known.
-        m_torrentSha256 = target.sha256;
-        m_torrentSha256Path = target.path;
     }
 
     // An empty report means either "no metadata at all" or "the user
@@ -778,18 +774,11 @@ void AddTorrentDialog::refreshReputationLabel() {
     if (!m_reputationLabel) return;
 
     // Whichever explicit check ran last owns the line. Both say what they found
-    // and neither calls anything safe. The small print follows: which hash the
-    // metadata carries, so the user can check it themselves, or that there is
-    // none to check.
+    // and neither calls anything safe. The hash follows in the small print, so
+    // the user can see which value was looked up.
     std::string line =
         m_checkLine.empty() ? reputationLine(m_reputation) : m_checkLine;
-    const std::string hash = m_reputation.sha256.empty()
-                                 ? m_torrentSha256
-                                 : m_reputation.sha256;
-    line += "\n";
-    line += hashSmallPrint(hash, m_reputation.sha256.empty()
-                                     ? m_torrentSha256Path
-                                     : std::string());
+    line += "\n" + reputationHashLine(m_reputation);
     m_reputationLabel->copy_label(line.c_str());
     if (reputationHasDetections(m_reputation)) {
         m_reputationLabel->labelcolor(
