@@ -395,6 +395,19 @@ void TorrentDetailsDialog::updateSecurity() {
                      "machine... nothing is uploaded."
                    : reputationLine(m_reputation))
         << "\n";
+    // The small print: the hash itself, or an honest "none". It is shown even
+    // when no provider was asked, because knowing which hash was used is not
+    // the same question as what a provider said about it.
+    {
+        const std::string hash = m_reputation.sha256.empty()
+                                     ? m_securityReport.sha256
+                                     : m_reputation.sha256;
+        const std::string path = m_reputation.sha256.empty()
+                                     ? m_securityReport.sha256Path
+                                     : std::string();
+        out << "  " << SecurityBadge::displayText(hashSmallPrint(hash, path))
+            << "\n";
+    }
     if (!m_reputationNote.empty()) {
         out << "  " << SecurityBadge::displayText(m_reputationNote) << "\n";
     }

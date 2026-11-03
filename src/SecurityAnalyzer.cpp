@@ -538,6 +538,7 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
 
 SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files) {
     SecurityReport report;
+    bool shaIsRunnable = false;
     if (files.empty()) {
         report.summary = "No file list available. Metadata risk is unknown.";
         return report;
@@ -565,6 +566,18 @@ SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files)
         if (file.encrypted) ++report.encrypted;
         if (isShortcutPath(file.path)) ++report.shortcuts;
         if (file.symlink || !file.symlinkPath.empty()) ++report.symlinks;
+
+        // The whole-file hash the metadata carries, so every surface can show
+        // it in the small print. A file that can run is the one whose hash
+        // matters, so it wins over whatever came first.
+        if (file.sha256Complete && !file.sha256.empty()) {
+            const bool runnable = isRunnable(file);
+            if (report.sha256.empty() || (runnable && !shaIsRunnable)) {
+                report.sha256 = file.sha256;
+                report.sha256Path = file.path;
+                shaIsRunnable = runnable;
+            }
+        }
 
         bool suspiciousName = false;
         for (const Finding& finding : assessment.findings) {

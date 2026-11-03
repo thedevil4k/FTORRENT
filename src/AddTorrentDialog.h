@@ -102,6 +102,10 @@ private:
     // the search row already resolved, or the .torrent link it came from.
     std::string m_torrentBody;
     std::string m_torrentUrl;
+    // The whole-file SHA-256 the selection's metadata carries, and the file it
+    // belongs to. Shown in the small print whether or not a provider is asked.
+    std::string m_torrentSha256;
+    std::string m_torrentSha256Path;
     std::vector<SecurityFile> m_archiveEntries;
     void showArchiveEntries();
     

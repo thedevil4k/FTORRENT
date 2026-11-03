@@ -518,6 +518,10 @@ void AddTorrentDialog::updateSecurityPanel() {
             m_reputationSha = target.sha256;
             m_reputation = ReputationResult{};
         }
+        // The small print is not tied to a provider: it says which hash the
+        // metadata carries as soon as the selection is known.
+        m_torrentSha256 = target.sha256;
+        m_torrentSha256Path = target.path;
     }
 
     // An empty report means either "no metadata at all" or "the user
@@ -774,9 +778,18 @@ void AddTorrentDialog::refreshReputationLabel() {
     if (!m_reputationLabel) return;
 
     // Whichever explicit check ran last owns the line. Both say what they found
-    // and neither calls anything safe.
-    const std::string line =
+    // and neither calls anything safe. The small print follows: which hash the
+    // metadata carries, so the user can check it themselves, or that there is
+    // none to check.
+    std::string line =
         m_checkLine.empty() ? reputationLine(m_reputation) : m_checkLine;
+    const std::string hash = m_reputation.sha256.empty()
+                                 ? m_torrentSha256
+                                 : m_reputation.sha256;
+    line += "\n";
+    line += hashSmallPrint(hash, m_reputation.sha256.empty()
+                                     ? m_torrentSha256Path
+                                     : std::string());
     m_reputationLabel->copy_label(line.c_str());
     if (reputationHasDetections(m_reputation)) {
         m_reputationLabel->labelcolor(

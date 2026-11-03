@@ -118,6 +118,12 @@ struct SecurityReport {
     int videos = 0;
     int nativeExecutables = 0;
     int encrypted = 0;
+    // Whole-file SHA-256 the torrent metadata itself carries, and the file it
+    // belongs to. Empty when the metadata carries none: FTorrent never
+    // downloads a file just to compute a hash. The user is entitled to see
+    // which hash was used, whether or not a provider ever answers.
+    std::string sha256;
+    std::string sha256Path;
     int suspiciousNameCount = 0;
     std::string summary;
 

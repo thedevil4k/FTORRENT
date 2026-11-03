@@ -352,6 +352,33 @@ int main() {
            "a file list with no archive headers reports nothing encrypted");
     }
     {
+        // The whole-file hash in the metadata is what the small print shows.
+        // A file that can run wins: it is the hash whose reputation matters.
+        SecurityFile notes = file("docs/notes.txt");
+        notes.sha256 = std::string(64, 'a');
+        notes.sha256Complete = true;
+        SecurityFile setup = file("setup.exe");
+        setup.sha256 = std::string(64, 'b');
+        setup.sha256Complete = true;
+        const SecurityReport r = SecurityAnalyzer::analyze({notes, setup});
+        ok(r.sha256 == setup.sha256,
+           "the runnable file's hash is the one reported");
+        ok(r.sha256Path == "setup.exe", "and it names that file");
+
+        const SecurityReport onlyNotes = SecurityAnalyzer::analyze({notes});
+        ok(onlyNotes.sha256 == notes.sha256,
+           "a hash on a plain file is still reported");
+
+        // A partial hash (a v2 Merkle root, say) must never be presented as
+        // the file's SHA-256.
+        SecurityFile partial = file("big.bin");
+        partial.sha256 = std::string(64, 'c');
+        partial.sha256Complete = false;
+        const SecurityReport none = SecurityAnalyzer::analyze({partial});
+        ok(none.sha256.empty(),
+           "an incomplete hash is never shown as the file's own");
+    }
+    {
         // The badge shown before the file list is known comes from the title.
         // It is a hint, so the rule is deliberately narrow: the end of the name.
         ok(SecurityAnalyzer::titleSuggestsArchive(

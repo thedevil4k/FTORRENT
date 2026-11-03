@@ -470,6 +470,29 @@ int main() {
            "the plural wording follows the count");
     }
 
+    section("the hash in the small print");
+    {
+        // The user is entitled to know which hash was used, or that none was
+        // found. This line never depends on a provider having answered.
+        const std::string shown = hashSmallPrint(HASH, "setup.exe");
+        ok(contains(shown, HASH),
+           "the whole hash is printed, not a truncated one");
+        ok(contains(shown, "setup.exe"),
+           "and it names the file it belongs to");
+        ok(!contains(shown, "safe"),
+           "the small print never claims anything is safe");
+
+        const std::string withPath = hashSmallPrint(HASH);
+        ok(contains(withPath, HASH), "a hash with no path still prints");
+
+        const std::string none = hashSmallPrint("", "");
+        ok(contains(none, "none in the torrent metadata"),
+           "with no whole-file hash the line says so");
+        ok(contains(none, "never downloaded just to compute one"),
+           "and says the file is not downloaded to obtain it");
+        ok(!contains(none, "safe"), "and never says safe either");
+    }
+
     section("what may be hashed locally");
     {
         SecurityFile doneExe;
