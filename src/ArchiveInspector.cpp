@@ -85,6 +85,12 @@ struct WindowStream {
     std::string tail;   // At offset size - tail.size()
     std::int64_t pos = 0;
     char zeros[64 * 1024] = {};
+    // When set, bytes outside the two windows are fetched on demand instead of
+    // read as zeros. This is what lets libarchive walk a RAR 1.5-4.x archive:
+    // it skips the packed data and asks only for the next header.
+    const ArchiveInspector::RangeFetcher* fetch = nullptr;
+    std::string scratch;
+    std::string error;
 };
 
 la_ssize_t windowRead(archive*, void* client, const void** buffer)
@@ -113,7 +119,33 @@ la_ssize_t windowRead(archive*, void* client, const void** buffer)
         return take;
     }
 
-    // The gap: zeros, handed out in one fixed buffer.
+    // The gap: fetch it when the caller can, otherwise hand out zeros. The
+    // two-window check has no fetcher and relies on the zeros; a RAR 1.5-4.x
+    // walk has one and only pays for the pieces holding a header.
+    if (stream->fetch && *stream->fetch) {
+        const std::int64_t gap = tailStart - stream->pos;
+        const std::int64_t take = gap < static_cast<std::int64_t>(64 * 1024)
+                                      ? gap
+                                      : static_cast<std::int64_t>(64 * 1024);
+        std::string out;
+        std::string error;
+        if (!(*stream->fetch)(stream->pos, static_cast<std::size_t>(take), out,
+                              error) ||
+            out.empty()) {
+            stream->error = error.empty()
+                                ? "the archive bytes could not be fetched"
+                                : error;
+            return -1;
+        }
+        if (static_cast<std::int64_t>(out.size()) > take) {
+            out.resize(static_cast<std::size_t>(take));
+        }
+        stream->scratch = std::move(out);
+        *buffer = stream->scratch.data();
+        stream->pos += static_cast<std::int64_t>(stream->scratch.size());
+        return static_cast<la_ssize_t>(stream->scratch.size());
+    }
+
     const std::int64_t gap = tailStart - stream->pos;
     const la_ssize_t take = static_cast<la_ssize_t>(
         gap < static_cast<std::int64_t>(sizeof(stream->zeros))
@@ -171,6 +203,20 @@ bool isEncrypted(archive_entry* entry)
     (void)entry;
     return false;
 #endif
+}
+
+// libarchive's own words for "these headers need a password": RAR says "RAR
+// encryption support unavailable", ZIP says "Passphrase required". Only used
+// when nothing at all could be listed, so it can never turn a readable archive
+// into an encrypted one.
+bool looksEncrypted(const std::string& message)
+{
+    std::string lower = message;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower.find("encrypt") != std::string::npos ||
+           lower.find("passphrase") != std::string::npos ||
+           lower.find("password") != std::string::npos;
 }
 
 // The .exe rule, for the walk below, which is not a member function. Same
@@ -325,7 +371,7 @@ bool ArchiveInspector::readEntries(const std::string& archivePath,
 
 ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
     std::int64_t fileSize, const std::string& head, const std::string& tail,
-    const std::atomic<bool>* cancelled)
+    const std::atomic<bool>* cancelled, RangeFetcher fetch)
 {
     ListingAll result;
 #ifndef FTORRENT_HAVE_LIBARCHIVE
@@ -333,6 +379,7 @@ ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
     (void)head;
     (void)tail;
     (void)cancelled;
+    (void)fetch;
     result.error = "archive support is not available in this build";
     return result;
 #else
@@ -366,15 +413,43 @@ ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
     stream.size = fileSize;
     stream.head = head;
     stream.tail = tail;
+    if (fetch) stream.fetch = &fetch;
     archive_read_set_seek_callback(archive.get(), &windowSeek);
     if (archive_read_open2(archive.get(), &stream, nullptr, &windowRead,
                            &windowSkip, nullptr) != ARCHIVE_OK) {
-        result.error = archiveError(archive.get(), "could not open archive");
+        result.error = stream.error.empty()
+                           ? archiveError(archive.get(), "could not open archive")
+                           : stream.error;
         return result;
     }
     if (!readOpenArchive(archive.get(), false, result.entries, result.error,
                          cancelled)) {
+        // A failed fetch says more than libarchive's "truncated header": the
+        // caller stopped it on purpose (a piece budget, a timeout) or the
+        // network gave up, and that is the fact the user needs.
+        if (!stream.error.empty()) result.error = stream.error;
+        if (result.entries.empty() && looksEncrypted(result.error)) {
+            result.encryptedHeaders = true;
+        }
         return result;
+    }
+    // libarchive can also treat a failed read as the end of the archive and
+    // report success with whatever it read so far. That happened on a real
+    // 21 GB RAR 4 archive: 26 entries and a clean end, right after a piece
+    // timed out. The fetch failure is the truth, so the listing is partial.
+    if (!stream.error.empty()) {
+        result.error = stream.error;
+        return result;
+    }
+    if (result.entries.empty()) {
+        // An archive whose headers are encrypted opens with no entries and no
+        // error on some paths; libarchive's message is the only clue.
+        const char* message = archive_error_string(archive.get());
+        if (message && looksEncrypted(message)) {
+            result.error = message;
+            result.encryptedHeaders = true;
+            return result;
+        }
     }
     result.ok = true;
     return result;

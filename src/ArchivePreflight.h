@@ -11,17 +11,18 @@
 #include <vector>
 
 /**
- * @brief Reads an archive's index before the download, from two pieces.
+ * @brief Reads an archive's index before the download.
  *
  * ZIP keeps its central directory at the end of the file and RAR5 keeps headers
- * at both ends, so the first and the last piece are enough to list what an
- * archive contains - which is exactly what the user wants to know ("does this
- * rar hide an .exe?") without downloading the archive.
+ * at both ends, so the first and the last piece are enough to list what those
+ * archives contain - which is exactly what the user wants to know ("does this
+ * rar hide an .exe?") without downloading the archive. A RAR 1.5-4.x has no
+ * central index, so libarchive walks its headers and only the pieces holding a
+ * header are fetched, within a bounded budget.
  *
  * Only those pieces are fetched, and only when the user asks. They are written
- * to a temporary directory under the config folder, used to build a sparse file
- * of the real size with just those two windows filled, and deleted before the
- * call returns. Nothing is ever written to the download folder.
+ * to a temporary directory under the config folder and deleted before the call
+ * returns. Nothing is ever written to the download folder.
  */
 class ArchivePreflight {
 public:
@@ -66,16 +67,28 @@ public:
 
     // Fetch, assemble, list the entries, delete everything it created.
     // 'entries' receives every regular file name the index exposed.
+    //
+    // A ZIP or RAR5 lists from its two ends. A RAR 1.5-4.x has no central
+    // index, so libarchive walks its headers and the check fetches only the
+    // pieces that hold one. That walk is bounded: when it stops early because
+    // of its piece budget or its deadline, 'note' says so in one sentence and
+    // 'entries' still carries everything read up to that point.
+    //
+    // 'encryptedHeaders' is set when the archive could not be opened at all
+    // because its headers need a password: nothing can be listed, but the lock
+    // badge is then an honest fact rather than a guess.
     static bool inspect(const std::string& magnet,
                         const std::string& torrentPath, int fileIndex,
                         std::vector<SecurityFile>& entries, std::string& error,
                         const std::atomic<bool>* cancelled,
-                        int timeoutSeconds = 120);
+                        int timeoutSeconds = 120, std::string* note = nullptr,
+                        bool* encryptedHeaders = nullptr);
 
     static bool inspect(const lt::add_torrent_params& params, int fileIndex,
                         std::vector<SecurityFile>& entries,
                         std::string& error, const std::atomic<bool>* cancelled,
-                        int timeoutSeconds = 120);
+                        int timeoutSeconds = 120, std::string* note = nullptr,
+                        bool* encryptedHeaders = nullptr);
 
     // Same, from the bytes of a .torrent the app already holds: the file list
     // the search row resolved keeps them, so a check pays no metadata exchange
@@ -85,7 +98,9 @@ public:
                                std::vector<SecurityFile>& entries,
                                std::string& error,
                                const std::atomic<bool>* cancelled,
-                               int timeoutSeconds = 120);
+                               int timeoutSeconds = 120,
+                               std::string* note = nullptr,
+                               bool* encryptedHeaders = nullptr);
 
     // Root of the temporary directories. Cleaned up by inspect().
     static std::string tempRoot();

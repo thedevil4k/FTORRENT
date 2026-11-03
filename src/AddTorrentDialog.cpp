@@ -173,12 +173,13 @@ void AddTorrentDialog::createUI() {
     m_reputationLabel->labelsize(11);
     m_reputationLabel->copy_label(reputationLine(ReputationResult{}).c_str());
 
-    // Second explicit check: read a RAR/ZIP's index from its first and last
-    // piece. Disabled until there is an archive in the selection.
+    // Second explicit check: read a RAR/ZIP's index without downloading the
+    // archive. Disabled until there is an archive in the selection.
     m_checkArchive = new Fl_Button(260, y + 78, 200, 26, "Check archive");
     m_checkArchive->callback(onCheckArchive, this);
     m_checkArchive->tooltip(
-        "Downloads only the first and last piece of the archive to list what "
+        "Reads only the archive index (first and last piece for ZIP/RAR5, a "
+        "bounded header walk for older RAR) to list what "
         "is inside. Saved to a temporary folder and deleted afterwards.");
     m_checkArchive->deactivate();
 
@@ -651,7 +652,7 @@ void AddTorrentDialog::checkArchive() {
 
     m_archiveRunning = true;
     m_checkArchive->deactivate();
-    m_checkLine = "Archive: reading the first and last piece...";
+    m_checkLine = "Archive: reading the archive index...";
     refreshReputationLabel();
     // The previous answer described a check that is no longer the last word.
     m_archiveEntries.clear();
@@ -667,17 +668,19 @@ void AddTorrentDialog::checkArchive() {
                  body]() {
         std::vector<SecurityFile> entries;
         std::string error;
+        std::string note;
         std::atomic<bool> cancelled{false};
         bool ok = false;
         if (!body.empty()) {
             ok = ArchivePreflight::inspectTorrent(body, index, entries, error,
-                                                  &cancelled);
+                                                  &cancelled, 120, &note);
         }
         if (!ok && body.empty()) {
             ok = ArchivePreflight::inspect(magnet, torrentPath.empty()
                                                         ? torrentUrl
                                                         : torrentPath,
-                                           index, entries, error, &cancelled);
+                                           index, entries, error, &cancelled,
+                                           120, &note);
         }
 
         ArchiveCheckDelivery* delivery = new ArchiveCheckDelivery;
@@ -687,7 +690,9 @@ void AddTorrentDialog::checkArchive() {
             delivery->message =
                 "Archive: the index could not be read (" + error + ").";
         } else {
-            delivery->message = archiveSummary(path, entries);
+            delivery->message =
+                note.empty() ? archiveSummary(path, entries)
+                             : note + " " + archiveSummary(path, entries);
             delivery->entries = std::move(entries);
         }
         Fl::awake(&AddTorrentDialog::deliverArchiveCheck, delivery);

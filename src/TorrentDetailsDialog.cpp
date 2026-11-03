@@ -182,7 +182,8 @@ void TorrentDetailsDialog::createSecurityTab() {
     m_checkArchiveButton = new Fl_Button(440, 48, 140, 26, "Check archive");
     m_checkArchiveButton->callback(onCheckArchiveClicked, this);
     m_checkArchiveButton->tooltip(
-        "Fetches only the first and last piece of a RAR or ZIP to list what is "
+        "Reads only the index of a RAR or ZIP (two pieces for ZIP/RAR5, a "
+        "bounded header walk for older RAR) to list what is "
         "inside. The pieces go to a temporary folder and are deleted.");
     m_checkArchiveButton->deactivate();
 
@@ -416,7 +417,7 @@ void TorrentDetailsDialog::updateSecurity() {
         out << "\nArchive\n  "
             << SecurityBadge::displayText(
                    m_archiveRunning
-                       ? "Reading the first and last piece of the archive..."
+                       ? "Reading the archive index..."
                        : m_archiveLine)
             << "\n";
         // The entries the index lists, one per line. Names and sizes only:
@@ -527,14 +528,17 @@ void TorrentDetailsDialog::checkArchive() {
     std::thread([this, alive, cancel, params, index, path]() {
         std::vector<SecurityFile> entries;
         std::string error;
+        std::string note;
         const bool ok = ArchivePreflight::inspect(params, index, entries,
-                                                  error, cancel.get());
+                                                  error, cancel.get(), 120,
+                                                  &note);
 
         Delivery* delivery = new Delivery;
         delivery->dialog = this;
         delivery->alive = alive;
         delivery->line =
-            ok ? archiveSummary(path, entries)
+            ok ? (note.empty() ? archiveSummary(path, entries)
+                               : note + " " + archiveSummary(path, entries))
                : "Archive: the index could not be read (" + error + ").";
         if (ok) delivery->entries = std::move(entries);
         Fl::awake([](void* data) {

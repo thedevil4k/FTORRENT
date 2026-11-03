@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,10 @@ public:
     // the pre-download archive check, which analyzes all the names.
     struct ListingAll {
         bool ok = false;
+        // True when the archive could not be opened at all because its headers
+        // are encrypted. Nothing can be listed then, but the user must be told
+        // the archive is password-protected rather than broken.
+        bool encryptedHeaders = false;
         std::string error;
         std::vector<Entry> entries;
     };
@@ -67,18 +72,30 @@ public:
                                   const std::atomic<bool>* cancelled = nullptr);
 
     /**
-     * @brief List every regular file from the first and last bytes of an
-     *        archive, which is all the pre-download check fetches.
+     * @brief List every regular file from the bytes of an archive the caller
+     *        already holds or can fetch on demand.
      *
      * The archive never touches the disk: 'head' is served at offset 0, 'tail'
      * at the end of a file of 'fileSize' bytes, and the gap between them reads
-     * as zeros. That is exactly what a header walk needs, and it avoids writing
-     * a file of the real size first (on NTFS extending a normal file
-     * zero-fills the gap, so a 21 GB RAR meant 21 GB of writes).
+     * as zeros unless a 'fetch' callback is supplied. With one, libarchive can
+     * walk a RAR 1.5-4.x header chain and ask only for the pieces that hold a
+     * header, while skipping the packed data. That also avoids writing a file
+     * of the real size first (on NTFS extending a normal file zero-fills the
+     * gap, so a 21 GB RAR meant 21 GB of writes).
      */
+    // Asks for a byte range the windows do not cover. The pre-download check
+    // backs this with the pieces of the torrent, so a RAR 1.5-4.x archive can
+    // be walked header by header: libarchive skips the compressed data and only
+    // the pieces holding a header are ever fetched. Returning false with a
+    // non-empty 'error' stops the listing and that error is reported.
+    using RangeFetcher = std::function<bool(
+        std::int64_t offset, std::size_t length, std::string& out,
+        std::string& error)>;
+
     static ListingAll listEntriesFromWindows(
         std::int64_t fileSize, const std::string& head, const std::string& tail,
-        const std::atomic<bool>* cancelled = nullptr);
+        const std::atomic<bool>* cancelled = nullptr,
+        RangeFetcher fetch = {});
 
     /**
      * @brief Hash one .exe entry by its position in the archive.

@@ -37,6 +37,11 @@ const std::string USER_AGENT = Version::httpUserAgent();
 // arrived by then, the answer is "not now" and the torrent is dropped.
 const int METADATA_TIMEOUT_SECONDS = 25;
 
+// A RAR 1.5-4.x header walk asks for one piece per header region. One piece
+// that never arrives stops the walk instead of spending the whole deadline on
+// it, so the user still gets the entries read so far.
+const int PIECE_WAIT_SECONDS = 20;
+
 bool cancelled(const std::atomic<bool>* flag) {
     return flag && flag->load();
 }
@@ -106,18 +111,448 @@ std::string ArchivePreflight::tempRoot() {
     return (fs::path(SystemUtils::getConfigDir()) / "preflight").string();
 }
 
-bool ArchivePreflight::fetchSnippet(const std::string& magnet,
-                                    const std::string& torrentPathOrUrl,
-                                    int fileIndex, Snippet& out,
-                                    std::string& error,
-                                    const std::atomic<bool>* cancel,
-                                    int timeoutSeconds) {
-    lt::add_torrent_params atp;
+namespace {
+
+// One throwaway libtorrent session that reads arbitrary ranges of one file.
+// It started as the two-piece probe and now also backs the RAR 1.5-4.x header
+// walk: libarchive asks for a header, this fetches the piece that holds it and
+// skips over the compressed data, so the archive itself is never downloaded.
+class ProbeSession {
+public:
+    ProbeSession(const lt::add_torrent_params& params, int fileIndex,
+                 const std::atomic<bool>* cancel, int timeoutSeconds,
+                 std::string& error)
+        : m_cancel(cancel) {
+        if (fileIndex < 0) {
+            error = "no file to look at";
+            return;
+        }
+        if (cancelled(m_cancel)) {
+            error = "cancelled";
+            return;
+        }
+
+        std::error_code ec;
+        m_workDir = fs::path(ArchivePreflight::tempRoot()) /
+                    ("run-" + std::to_string(static_cast<unsigned long long>(
+                                  std::chrono::steady_clock::now()
+                                      .time_since_epoch()
+                                      .count())));
+        fs::create_directories(m_workDir, ec);
+        if (ec) {
+            error = "could not create the temporary folder: " + ec.message();
+            return;
+        }
+
+        lt::add_torrent_params atp = params;
+        atp.save_path = m_workDir.string();
+        if (atp.trackers.empty()) {
+            TorrentFileList::addDefaultTrackers(atp.trackers);
+        }
+        atp.flags &= ~(lt::torrent_flags::auto_managed |
+                       lt::torrent_flags::paused);
+
+        try {
+            const lt::session_params settings(probeSettings());
+            m_ses = std::make_unique<lt::session>(settings);
+            m_handle = m_ses->add_torrent(atp);
+        } catch (const std::exception& e) {
+            error = std::string("could not query the swarm: ") + e.what();
+            return;
+        }
+        if (!m_handle.is_valid()) {
+            error = "the torrent was rejected";
+            return;
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        m_deadline = now + std::chrono::seconds(timeoutSeconds);
+        const auto metadataDeadline =
+            now + std::chrono::seconds(std::min(timeoutSeconds,
+                                                METADATA_TIMEOUT_SECONDS));
+        while (std::chrono::steady_clock::now() < metadataDeadline) {
+            if (cancelled(m_cancel)) {
+                error = "cancelled";
+                return;
+            }
+            std::vector<lt::alert*> alerts;
+            m_ses->pop_alerts(&alerts);
+            m_info = m_handle.torrent_file();
+            if (m_info && m_info->num_files() > 0) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+        if (!m_info || m_info->num_files() <= 0) {
+            error = "no peers answered with the metadata";
+            return;
+        }
+
+#if LIBTORRENT_VERSION_NUM >= 20100
+        m_storage = &m_info->layout();
+#else
+        m_storage = &m_info->files();
+#endif
+        if (fileIndex >= m_storage->num_files()) {
+            error = "the file is not in the torrent";
+            return;
+        }
+
+        const lt::file_index_t index(fileIndex);
+        m_fileOffset = m_storage->file_offset(index);
+        m_fileSize = m_storage->file_size(index);
+        m_pieceLength = m_info->piece_length();
+        m_pieceCount = m_info->num_pieces();
+        m_range = ArchivePreflight::computeRange(
+            m_fileOffset, m_fileSize, m_pieceLength, m_info->total_size());
+
+        // Every file at zero: the check must never pull the file it describes.
+        // Pieces are wanted on their own through piece priorities, which
+        // override the file priorities.
+        std::vector<lt::download_priority_t> priorities(
+            static_cast<std::size_t>(m_storage->num_files()),
+            lt::download_priority_t(0));
+        m_handle.prioritize_files(priorities);
+
+        // Endpoints handed to the probe directly are remembered too, so the
+        // revival below has something to reconnect to if the swarm never
+        // reported a connected peer.
+        for (const lt::tcp::endpoint& endpoint : params.peers) {
+            rememberPeer(endpoint);
+        }
+
+        m_ok = true;
+    }
+
+    ~ProbeSession() {
+        if (m_ses && m_handle.is_valid()) {
+            m_ses->remove_torrent(m_handle, lt::session_handle::delete_files);
+        }
+        if (m_ses) {
+            // The session is torn down here instead of in the member
+            // destructor so the torrent is gone first: removing a torrent from
+            // a session that is already shutting down blocked the caller.
+            m_ses.reset();
+        }
+        if (!m_workDir.empty()) {
+            std::error_code ignored;
+            fs::remove_all(m_workDir, ignored);
+        }
+    }
+
+    bool ok() const { return m_ok; }
+    std::int64_t fileSize() const { return m_fileSize; }
+    int pieceLength() const { return m_pieceLength; }
+    int fetchedPieces() const { return m_fetchedPieces; }
+
+    // At most this many distinct pieces may be fetched. Zero means no limit.
+    void setPieceBudget(int pieces) { m_budget = pieces; }
+
+    bool readFirst(std::string& out, std::string& error) {
+        if (!waitForPiece(m_range.firstPiece, error)) return false;
+        const std::string& piece = m_cache[m_range.firstPiece];
+        if (m_range.firstOffset + m_range.firstLength >
+            static_cast<int>(piece.size())) {
+            error = "the first piece is shorter than expected";
+            return false;
+        }
+        out = piece.substr(static_cast<std::size_t>(m_range.firstOffset),
+                           static_cast<std::size_t>(m_range.firstLength));
+        return true;
+    }
+
+    bool readLast(std::string& out, std::string& error) {
+        if (!waitForPiece(m_range.lastPiece, error)) return false;
+        const std::string& piece = m_cache[m_range.lastPiece];
+        if (m_range.lastOffset + m_range.lastLength >
+            static_cast<int>(piece.size())) {
+            error = "the last piece is shorter than expected";
+            return false;
+        }
+        out = piece.substr(static_cast<std::size_t>(m_range.lastOffset),
+                           static_cast<std::size_t>(m_range.lastLength));
+        return true;
+    }
+
+    // Reads bytes relative to the start of the archive file, for libarchive.
+    bool readArchiveRange(std::int64_t offset, std::size_t length,
+                          std::string& out, std::string& error) {
+        if (offset < 0 || length == 0 ||
+            offset > m_fileSize ||
+            static_cast<std::int64_t>(length) > m_fileSize - offset) {
+            error = "the archive asked for bytes outside the file";
+            return false;
+        }
+        out.clear();
+        out.reserve(length);
+        std::size_t done = 0;
+        while (done < length) {
+            const std::int64_t absolute =
+                m_fileOffset + offset + static_cast<std::int64_t>(done);
+            const int piece = static_cast<int>(absolute / m_pieceLength);
+            const std::size_t inPiece =
+                static_cast<std::size_t>(absolute % m_pieceLength);
+            if (!waitForPiece(piece, error, PIECE_WAIT_SECONDS)) return false;
+            const std::string& bytes = m_cache[piece];
+            if (inPiece >= bytes.size()) {
+                error = "the fetched piece is shorter than expected";
+                return false;
+            }
+            const std::size_t take =
+                std::min(length - done, bytes.size() - inPiece);
+            out.append(bytes, inPiece, take);
+            done += take;
+        }
+        return true;
+    }
+
+private:
+    // Pieces are read forward, so the oldest ones can go: the bytes stay in the
+    // temporary storage and are read back from disk if the archive ever asks
+    // for them again, which costs no network. The cap keeps a 16 MiB-piece
+    // torrent from turning a bounded check into a gigabyte of memory.
+    static constexpr std::size_t CACHE_LIMIT_BYTES = 128u * 1024u * 1024u;
+
+    void storePiece(int index, std::string bytes) {
+        m_cacheBytes += bytes.size();
+        m_cache[index] = std::move(bytes);
+        while (m_cacheBytes > CACHE_LIMIT_BYTES && m_cache.size() > 1) {
+            auto oldest = m_cache.begin();
+            if (oldest->first == index) ++oldest;
+            if (oldest == m_cache.end()) break;
+            m_cacheBytes -= oldest->second.size();
+            m_cache.erase(oldest);
+        }
+    }
+
+    void collectAlerts() {
+        std::vector<lt::alert*> alerts;
+        m_ses->pop_alerts(&alerts);
+        for (lt::alert* alert : alerts) {
+            if (auto* read = lt::alert_cast<lt::read_piece_alert>(alert)) {
+                if (read->error || !read->buffer) continue;
+                storePiece(static_cast<int>(read->piece),
+                           std::string(read->buffer.get(),
+                                       static_cast<std::size_t>(read->size)));
+            }
+        }
+    }
+
+    // With every file deselected the initial check ends with the torrent
+    // "finished": nothing is wanted. A piece priority set before that point is
+    // wiped by the check, and the torrent then sits finished, never contacting
+    // a peer, until the caller gives up. Measuring it on a local seeder showed
+    // exactly that: piece 0 never arrived, read_piece failed, and the check
+    // waited out its whole timeout. Waiting for the check to settle and then
+    // asking for the piece revives the torrent and downloads only that piece.
+    void settleFilePriorities() {
+        if (m_settled) return;
+        const auto until =
+            std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (std::chrono::steady_clock::now() < until) {
+            const lt::torrent_status status = m_handle.status();
+            if (status.is_finished ||
+                status.state == lt::torrent_status::finished ||
+                status.state == lt::torrent_status::seeding) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        m_settled = true;
+    }
+
+    // Every piece asked for is recorded here, whether it is cached, still on
+    // disk, or still in flight.
+    std::map<int, bool> m_asked;
+
+    // Asks the swarm for one piece. The piece is wanted on its own: every file
+    // stays at priority zero, so nothing but the pieces asked for here is ever
+    // fetched.
+    //
+    // For a moment after its initial check libtorrent has no piece layer yet
+    // and throws "a piece layer is invalid" (libtorrent:215) at the caller.
+    // That is a transient state, not a failure, so the request is retried.
+    bool requestPiece(int piece) {
+        for (int attempt = 0; attempt < 10; ++attempt) {
+            try {
+                m_handle.piece_priority(lt::piece_index_t(piece),
+                                        lt::download_priority_t(4));
+                m_handle.set_piece_deadline(
+                    lt::piece_index_t(piece), 0,
+                    lt::torrent_handle::alert_when_available);
+            } catch (const std::exception&) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+            m_asked[piece] = true;
+            ++m_fetchedPieces;
+            m_lastAsk = std::chrono::steady_clock::now();
+            return true;
+        }
+        return false;
+    }
+
+    void rememberPeer(const lt::tcp::endpoint& endpoint) {
+        if (endpoint.port() == 0) return;
+        if (std::find(m_seenPeers.begin(), m_seenPeers.end(), endpoint) !=
+            m_seenPeers.end()) {
+            return;
+        }
+        if (m_seenPeers.size() < MAX_SEEN_PEERS) m_seenPeers.push_back(endpoint);
+    }
+
+    // With every file deselected libtorrent marks the torrent "finished" as
+    // soon as the last wanted piece arrives, and a finished torrent drops its
+    // peers and then ignores connect_peer for endpoints it already tried: on a
+    // local seeder the first piece arrived in 0.3 s and every later piece never
+    // did, with connect_peer called again every half second. Clearing the peer
+    // list first makes the same endpoints connect again, and costs nothing else.
+    // The peers are remembered while they are still connected, because once the
+    // torrent is finished the list is already empty.
+    void reviveSwarm(bool force = false) {
+        const auto now = std::chrono::steady_clock::now();
+        if (!force && now - m_lastRevive < std::chrono::milliseconds(250)) {
+            return;
+        }
+        m_lastRevive = now;
+
+        std::vector<lt::peer_info> connected;
+        try {
+            m_handle.get_peer_info(connected);
+        } catch (const std::exception&) {
+            // For a moment right after the check finishes, libtorrent has no
+            // piece layer yet and refuses to report peers. There is nothing to
+            // do but wait for the next attempt.
+            return;
+        }
+        for (const lt::peer_info& peer : connected) {
+            rememberPeer(peer.remote_endpoint());
+        }
+        if (!connected.empty() || m_seenPeers.empty()) return;
+
+        try {
+            m_handle.clear_peers();
+            for (const lt::tcp::endpoint& endpoint : m_seenPeers) {
+                m_handle.connect_peer(endpoint);
+            }
+        } catch (const std::exception&) {
+            // Same transient state as above: the next attempt tries again.
+        }
+    }
+
+    bool waitForPiece(int piece, std::string& error, int maxWaitSeconds = 0) {
+        if (m_cache.count(piece)) return true;
+        if (cancelled(m_cancel)) {
+            error = "cancelled";
+            return false;
+        }
+        if (piece < 0 || piece >= m_pieceCount) {
+            error = "the archive points outside the torrent";
+            return false;
+        }
+
+        const bool alreadyAsked = m_asked.count(piece) != 0;
+        if (!alreadyAsked) {
+            settleFilePriorities();
+            if (m_budget > 0 && m_fetchedPieces >= m_budget) {
+                m_budgetHit = true;
+                error = "the archive header walk reached its piece budget";
+                return false;
+            }
+            // The first request only needs the check to have settled: the
+            // torrent has just started and its peers are still connecting.
+            // Later ones come after a piece was already delivered, which is
+            // exactly when libtorrent has marked the torrent finished.
+            reviveSwarm(true);
+            if (!requestPiece(piece)) {
+                error = "the torrent would not accept the request for a piece";
+                return false;
+            }
+        }
+
+        bool askedForRead = false;
+        // One piece that never arrives must not eat the whole deadline: the
+        // walk stops there, says so, and keeps what it already read.
+        const auto pieceDeadline =
+            maxWaitSeconds > 0
+                ? std::min(m_deadline,
+                           std::chrono::steady_clock::now() +
+                               std::chrono::seconds(maxWaitSeconds))
+                : m_deadline;
+        while (std::chrono::steady_clock::now() < pieceDeadline) {
+            if (cancelled(m_cancel)) {
+                error = "cancelled";
+                return false;
+            }
+            collectAlerts();
+            if (m_cache.count(piece)) return true;
+            reviveSwarm();
+
+            // A piece already on disk produces no deadline alert; ask for its
+            // bytes directly. This only reads what is there.
+            if (!askedForRead && m_handle.have_piece(lt::piece_index_t(piece))) {
+                m_handle.read_piece(lt::piece_index_t(piece));
+                askedForRead = true;
+            }
+
+            const auto now = std::chrono::steady_clock::now();
+            if (now - m_lastAsk >= std::chrono::seconds(5)) {
+                // A deadline set before the torrent finished starting is
+                // answered with an error and never retried.
+                m_handle.set_piece_deadline(
+                    lt::piece_index_t(piece), 0,
+                    lt::torrent_handle::alert_when_available);
+                m_lastAsk = now;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(120));
+        }
+
+        if (cancelled(m_cancel)) {
+            error = "cancelled";
+        } else if (m_budgetHit) {
+            error = "the archive header walk reached its piece budget";
+        } else {
+            error = "the archive headers did not arrive in time";
+        }
+        return false;
+    }
+
+    const std::atomic<bool>* m_cancel = nullptr;
+    std::unique_ptr<lt::session> m_ses;
+    lt::torrent_handle m_handle;
+    std::shared_ptr<const lt::torrent_info> m_info;
+    const lt::file_storage* m_storage = nullptr;
+    fs::path m_workDir;
+    ArchivePreflight::PieceRange m_range;
+    std::int64_t m_fileOffset = 0;
+    std::int64_t m_fileSize = 0;
+    int m_pieceLength = 0;
+    int m_pieceCount = 0;
+    int m_budget = 0;
+    int m_fetchedPieces = 0;
+    bool m_budgetHit = false;
+    bool m_settled = false;
+    bool m_ok = false;
+    std::map<int, std::string> m_cache;
+    std::size_t m_cacheBytes = 0;
+    static constexpr std::size_t MAX_SEEN_PEERS = 40;
+    std::vector<lt::tcp::endpoint> m_seenPeers;
+    std::chrono::steady_clock::time_point m_lastRevive{};
+    std::chrono::steady_clock::time_point m_deadline;
+    std::chrono::steady_clock::time_point m_lastAsk;
+};
+
+} // namespace
+
+namespace {
+
+// Builds the torrent parameters from whichever source the row has: a .torrent
+// URL, a local file, or a magnet. A downloaded .torrent is checked against the
+// magnet's info hash before its bytes are trusted.
+bool loadTorrentSource(const std::string& magnet,
+                       const std::string& torrentPathOrUrl,
+                       lt::add_torrent_params& atp, std::string& error) {
     std::string fileError;
     bool haveFile = false;
 
-    // A row can now offer its .torrent link, and that is the cheap path: no
-    // metadata exchange with the swarm at all.
     if (torrentPathOrUrl.rfind("https://", 0) == 0) {
         HttpClient::Response res =
             HttpClient::get(torrentPathOrUrl, USER_AGENT, 15);
@@ -168,6 +603,19 @@ bool ArchivePreflight::fetchSnippet(const std::string& magnet,
         }
         TorrentFileList::addDefaultTrackers(atp.trackers);
     }
+    return true;
+}
+
+} // namespace
+
+bool ArchivePreflight::fetchSnippet(const std::string& magnet,
+                                    const std::string& torrentPathOrUrl,
+                                    int fileIndex, Snippet& out,
+                                    std::string& error,
+                                    const std::atomic<bool>* cancel,
+                                    int timeoutSeconds) {
+    lt::add_torrent_params atp;
+    if (!loadTorrentSource(magnet, torrentPathOrUrl, atp, error)) return false;
     return fetchSnippet(atp, fileIndex, out, error, cancel, timeoutSeconds);
 }
 
@@ -177,224 +625,17 @@ bool ArchivePreflight::fetchSnippet(const lt::add_torrent_params& params,
                                     const std::atomic<bool>* cancel,
                                     int timeoutSeconds) {
     out = Snippet{};
-    if (fileIndex < 0) {
-        error = "no file to look at";
-        return false;
-    }
-    if (cancelled(cancel)) {
-        error = "cancelled";
-        return false;
-    }
+    error.clear();
 
-    // The pieces go into a directory of their own, and it is deleted below.
-    std::error_code ec;
-    const fs::path workDir =
-        fs::path(tempRoot()) /
-        ("run-" + std::to_string(static_cast<unsigned long long>(
-                      std::chrono::steady_clock::now().time_since_epoch().count())));
-    fs::create_directories(workDir, ec);
-    if (ec) {
-        error = "could not create the temporary folder: " + ec.message();
-        return false;
-    }
+    // One session reads the pieces, whichever format the archive is: the first
+    // and the last piece are all a ZIP or a RAR5 needs, and a RAR 1.5-4.x walk
+    // uses the same session piece by piece.
+    ProbeSession probe(params, fileIndex, cancel, timeoutSeconds, error);
+    if (!probe.ok()) return false;
 
-    auto cleanup = [&]() {
-        std::error_code ignored;
-        fs::remove_all(workDir, ignored);
-    };
-
-    lt::add_torrent_params atp = params;
-    // The probe owns where the pieces go; whatever the caller had is replaced.
-    atp.save_path = workDir.string();
-    // A .torrent rebuilt from metadata carries no announce list, and a torrent
-    // with none can only find peers over DHT. The public trackers are added the
-    // same way the magnet path adds them, so a check does not depend on the DHT
-    // alone.
-    if (atp.trackers.empty()) TorrentFileList::addDefaultTrackers(atp.trackers);
-    // Nothing but the two pieces below is wanted: every file starts at zero
-    // priority, so no other piece is ever requested.
-    atp.flags &= ~(lt::torrent_flags::auto_managed | lt::torrent_flags::paused);
-
-    const lt::session_params sessionSettings(probeSettings());
-    lt::session ses(sessionSettings);
-    lt::torrent_handle handle;
-    try {
-        handle = ses.add_torrent(atp);
-    } catch (const std::exception& e) {
-        error = std::string("could not query the swarm: ") + e.what();
-        cleanup();
-        return false;
-    }
-    if (!handle.is_valid()) {
-        error = "the torrent was rejected";
-        cleanup();
-        return false;
-    }
-
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::seconds(timeoutSeconds);
-    std::shared_ptr<const lt::torrent_info> info;
-    const auto metadataDeadline = std::chrono::steady_clock::now() +
-                                  std::chrono::seconds(
-                                      std::min(timeoutSeconds,
-                                               METADATA_TIMEOUT_SECONDS));
-    while (std::chrono::steady_clock::now() < metadataDeadline) {
-        if (cancelled(cancel)) {
-            error = "cancelled";
-            break;
-        }
-        std::vector<lt::alert*> alerts;
-        ses.pop_alerts(&alerts);
-        info = handle.torrent_file();
-        if (info && info->num_files() > 0) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    }
-    if (!info || info->num_files() <= 0) {
-        if (error.empty()) error = "no peers answered with the metadata";
-        ses.remove_torrent(handle, lt::session_handle::delete_files);
-        cleanup();
-        return false;
-    }
-
-#if LIBTORRENT_VERSION_NUM >= 20100
-    const lt::file_storage& storage = info->layout();
-#else
-    const lt::file_storage& storage = info->files();
-#endif
-    if (fileIndex >= storage.num_files()) {
-        error = "the file is not in the torrent";
-        ses.remove_torrent(handle, lt::session_handle::delete_files);
-        cleanup();
-        return false;
-    }
-
-    const lt::file_index_t index(fileIndex);
-    const std::int64_t fileOffset = storage.file_offset(index);
-    const std::int64_t fileSize = storage.file_size(index);
-    const int pieceLength = info->piece_length();
-    out.fileSize = fileSize;
-
-    const PieceRange range =
-        computeRange(fileOffset, fileSize, pieceLength, info->total_size());
-
-    // Every file at zero: the check must never pull the file it is describing.
-    // The two pieces are then wanted on their own, through piece priorities,
-    // which override the file priorities. Asking for a deadline alone does
-    // nothing when every file is deselected: libtorrent rejected the request
-    // ("invalid piece index in slot list") and the check waited out its timeout
-    // on every torrent. Measured on a 20 GB RAR with 10 seeds: piece priorities
-    // delivered both pieces and pulled 3.9 MiB in total.
-    std::vector<lt::download_priority_t> priorities(
-        static_cast<std::size_t>(storage.num_files()),
-        lt::download_priority_t(0));
-    handle.prioritize_files(priorities);
-    const lt::download_priority_t wanted(4);   // libtorrent's "normal"
-    handle.piece_priority(lt::piece_index_t(range.firstPiece), wanted);
-    if (range.lastPiece != range.firstPiece) {
-        handle.piece_priority(lt::piece_index_t(range.lastPiece), wanted);
-    }
-
-    std::map<int, std::string> pieces;
-    auto collectAlerts = [&]() {
-        std::vector<lt::alert*> alerts;
-        ses.pop_alerts(&alerts);
-        for (lt::alert* alert : alerts) {
-            if (auto* read = lt::alert_cast<lt::read_piece_alert>(alert)) {
-                if (read->error || !read->buffer) continue;
-                pieces[static_cast<int>(read->piece)] =
-                    std::string(read->buffer.get(),
-                                static_cast<std::size_t>(read->size));
-            }
-        }
-    };
-    auto havePiece = [&](int piece) {
-        return pieces.count(piece) != 0 ||
-               handle.have_piece(lt::piece_index_t(piece));
-    };
-
-    // The deadline is the only thing asked for here, and it is asked again
-    // every few seconds: a deadline set before the torrent has finished
-    // starting is answered at once with an error and never retried, which is
-    // also why the very first request often does nothing.
-    bool asked = false;
-    auto lastAsk = std::chrono::steady_clock::now() - std::chrono::seconds(10);
-    while (std::chrono::steady_clock::now() < deadline && !cancelled(cancel)) {
-        collectAlerts();
-        if (havePiece(range.firstPiece) && havePiece(range.lastPiece)) break;
-
-        const auto now = std::chrono::steady_clock::now();
-        if (!asked || now - lastAsk >= std::chrono::seconds(5)) {
-            if (!havePiece(range.firstPiece)) {
-                handle.set_piece_deadline(
-                    lt::piece_index_t(range.firstPiece), 0,
-                    lt::torrent_handle::alert_when_available);
-            }
-            if (range.lastPiece != range.firstPiece &&
-                !havePiece(range.lastPiece)) {
-                handle.set_piece_deadline(
-                    lt::piece_index_t(range.lastPiece), 0,
-                    lt::torrent_handle::alert_when_available);
-            }
-            asked = true;
-            lastAsk = now;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(120));
-    }
-
-    // A piece that is already on disk no longer produces a deadline alert, so
-    // the bytes are asked for directly. This only reads what is there: the
-    // download itself was driven by the deadline above.
-    for (int piece : {range.firstPiece, range.lastPiece}) {
-        if (pieces.count(piece) || !handle.have_piece(lt::piece_index_t(piece))) {
-            continue;
-        }
-        handle.read_piece(lt::piece_index_t(piece));
-        const auto readUntil = std::chrono::steady_clock::now() +
-                               std::chrono::seconds(10);
-        while (std::chrono::steady_clock::now() < readUntil &&
-               !pieces.count(piece)) {
-            collectAlerts();
-            if (pieces.count(piece)) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(120));
-        }
-    }
-
-    bool ok = true;
-    if (cancelled(cancel)) {
-        error = "cancelled";
-        ok = false;
-    } else if (!pieces.count(range.firstPiece) ||
-               !pieces.count(range.lastPiece)) {
-        error = "the first and last pieces did not arrive in time";
-        ok = false;
-    }
-
-    if (ok) {
-        const std::string& first = pieces[range.firstPiece];
-        if (range.firstOffset + range.firstLength >
-            static_cast<int>(first.size())) {
-            error = "the first piece is shorter than expected";
-            ok = false;
-        } else {
-            out.head = first.substr(static_cast<std::size_t>(range.firstOffset),
-                                    static_cast<std::size_t>(range.firstLength));
-        }
-    }
-    if (ok) {
-        const std::string& last = pieces[range.lastPiece];
-        if (range.lastOffset + range.lastLength >
-            static_cast<int>(last.size())) {
-            error = "the last piece is shorter than expected";
-            ok = false;
-        } else {
-            out.tail = last.substr(static_cast<std::size_t>(range.lastOffset),
-                                   static_cast<std::size_t>(range.lastLength));
-        }
-    }
-
-    ses.remove_torrent(handle, lt::session_handle::delete_files);
-    cleanup();
-    return ok;
+    out.fileSize = probe.fileSize();
+    if (!probe.readFirst(out.head, error)) return false;
+    return probe.readLast(out.tail, error);
 }
 
 namespace {
@@ -435,10 +676,29 @@ std::string readableIndexError(const std::string& raw) {
 const char* OLD_RAR_SIGNATURE = "\x52\x61\x72\x21\x1a\x07\x00";
 const std::size_t OLD_RAR_SIGNATURE_SIZE = 7;
 
+bool hasOldRarSignature(const std::string& bytes) {
+    return bytes.size() >= OLD_RAR_SIGNATURE_SIZE &&
+           bytes.compare(0, OLD_RAR_SIGNATURE_SIZE, OLD_RAR_SIGNATURE,
+                         OLD_RAR_SIGNATURE_SIZE) == 0;
+}
+
 bool isOldRar(const ArchivePreflight::Snippet& snippet) {
-    if (snippet.head.size() < OLD_RAR_SIGNATURE_SIZE) return false;
-    return snippet.head.compare(0, OLD_RAR_SIGNATURE_SIZE, OLD_RAR_SIGNATURE,
-                                OLD_RAR_SIGNATURE_SIZE) == 0;
+    return hasOldRarSignature(snippet.head);
+}
+
+// Copies what an index exposed into the entries the UI shows. The encrypted
+// flag is carried through: this is the only point in the app where an archive
+// header is actually read before a download.
+void copyListing(const ArchiveInspector::ListingAll& listing,
+                 std::vector<SecurityFile>& entries) {
+    entries.reserve(listing.entries.size());
+    for (const ArchiveInspector::Entry& entry : listing.entries) {
+        SecurityFile file;
+        file.path = entry.path;
+        file.size = static_cast<std::int64_t>(entry.size);
+        file.encrypted = entry.encrypted;
+        entries.push_back(std::move(file));
+    }
 }
 
 // Lists the index straight from the two windows. Nothing is written anywhere:
@@ -447,34 +707,59 @@ bool isOldRar(const ArchivePreflight::Snippet& snippet) {
 // pieces had already arrived.
 bool listSnippet(const ArchivePreflight::Snippet& snippet,
                  std::vector<SecurityFile>& entries, std::string& error,
-                 const std::atomic<bool>* cancel) {
+                 const std::atomic<bool>* cancel,
+                 bool* encryptedHeaders = nullptr) {
     if (isOldRar(snippet)) {
-        error = "this is a RAR 1.5-4.x archive: it keeps its headers spread "
-                "through the file, so it cannot be listed from its first and "
-                "last piece";
+        error = "this is a RAR 1.5-4.x archive: it has no central index, so it "
+                "needs the bounded header walk";
         return false;
     }
 
     const ArchiveInspector::ListingAll listing =
         ArchiveInspector::listEntriesFromWindows(snippet.fileSize, snippet.head,
                                                  snippet.tail, cancel);
+    if (encryptedHeaders) *encryptedHeaders = listing.encryptedHeaders;
     if (!listing.ok) {
-        error = readableIndexError(listing.error);
+        error = listing.encryptedHeaders
+                    ? "the archive headers are encrypted, so its contents "
+                      "cannot be listed before downloading it"
+                    : readableIndexError(listing.error);
         return false;
     }
 
-    entries.reserve(listing.entries.size());
-    for (const ArchiveInspector::Entry& entry : listing.entries) {
-        SecurityFile file;
-        file.path = entry.path;
-        file.size = static_cast<std::int64_t>(entry.size);
-        // Carried through so the row can say the archive is
-        // password-protected: this is the only point in the app where an
-        // archive header is actually read before a download.
-        file.encrypted = entry.encrypted;
-        entries.push_back(std::move(file));
-    }
+    copyListing(listing, entries);
     return true;
+}
+
+} // namespace
+
+namespace {
+
+// A RAR 1.5-4.x has no central index, so the walk can be long. It is allowed a
+// tenth of the archive's own pieces, capped at 64 (128 MiB with 2 MiB pieces):
+// the user gets the first entries and a note instead of a hidden full download.
+int oldRarPieceBudget(std::int64_t fileSize, int pieceLength) {
+    if (fileSize <= 0 || pieceLength <= 0) return 0;
+    const int archivePieces =
+        static_cast<int>((fileSize + pieceLength - 1) / pieceLength);
+    const int byFraction = std::max(2, archivePieces / 10);
+    return std::min(64, byFraction);
+}
+
+std::string partialRarNote(const ArchiveInspector::ListingAll& listing,
+                           int fetchedPieces, int pieceLength) {
+    const long long mib = static_cast<long long>(fetchedPieces) *
+                          static_cast<long long>(pieceLength) /
+                          (1024LL * 1024LL);
+    std::string note =
+        "RAR 1.5-4.x has no central index, so this is a partial list: " +
+        std::to_string(listing.entries.size()) + " entries read from headers";
+    if (mib > 0) note += " (" + std::to_string(mib) + " MiB fetched)";
+    note += ". ";
+    note += listing.error.empty() ? "The header walk stopped early."
+                                  : "The header walk stopped early: " +
+                                        listing.error + ".";
+    return note;
 }
 
 } // namespace
@@ -484,21 +769,12 @@ bool ArchivePreflight::inspect(const std::string& magnet,
                                std::vector<SecurityFile>& entries,
                                std::string& error,
                                const std::atomic<bool>* cancel,
-                               int timeoutSeconds) {
-    entries.clear();
-    error.clear();
-
-    if (!ArchiveInspector::isAvailable()) {
-        error = "archive support is not available in this build";
-        return false;
-    }
-
-    Snippet snippet;
-    if (!fetchSnippet(magnet, torrentPath, fileIndex, snippet, error, cancel,
-                      timeoutSeconds)) {
-        return false;
-    }
-    return listSnippet(snippet, entries, error, cancel);
+                               int timeoutSeconds, std::string* note,
+                               bool* encryptedHeaders) {
+    lt::add_torrent_params atp;
+    if (!loadTorrentSource(magnet, torrentPath, atp, error)) return false;
+    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds,
+                   note, encryptedHeaders);
 }
 
 bool ArchivePreflight::inspect(const lt::add_torrent_params& params,
@@ -506,21 +782,69 @@ bool ArchivePreflight::inspect(const lt::add_torrent_params& params,
                                std::vector<SecurityFile>& entries,
                                std::string& error,
                                const std::atomic<bool>* cancel,
-                               int timeoutSeconds) {
+                               int timeoutSeconds, std::string* note,
+                               bool* encryptedHeaders) {
     entries.clear();
     error.clear();
+    if (note) note->clear();
+    if (encryptedHeaders) *encryptedHeaders = false;
 
     if (!ArchiveInspector::isAvailable()) {
         error = "archive support is not available in this build";
         return false;
     }
 
-    Snippet snippet;
-    if (!fetchSnippet(params, fileIndex, snippet, error, cancel,
-                      timeoutSeconds)) {
-        return false;
+    ProbeSession probe(params, fileIndex, cancel, timeoutSeconds, error);
+    if (!probe.ok()) return false;
+
+    // The first piece also decides the format: RAR 1.5-4.x keeps its headers
+    // interleaved with the data, so it gets the header walk below. ZIP and
+    // RAR5 still pay only their two ends.
+    std::string head;
+    if (!probe.readFirst(head, error)) return false;
+
+    if (hasOldRarSignature(head)) {
+        probe.setPieceBudget(
+            oldRarPieceBudget(probe.fileSize(), probe.pieceLength()));
+        const ArchiveInspector::ListingAll listing =
+            ArchiveInspector::listEntriesFromWindows(
+                probe.fileSize(), head, "", cancel,
+                [&probe](std::int64_t offset, std::size_t length,
+                         std::string& out, std::string& fetchError) {
+                    return probe.readArchiveRange(offset, length, out,
+                                                  fetchError);
+                });
+
+        if (encryptedHeaders) *encryptedHeaders = listing.encryptedHeaders;
+
+        if (listing.entries.empty()) {
+            error = listing.encryptedHeaders
+                        ? "the archive headers are encrypted, so its contents "
+                          "cannot be listed before downloading it"
+                        : (listing.ok
+                               ? "the archive lists no files"
+                               : (listing.error.empty()
+                                      ? "the archive index could not be read"
+                                      : listing.error));
+            return false;
+        }
+
+        copyListing(listing, entries);
+        if (!listing.ok && note) {
+            *note = partialRarNote(listing, probe.fetchedPieces(),
+                                   probe.pieceLength());
+        }
+        return true;
     }
-    return listSnippet(snippet, entries, error, cancel);
+
+    std::string tail;
+    if (!probe.readLast(tail, error)) return false;
+
+    Snippet snippet;
+    snippet.fileSize = probe.fileSize();
+    snippet.head = std::move(head);
+    snippet.tail = std::move(tail);
+    return listSnippet(snippet, entries, error, cancel, encryptedHeaders);
 }
 
 bool ArchivePreflight::inspectTorrent(const std::string& torrentBody,
@@ -528,9 +852,12 @@ bool ArchivePreflight::inspectTorrent(const std::string& torrentBody,
                                       std::vector<SecurityFile>& entries,
                                       std::string& error,
                                       const std::atomic<bool>* cancel,
-                                      int timeoutSeconds) {
+                                      int timeoutSeconds, std::string* note,
+                                      bool* encryptedHeaders) {
     entries.clear();
     error.clear();
+    if (note) note->clear();
+    if (encryptedHeaders) *encryptedHeaders = false;
 
     if (torrentBody.empty()) {
         error = "no torrent metadata to check";
@@ -549,5 +876,6 @@ bool ArchivePreflight::inspectTorrent(const std::string& torrentBody,
         error = "the torrent metadata carries no file list";
         return false;
     }
-    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds);
+    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds,
+                   note);
 }

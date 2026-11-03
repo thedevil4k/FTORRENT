@@ -389,23 +389,31 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
                  torrentBody]() {
         std::vector<SecurityFile> entries;
         std::string error;
+        std::string note;
+        bool encryptedHeaders = false;
         std::atomic<bool> cancelled{false};
         const bool ok = !torrentBody.empty()
                             ? ArchivePreflight::inspectTorrent(
-                                  torrentBody, index, entries, error, &cancelled)
+                                  torrentBody, index, entries, error,
+                                  &cancelled, 120, &note, &encryptedHeaders)
                             : ArchivePreflight::inspect(magnet, torrentUrl,
                                                         index, entries, error,
-                                                        &cancelled);
+                                                        &cancelled, 120, &note,
+                                                        &encryptedHeaders);
 
         Delivery* delivery = new Delivery;
         delivery->widget = self;
         delivery->alive = alive;
         delivery->key = key;
         delivery->line =
-            ok ? archiveSummary(path, entries)
+            ok ? (note.empty() ? archiveSummary(path, entries)
+                               : note + " " + archiveSummary(path, entries))
                : "Archive: the index could not be read (" + error + ").";
         // The lock badge is driven by this count, and only by it: a failed or
-        // skipped check leaves it at zero rather than guessing.
+        // skipped check leaves it at zero rather than guessing. Encrypted
+        // headers are the exception that is not a guess: libarchive refused to
+        // open the archive because it needs a password, so the lock is a fact.
+        if (encryptedHeaders) delivery->encrypted = 1;
         if (ok) {
             for (const SecurityFile& entry : entries) {
                 if (entry.encrypted) ++delivery->encrypted;
@@ -975,13 +983,13 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
     std::string text;
     Fl_Color color = fl_rgb_color(30, 90, 160);
     if (action.running) {
-        text = "Archive: reading the first and last piece...";
+        text = "Archive: reading the archive index...";
         color = SecurityBadge::riskColor(RiskLevel::Medium);
     } else if (!action.line.empty()) {
         text = action.line;
         color = FL_FOREGROUND_COLOR;
     } else {
-        text = "+ Check archive " + archive.path + " (first + last piece)";
+        text = "+ Check archive " + archive.path + " (index only)";
     }
 
     if (ly + FILE_LINE_HEIGHT <= limit + 1) {

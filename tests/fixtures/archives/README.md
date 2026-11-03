@@ -11,6 +11,23 @@ are never executed or extracted by the application or the tests.
 | `test_read_format_rar5_compressed.rar` | <https://github.com/libarchive/libarchive/blob/803c67fbacb0e46d95c2fa991f5380786f30604e/libarchive/test/test_read_format_rar5_compressed.rar.uu> |
 | `test_read_format_rar5_encrypted.rar` | <https://github.com/libarchive/libarchive/blob/803c67fbacb0e46d95c2fa991f5380786f30604e/libarchive/test/test_read_format_rar5_encrypted.rar.uu> |
 
+## RAR 1.5-4.x fixtures
+
+| file | source |
+| :--- | :--- |
+| `test_read_format_rar_filter.rar` | <https://github.com/libarchive/libarchive/blob/803c67fbacb0e46d95c2fa991f5380786f30604e/libarchive/test/test_read_format_rar_filter.rar.uu> |
+| `test_read_format_rar_unicode.rar` | <https://github.com/libarchive/libarchive/blob/803c67fbacb0e46d95c2fa991f5380786f30604e/libarchive/test/test_read_format_rar_unicode.rar.uu> |
+| `test_read_format_rar_binary_data.rar` | <https://github.com/libarchive/libarchive/blob/803c67fbacb0e46d95c2fa991f5380786f30604e/libarchive/test/test_read_format_rar_binary_data.rar.uu> |
+| `test_read_format_rar_encryption_header.rar` | <https://github.com/libarchive/libarchive/blob/803c67fbacb0e46d95c2fa991f5380786f30604e/libarchive/test/test_read_format_rar_encryption_header.rar.uu> |
+
+The first has one 204 KB payload behind a real RAR4 compressed stream, so the
+test can prove the reader skips the packed bytes and only asks for headers. The
+second has six entries with Unicode names. The third is 1 MB with a 1 MB
+payload, so the amount of data actually touched is easy to measure. The fourth
+is 220 bytes with its headers encrypted, so nothing can be listed at all and
+libarchive says so; the check must report that as password protection rather
+than as a broken archive. None is extracted or executed.
+
 The `.uu` files were decoded to their original bytes. They come from the
 libarchive test suite, which is distributed under the BSD 2-Clause License:
 

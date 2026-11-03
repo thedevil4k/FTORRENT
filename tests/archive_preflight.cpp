@@ -10,6 +10,7 @@
 #include "ArchiveInspector.h"
 #include "SecurityTypes.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -137,6 +138,122 @@ int main() {
         ok(!ArchiveInspector::listEntriesFromWindows(16, "not an archive",
                                                      "").ok,
            "bytes that are not an archive are refused");
+    }
+
+    section("lazy header walk for RAR 1.5-4.x");
+    {
+        // A RAR 1.5-4.x keeps no central index. libarchive can still list it if
+        // the stream is allowed to fetch the next header on demand: it skips
+        // the packed data and asks only for the bytes around a header. The
+        // fetcher below serves a local file so the test measures how much of it
+        // is actually touched, with no network involved.
+        const char* fixtures[] = {
+            "test_read_format_rar_filter.rar",
+            "test_read_format_rar_unicode.rar",
+            "test_read_format_rar_binary_data.rar",
+        };
+        for (const char* name : fixtures) {
+            const fs::path full = fs::path(FTORRENT_ARCHIVE_FIXTURES) / name;
+            const std::string bytes = readFile(full);
+            ok(!bytes.empty(), std::string("fixture is present: ") + name);
+            if (bytes.empty()) continue;
+
+            const ArchiveInspector::ListingAll fromFull =
+                ArchiveInspector::listEntries(full.string());
+            std::vector<char> touched(bytes.size(), 0);
+            std::size_t fetched = 0;
+            const ArchiveInspector::ListingAll lazy =
+                ArchiveInspector::listEntriesFromWindows(
+                    static_cast<std::int64_t>(bytes.size()), "", "", nullptr,
+                    [&](std::int64_t offset, std::size_t length,
+                        std::string& out, std::string& error) {
+                        if (offset < 0 ||
+                            static_cast<std::size_t>(offset) + length >
+                                bytes.size()) {
+                            error = "the test fetcher was asked outside the file";
+                            return false;
+                        }
+                        out.assign(bytes, static_cast<std::size_t>(offset),
+                                   length);
+                        for (std::size_t i = 0; i < length; ++i) {
+                            touched[static_cast<std::size_t>(offset) + i] = 1;
+                        }
+                        fetched += length;
+                        return true;
+                    });
+
+            ok(fromFull.ok, std::string("the whole file lists: ") + name);
+            ok(lazy.ok, std::string("the lazy walk lists it too: ") + name);
+            if (fromFull.ok && lazy.ok) {
+                ok(namesOf(lazy.entries) == namesOf(fromFull.entries),
+                   std::string("and sees the same entries: ") + name);
+                ok(!lazy.entries.empty(),
+                   std::string("the lazy listing is not empty: ") + name);
+            }
+
+            const std::size_t unique =
+                static_cast<std::size_t>(std::count(touched.begin(),
+                                                    touched.end(), 1));
+            ok(fetched > 0 && unique > 0,
+               std::string("the walk asked for header bytes: ") + name);
+            if (std::string(name) == "test_read_format_rar_filter.rar") {
+                ok(unique < bytes.size(),
+                   "the walk does not need every byte of the RAR4");
+            }
+            if (std::string(name) == "test_read_format_rar_binary_data.rar") {
+                // The 1 MB payload is skipped; only the headers and libarchive's
+                // read-ahead are touched.
+                ok(unique < bytes.size() / 2,
+                   "the walk skips most of the compressed data");
+            }
+        }
+
+        // A fetcher that stops must stop the listing and keep what was already
+        // read, because that is exactly what the piece budget or a timeout does
+        // in the real check.
+        const fs::path binary = fs::path(FTORRENT_ARCHIVE_FIXTURES) /
+                                "test_read_format_rar_binary_data.rar";
+        const std::string bytes = readFile(binary);
+        if (!bytes.empty()) {
+            bool firstCall = true;
+            const ArchiveInspector::ListingAll stopped =
+                ArchiveInspector::listEntriesFromWindows(
+                    static_cast<std::int64_t>(bytes.size()), "", "", nullptr,
+                    [&](std::int64_t offset, std::size_t length,
+                        std::string& out, std::string& error) {
+                        if (firstCall) {
+                            firstCall = false;
+                            out.assign(bytes,
+                                       static_cast<std::size_t>(offset),
+                                       length);
+                            return true;
+                        }
+                        error = "the test stopped the walk";
+                        return false;
+                    });
+            ok(!stopped.ok, "a failed fetch stops the listing");
+            ok(stopped.error.find("test stopped the walk") != std::string::npos,
+               "the fetch error is reported, not libarchive's generic one");
+        }
+
+        // Encrypted headers: nothing can be listed, and the reader must say so
+        // in a way the lock badge can use instead of reporting a broken file.
+        const fs::path encrypted =
+            fs::path(FTORRENT_ARCHIVE_FIXTURES) /
+            "test_read_format_rar_encryption_header.rar";
+        const std::string encryptedBytes = readFile(encrypted);
+        ok(!encryptedBytes.empty(), "the encrypted-header fixture is present");
+        if (!encryptedBytes.empty()) {
+            const ArchiveInspector::ListingAll listing =
+                ArchiveInspector::listEntriesFromWindows(
+                    static_cast<std::int64_t>(encryptedBytes.size()),
+                    encryptedBytes, "", nullptr);
+            ok(!listing.ok, "an archive with encrypted headers is not listed");
+            ok(listing.entries.empty(),
+               "and it claims no entries it could not read");
+            ok(listing.encryptedHeaders,
+               "it is reported as password-protected, not as broken");
+        }
     }
 
     section("a check from torrent bytes");
