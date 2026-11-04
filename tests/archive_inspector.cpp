@@ -1,14 +1,13 @@
 // ArchiveInspector checks.
 //
-// The archive support exists to answer one question before the user runs
-// anything: what .exe files are inside this RAR/ZIP, and what is the SHA-256 of
-// one of them? These checks build a small ZIP with libarchive, then verify that
-// listing ignores non-executables, that hashing matches the published SHA-256
-// vectors, and that hostile or malformed input is refused rather than guessed
-// at. Nothing is extracted: the archive is created and read in a temp directory
-// that the test removes afterwards.
+// The reader answers one question before the user runs anything: what names and
+// sizes does this archive's index expose, and which entries need a password?
+// These checks build a small ZIP with libarchive, then verify that the listing
+// reports every regular file, that hostile names are shown verbatim instead of
+// being turned into paths, and that malformed input is refused rather than
+// guessed at. Nothing is extracted: the archive is created and read in a temp
+// directory that the test removes afterwards.
 #include "ArchiveInspector.h"
-#include "FileHash.h"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -127,12 +126,14 @@ bool createEncryptedZip(const std::filesystem::path& path,
     return ok;
 }
 
-const char* kAbcDigest =
-    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-const char* kEmptyDigest =
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-const char* kMillionAsDigest =
-    "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0";
+const ArchiveInspector::Entry* findEntry(
+    const std::vector<ArchiveInspector::Entry>& entries,
+    const std::string& path) {
+    for (const ArchiveInspector::Entry& entry : entries) {
+        if (entry.path == path) return &entry;
+    }
+    return nullptr;
+}
 
 } // namespace
 
@@ -144,12 +145,18 @@ int main() {
     std::filesystem::create_directories(dir, ec);
 
     ok(ArchiveInspector::isAvailable(), "archive support is compiled in");
-    ok(ArchiveInspector::isArchivePath("setup.rar"), ".rar is offered");
-    ok(ArchiveInspector::isArchivePath("SETUP.ZIP"), ".ZIP is offered");
-    ok(ArchiveInspector::isArchivePath("setup.zip"), ".zip is offered");
-    ok(!ArchiveInspector::isArchivePath("setup.7z"), ".7z is not offered");
-    ok(!ArchiveInspector::isArchivePath("setup.exe"), ".exe is not an archive");
-    ok(!ArchiveInspector::isArchivePath("rar"), "a bare name is not an archive");
+
+    // Which formats the pre-download check can read. This is deliberately
+    // narrower than "is this an archive?", which SecurityAnalyzer owns.
+    ok(ArchiveInspector::canListBeforeDownload("setup.rar"), ".rar is offered");
+    ok(ArchiveInspector::canListBeforeDownload("SETUP.ZIP"), ".ZIP is offered");
+    ok(ArchiveInspector::canListBeforeDownload("setup.zip"), ".zip is offered");
+    ok(!ArchiveInspector::canListBeforeDownload("setup.7z"),
+       ".7z is not listable yet");
+    ok(!ArchiveInspector::canListBeforeDownload("setup.exe"),
+       ".exe is not an archive");
+    ok(!ArchiveInspector::canListBeforeDownload("rar"),
+       "a bare name is not an archive");
 
     const std::filesystem::path zipPath = dir / "sample.zip";
     const std::string million(1000000, 'a');
@@ -162,119 +169,51 @@ int main() {
     };
     ok(createZip(zipPath, entries), "a test ZIP could be created");
 
-    const ArchiveInspector::Listing listing =
-        ArchiveInspector::listExecutables(zipPath.string());
+    const ArchiveInspector::ListingAll listing =
+        ArchiveInspector::listEntries(zipPath.string());
     ok(listing.ok, "the test ZIP lists cleanly");
     if (!listing.ok) std::cout << "      error: " << listing.error << '\n';
-    ok(listing.executables.size() == 3,
-       "only the three .exe entries are listed");
+    ok(listing.entries.size() == 4,
+       "the four regular files are listed and the directory is not");
 
-    if (listing.executables.size() == 3) {
-        const auto& inner = listing.executables[0];
-        const auto& setup = listing.executables[1];
-        const auto& big = listing.executables[2];
-
-        ok(inner.path == "nested/inner.EXE", "the nested .EXE keeps its path");
-        ok(inner.sizeKnown && inner.size == 0, "the nested .EXE is empty");
-        ok(setup.path == "setup.exe", "the first .exe is found");
-        ok(setup.sizeKnown && setup.size == 3, "the .exe size is reported");
-        ok(!setup.encrypted, "a plain entry is not marked encrypted");
-        ok(big.sizeKnown && big.size == million.size(),
+    const auto* inner = findEntry(listing.entries, "nested/inner.EXE");
+    const auto* setup = findEntry(listing.entries, "setup.exe");
+    const auto* big = findEntry(listing.entries, "big.exe");
+    ok(inner != nullptr, "the nested .EXE keeps its path");
+    ok(setup != nullptr, "the first .exe is found");
+    ok(big != nullptr, "the large .exe is found");
+    if (inner && setup && big) {
+        ok(inner->sizeKnown && inner->size == 0, "the nested .EXE is empty");
+        ok(setup->sizeKnown && setup->size == 3, "the .exe size is reported");
+        ok(!setup->encrypted, "a plain entry is not marked encrypted");
+        ok(big->sizeKnown && big->size == million.size(),
            "the large .exe size is reported");
-        ok(inner.index > 0 && setup.index > inner.index && big.index > setup.index,
+        ok(inner->index > 0 && setup->index > inner->index &&
+               big->index > setup->index,
            "entry indexes follow archive order");
+    }
 
-        std::string digest;
-        std::string error;
-        ok(ArchiveInspector::hashExecutable(zipPath.string(), setup.index,
-                                            nullptr, digest, error),
-           "setup.exe can be hashed");
-        ok(digest == kAbcDigest, "setup.exe has the SHA-256 of its bytes");
-        if (digest != kAbcDigest) std::cout << "      got: " << digest << '\n';
-
-        ok(ArchiveInspector::hashExecutable(zipPath.string(), inner.index,
-                                            nullptr, digest, error),
-           "an empty .exe can be hashed");
-        ok(digest == kEmptyDigest, "an empty .exe hashes to the empty digest");
-
-        ok(ArchiveInspector::hashExecutable(zipPath.string(), big.index,
-                                            nullptr, digest, error),
-           "a large .exe can be hashed in chunks");
-        ok(digest == kMillionAsDigest, "the large .exe matches its vector");
-
-        // An entry that is not an .exe is refused even when its index is valid.
-        ok(!ArchiveInspector::hashExecutable(zipPath.string(), 1, nullptr,
-                                             digest, error),
-           "a .txt entry is refused");
-        ok(error == "the selected entry is not an .exe file",
-           "the .txt refusal explains itself");
-        ok(digest.empty(), "a refused entry leaves no digest");
-
-        ok(!ArchiveInspector::hashExecutable(zipPath.string(), 2, nullptr,
-                                             digest, error),
-           "a directory entry is refused");
-        ok(error == "the selected entry is not a regular file",
-           "the directory refusal explains itself");
-
-        ok(!ArchiveInspector::hashExecutable(zipPath.string(), 99, nullptr,
-                                             digest, error),
-           "a missing entry index is refused");
-        ok(error == "the archive entry was not found",
-           "a missing entry index explains itself");
-
-        ok(!ArchiveInspector::hashExecutable(zipPath.string(), 0, nullptr,
-                                             digest, error),
-           "entry index zero is invalid");
-
+    {
         std::atomic<bool> cancelled{true};
-        digest = "stale";
-        error.clear();
-        ok(!ArchiveInspector::hashExecutable(zipPath.string(), setup.index,
-                                             &cancelled, digest, error),
-           "a cancelled hash returns no digest");
-        ok(error == "cancelled", "a cancelled hash says so");
-        ok(digest.empty(), "cancellation clears the previous digest");
-
-        const ArchiveInspector::Listing cancelledListing =
-            ArchiveInspector::listExecutables(zipPath.string(), &cancelled);
+        const ArchiveInspector::ListingAll cancelledListing =
+            ArchiveInspector::listEntries(zipPath.string(), &cancelled);
         ok(!cancelledListing.ok, "a cancelled listing fails");
         ok(cancelledListing.error == "cancelled", "a cancelled listing says so");
     }
 
-    // Password-protected entries must be visible but never hashed. The writer's
+    // Password-protected entries must be visible and flagged. The writer's
     // encryption support depends on the libarchive build, so this part is
     // skipped rather than failed when neither AES nor ZipCrypto is available.
     const std::filesystem::path encryptedPath = dir / "encrypted.zip";
     if (createEncryptedZip(encryptedPath, "aes256") ||
         createEncryptedZip(encryptedPath, "zipcrypt")) {
-        const ArchiveInspector::Listing encrypted =
-            ArchiveInspector::listExecutables(encryptedPath.string());
+        const ArchiveInspector::ListingAll encrypted =
+            ArchiveInspector::listEntries(encryptedPath.string());
         ok(encrypted.ok, "an encrypted ZIP lists cleanly");
-        ok(encrypted.executables.size() == 1,
-           "the encrypted .exe is listed");
-        if (encrypted.executables.size() == 1) {
-            ok(encrypted.executables[0].encrypted,
+        ok(encrypted.entries.size() == 1, "the encrypted entry is listed");
+        if (encrypted.entries.size() == 1) {
+            ok(encrypted.entries[0].encrypted,
                "the encrypted entry is marked as password-protected");
-
-            // The pre-download check lists every entry, not only the .exe
-            // files, and the lock badge is drawn from that listing: it has to
-            // carry the same flag.
-            const ArchiveInspector::ListingAll all =
-                ArchiveInspector::listEntries(encryptedPath.string());
-            ok(all.ok && all.entries.size() == 1,
-               "the encrypted ZIP lists its entries for the preflight");
-            ok(!all.entries.empty() && all.entries[0].encrypted,
-               "the preflight listing keeps the password-protected flag");
-
-            std::string digest = "stale";
-            std::string error;
-            ok(!ArchiveInspector::hashExecutable(
-                   encryptedPath.string(), encrypted.executables[0].index,
-                   nullptr, digest, error),
-               "a password-protected entry is not hashed");
-            ok(error == "the selected entry is password-protected",
-               "the encrypted refusal explains itself");
-            ok(digest.empty(), "the encrypted refusal leaves no digest");
         }
     } else {
         std::cout << "    SKIP encrypted ZIP checks: libarchive cannot write "
@@ -287,34 +226,33 @@ int main() {
         out << "this is not a ZIP";
         ok(out.good(), "could write the non-archive test file");
     }
-    const ArchiveInspector::Listing bad =
-        ArchiveInspector::listExecutables(textPath.string());
-    ok(!bad.ok, "a file that is not an archive is refused");
-    ok(!bad.error.empty(), "the non-archive refusal explains itself");
+    ok(!ArchiveInspector::listEntries(textPath.string()).ok,
+       "a file that is not an archive is refused");
+    ok(!ArchiveInspector::listEntries(textPath.string()).error.empty(),
+       "the non-archive refusal explains itself");
 
-    const ArchiveInspector::Listing missing =
-        ArchiveInspector::listExecutables((dir / "missing.zip").string());
-    ok(!missing.ok, "a missing archive is refused");
-    ok(!missing.error.empty(), "the missing-archive refusal explains itself");
-
-    ok(!ArchiveInspector::listExecutables("").ok, "an empty path is refused");
+    ok(!ArchiveInspector::listEntries((dir / "missing.zip").string()).ok,
+       "a missing archive is refused");
+    ok(!ArchiveInspector::listEntries((dir / "missing.zip").string())
+            .error.empty(),
+       "the missing-archive refusal explains itself");
+    ok(!ArchiveInspector::listEntries("").ok, "an empty path is refused");
 
 #ifdef FTORRENT_ARCHIVE_FIXTURES
-    // Real RAR5 streams from libarchive's test suite. None of them contains an
-    // .exe, so the assertion is that the reader parses them and reports an
-    // empty executable list instead of failing.
     const std::filesystem::path fixtures(FTORRENT_ARCHIVE_FIXTURES);
+
+    // Real RAR5 streams from libarchive's test suite: the reader has to parse
+    // them and report their entries instead of failing.
     const char* rarFixtures[] = {
         "test_read_format_rar5_stored.rar",
         "test_read_format_rar5_compressed.rar",
         "test_read_format_rar5_encrypted.rar",
     };
     for (const char* name : rarFixtures) {
-        const ArchiveInspector::Listing rar =
-            ArchiveInspector::listExecutables((fixtures / name).string());
+        const ArchiveInspector::ListingAll rar =
+            ArchiveInspector::listEntries((fixtures / name).string());
         ok(rar.ok, "a RAR5 fixture lists cleanly");
         if (!rar.ok) std::cout << "      " << name << ": " << rar.error << '\n';
-        ok(rar.executables.empty(), "the RAR5 fixture has no .exe entries");
     }
 
     // The RAR case the lock badge exists for: rar5 marks each entry that needs
@@ -334,42 +272,18 @@ int main() {
     // A ZIP built for this suite: one plain .exe, one double-extension .exe and
     // one name that tries to climb out of the extraction directory. The listing
     // reports names verbatim; it never turns an archive name into a filesystem
-    // path, and hashing only reads the selected stream.
-    const ArchiveInspector::Listing setup =
-        ArchiveInspector::listExecutables((fixtures / "setup.zip").string());
-    ok(setup.ok, "the hostile-name ZIP lists cleanly");
-    if (!setup.ok) std::cout << "      setup.zip: " << setup.error << '\n';
-    ok(setup.executables.size() == 3, "the hostile-name ZIP lists three .exe files");
-
-    bool sawPlain = false;
-    bool sawDoubleExtension = false;
-    bool sawTraversal = false;
-    const ArchiveInspector::Entry* plain = nullptr;
-    for (const ArchiveInspector::Entry& entry : setup.executables) {
-        if (entry.path == "setup.exe") {
-            sawPlain = true;
-            plain = &entry;
-        } else if (entry.path == "invoice.pdf.exe") {
-            sawDoubleExtension = true;
-        } else if (entry.path == "../escape.exe") {
-            sawTraversal = true;
-        }
-    }
-    ok(sawPlain, "the plain .exe is listed");
-    ok(sawDoubleExtension, "the double-extension .exe is listed");
-    ok(sawTraversal, "the traversal name is reported verbatim");
-
-    if (plain) {
-        std::string digest;
-        std::string error;
-        ok(ArchiveInspector::hashExecutable(
-               (fixtures / "setup.zip").string(), plain->index, nullptr,
-               digest, error),
-           "the fixture's plain .exe can be hashed");
-        ok(digest ==
-               "be1307d1e38db0d22f03095558630f1c748ca3451b48d0f252dce4ac2226b97d",
-           "the fixture's plain .exe matches its published SHA-256");
-    }
+    // path.
+    const ArchiveInspector::ListingAll setupZip =
+        ArchiveInspector::listEntries((fixtures / "setup.zip").string());
+    ok(setupZip.ok, "the hostile-name ZIP lists cleanly");
+    if (!setupZip.ok) std::cout << "      setup.zip: " << setupZip.error << '\n';
+    ok(setupZip.entries.size() == 4, "the hostile-name ZIP lists four files");
+    ok(findEntry(setupZip.entries, "setup.exe") != nullptr,
+       "the plain .exe is listed");
+    ok(findEntry(setupZip.entries, "invoice.pdf.exe") != nullptr,
+       "the double-extension .exe is listed");
+    ok(findEntry(setupZip.entries, "../escape.exe") != nullptr,
+       "the traversal name is reported verbatim");
 #endif
 
     std::filesystem::remove_all(dir, ec);

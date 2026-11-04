@@ -6,7 +6,7 @@
 #include "ReputationService.h"
 #include "ArchivePreflight.h"
 #include "ArchiveInspector.h"
-#include "TorrentItem.h"   // formatSize
+#include "Format.h"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_File_Chooser.H>
@@ -478,7 +478,7 @@ void AddTorrentDialog::showFiles(const std::vector<TorrentFileEntry>& files,
 std::string AddTorrentDialog::fileRowLabel(const TorrentFileEntry& file) const {
     std::string label = SecurityBadge::displayText(file.path);
     label += " (";
-    label += TorrentItem::formatSize(file.size);
+    label += Format::bytes(file.size);
     label += ")";
 
     const std::vector<std::string> tags = SecurityAnalyzer::tagsForFile(file);
@@ -592,7 +592,7 @@ void AddTorrentDialog::updateSecurityPanel() {
         const bool hasArchive =
             std::any_of(selected.begin(), selected.end(),
                         [](const TorrentFileEntry& file) {
-                            return ArchiveInspector::isArchivePath(file.path);
+                            return ArchiveInspector::canListBeforeDownload(file.path);
                         });
         if (hasArchive && !m_archiveRunning) m_checkArchive->activate();
         else m_checkArchive->deactivate();
@@ -614,7 +614,7 @@ void AddTorrentDialog::checkArchive() {
     const std::vector<TorrentFileEntry> selected = selectedFiles();
     const TorrentFileEntry* archive = nullptr;
     for (const TorrentFileEntry& file : selected) {
-        if (ArchiveInspector::isArchivePath(file.path)) {
+        if (ArchiveInspector::canListBeforeDownload(file.path)) {
             archive = &file;
             break;
         }
@@ -691,8 +691,7 @@ void AddTorrentDialog::checkArchive() {
                 "Archive: the index could not be read (" + error + ").";
         } else {
             delivery->message =
-                note.empty() ? archiveSummary(path, entries)
-                             : note + " " + archiveSummary(path, entries);
+                archiveCheckMessage(path, entries, note);
             delivery->entries = std::move(entries);
         }
         Fl::awake(&AddTorrentDialog::deliverArchiveCheck, delivery);

@@ -7,6 +7,7 @@
 #include "PathUtils.h"
 #include "AssetLoader.h"
 #include "ToolbarLayout.h"
+#include "Format.h"
 #include "SearchManager.h"
 #include "SearchScope.h"
 #include "NetworkMonitorDialog.h"
@@ -945,8 +946,8 @@ std::string MainWindow::formatStatusBar() const {
         << " (Active: " << activeTorrents << ")  |  ";
     
     if (downRate > 0 || upRate > 0) {
-        oss << "↓ " << TorrentItem::formatSpeed(downRate) << "  "
-            << "↑ " << TorrentItem::formatSpeed(upRate);
+        oss << "↓ " << Format::perSecond(downRate) << "  "
+            << "↑ " << Format::perSecond(upRate);
     } else {
         oss << "Idle";
     }

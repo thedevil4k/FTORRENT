@@ -125,6 +125,7 @@ set(SOURCES
     src/SecurityEvents.cpp
     src/NetworkMonitorDialog.cpp
     src/SearchScope.cpp
+    src/Format.cpp
 )
 
 if(WIN32)
@@ -172,6 +173,7 @@ set(HEADERS
     src/SecurityEvents.h
     src/NetworkMonitorDialog.h
     src/SearchScope.h
+    src/Format.h
     src/Version.h
 )
 

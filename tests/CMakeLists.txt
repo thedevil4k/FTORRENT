@@ -14,8 +14,8 @@
 #   flows           the user journeys end to end; needs the network
 #   file_hash       the SHA-256 vectors and the VirusTotal URL validation
 #   archive_inspector
-#                   read-only listing and hashing inside a generated ZIP, the
-#                   RAR5/ZIP fixtures and the refusals for bad input (only when
+#                   read-only listing inside a generated ZIP, the RAR5/ZIP
+#                   fixtures and the refusals for bad input (only when
 #                   libarchive is found)
 #   security_analyzer
 #                   the metadata heuristics: file families, hostile names,
@@ -80,6 +80,7 @@ ftorrent_add_test(search_scope search_scope.cpp)
 ftorrent_add_test(search_parse search_parse.cpp)
 ftorrent_add_test(filelist filelist.cpp)
 ftorrent_add_test(filelist_network filelist_network.cpp)
+ftorrent_add_test(format format.cpp)
 
 # The archive reader is optional, so its test is only built when the reader is.
 # FTORRENT_HAVE_LIBARCHIVE is set by the parent CMakeLists.txt and also reaches
@@ -128,11 +129,12 @@ add_test(NAME search_scope COMMAND search_scope)
 add_test(NAME search_parse COMMAND search_parse)
 add_test(NAME filelist COMMAND filelist)
 add_test(NAME filelist_network COMMAND filelist_network)
+add_test(NAME format COMMAND format)
 
 set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
     security_analyzer security_badge security_keys reputation archive_preflight
     security_events search_results search_scope search_parse filelist
-    filelist_network)
+    filelist_network format)
 if(FTORRENT_HAVE_LIBARCHIVE)
     add_test(NAME archive_inspector COMMAND archive_inspector)
     list(APPEND FTORRENT_TESTS archive_inspector)
@@ -155,7 +157,7 @@ set_tests_properties(toolbar_layout toolbar_clicks icons_full security_badge
     search_results PROPERTIES LABELS "ui")
 set_tests_properties(file_hash security_analyzer security_keys
     PROPERTIES LABELS "unit")
-set_tests_properties(search_parse filelist PROPERTIES LABELS "unit")
+set_tests_properties(search_parse filelist format PROPERTIES LABELS "unit")
 # The swarm probe: real trackers, real DHT, real .torrent downloads.
 set_tests_properties(filelist_network PROPERTIES LABELS "network")
 # reputation drives Fl::awake() delivery, so it needs the FLTK event loop even

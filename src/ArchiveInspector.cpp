@@ -20,8 +20,6 @@ namespace {
 // unbounded decompression. These limits are deliberately far above normal
 // installers; they exist to stop a hostile archive, not to judge a big game.
 constexpr int MAX_ENTRIES = 100000;
-constexpr size_t MAX_EXECUTABLES = 10000;
-constexpr std::uint64_t MAX_HASH_BYTES = 4ULL * 1024 * 1024 * 1024;
 
 std::filesystem::path pathFromUtf8(const std::string& text)
 {
@@ -219,25 +217,13 @@ bool looksEncrypted(const std::string& message)
            lower.find("password") != std::string::npos;
 }
 
-// The .exe rule, for the walk below, which is not a member function. Same
-// logic as ArchiveInspector::isExecutableName(), which cannot be called here.
-bool isExecutableEntryName(const std::string& path)
-{
-    const size_t separator = path.find_last_of("/\\");
-    const size_t dot = path.find_last_of('.');
-    if (dot == std::string::npos ||
-        (separator != std::string::npos && dot < separator)) {
-        return false;
-    }
-    std::string extension = path.substr(dot);
-    std::transform(extension.begin(), extension.end(), extension.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return extension == ".exe";
-}
+// The .exe rule lived here once, as a second, narrower answer next to
+// SecurityAnalyzer's. The pre-download check lists every name and lets the
+// analyzer decide what can run, so the reader no longer carries a predicate.
 
 // The header walk, shared by a file on disk and by the two-window stream. The
 // reader must already be open.
-bool readOpenArchive(archive* reader, bool executablesOnly,
+bool readOpenArchive(archive* reader,
                      std::vector<ArchiveInspector::Entry>& out,
                      std::string& error, const std::atomic<bool>* cancelled)
 {
@@ -259,8 +245,7 @@ bool readOpenArchive(archive* reader, bool executablesOnly,
 
         if (isRegularFileEntry(entry)) {
             const std::string name = entryName(entry);
-            if (!name.empty() &&
-                (!executablesOnly || isExecutableEntryName(name))) {
+            if (!name.empty()) {
                 ArchiveInspector::Entry found;
                 found.index = entryIndex;
                 found.path = name;
@@ -272,11 +257,6 @@ bool readOpenArchive(archive* reader, bool executablesOnly,
                 }
                 found.encrypted = isEncrypted(entry);
                 out.push_back(std::move(found));
-
-                if (executablesOnly && out.size() > MAX_EXECUTABLES) {
-                    error = "archive has too many .exe files";
-                    break;
-                }
             }
         }
 
@@ -320,27 +300,19 @@ std::string ArchiveInspector::extensionLower(const std::string& path)
     return extension;
 }
 
-bool ArchiveInspector::isArchivePath(const std::string& path)
+bool ArchiveInspector::canListBeforeDownload(const std::string& path)
 {
     const std::string extension = extensionLower(path);
     return extension == ".rar" || extension == ".zip";
 }
 
-bool ArchiveInspector::isExecutableName(const std::string& path)
-{
-    return extensionLower(path) == ".exe";
-}
-
-// Shared body of both listings. 'executablesOnly' keeps the old behaviour of
-// listExecutables; the pre-download check wants every name and passes false.
+// Shared by both listings: a file on disk and the two-window stream.
 bool ArchiveInspector::readEntries(const std::string& archivePath,
-                                   bool executablesOnly,
                                    std::vector<Entry>& out, std::string& error,
                                    const std::atomic<bool>* cancelled)
 {
 #ifndef FTORRENT_HAVE_LIBARCHIVE
     (void)archivePath;
-    (void)executablesOnly;
     (void)out;
     (void)cancelled;
     error = "archive support is not available in this build";
@@ -364,8 +336,7 @@ bool ArchiveInspector::readEntries(const std::string& archivePath,
     if (!openArchive(archive.get(), archivePath, error)) {
         return false;
     }
-    return readOpenArchive(archive.get(), executablesOnly, out, error,
-                           cancelled);
+    return readOpenArchive(archive.get(), out, error, cancelled);
 #endif
 }
 
@@ -422,7 +393,7 @@ ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
                            : stream.error;
         return result;
     }
-    if (!readOpenArchive(archive.get(), false, result.entries, result.error,
+    if (!readOpenArchive(archive.get(), result.entries, result.error,
                          cancelled)) {
         // A failed fetch says more than libarchive's "truncated header": the
         // caller stopped it on purpose (a piece budget, a timeout) or the
@@ -456,165 +427,15 @@ ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
 #endif
 }
 
-ArchiveInspector::Listing ArchiveInspector::listExecutables(
-    const std::string& archivePath,
-    const std::atomic<bool>* cancelled)
-{
-    Listing result;
-    if (!readEntries(archivePath, true, result.executables, result.error,
-                     cancelled)) {
-        return result;
-    }
-    result.ok = true;
-    return result;
-}
-
 ArchiveInspector::ListingAll ArchiveInspector::listEntries(
     const std::string& archivePath,
     const std::atomic<bool>* cancelled)
 {
     ListingAll result;
-    if (!readEntries(archivePath, false, result.entries, result.error,
+    if (!readEntries(archivePath, result.entries, result.error,
                      cancelled)) {
         return result;
     }
     result.ok = true;
     return result;
-}
-
-bool ArchiveInspector::hashExecutable(const std::string& archivePath,
-                                      int entryIndex,
-                                      const std::atomic<bool>* cancelled,
-                                      std::string& digestHex,
-                                      std::string& error)
-{
-    digestHex.clear();
-    error.clear();
-
-#ifndef FTORRENT_HAVE_LIBARCHIVE
-    (void)archivePath;
-    (void)entryIndex;
-    (void)cancelled;
-    error = "archive support is not available in this build";
-    return false;
-#else
-    if (archivePath.empty()) {
-        error = "empty archive path";
-        return false;
-    }
-    if (entryIndex <= 0) {
-        error = "invalid archive entry";
-        return false;
-    }
-    if (cancelled && cancelled->load()) {
-        error = "cancelled";
-        return false;
-    }
-
-    ArchivePtr archive(archive_read_new());
-    if (!archive) {
-        error = "could not create the archive reader";
-        return false;
-    }
-    if (!openArchive(archive.get(), archivePath, error)) {
-        return false;
-    }
-
-    archive_entry* entry = nullptr;
-    int currentIndex = 0;
-    int status = ARCHIVE_OK;
-    bool found = false;
-
-    while ((status = archive_read_next_header(archive.get(), &entry)) == ARCHIVE_OK) {
-        ++currentIndex;
-
-        if (cancelled && cancelled->load()) {
-            error = "cancelled";
-            return false;
-        }
-        if (currentIndex > MAX_ENTRIES) {
-            error = "archive has too many entries";
-            return false;
-        }
-        if (currentIndex != entryIndex) {
-            if (archive_read_data_skip(archive.get()) != ARCHIVE_OK) {
-                error = archiveError(archive.get(), "could not skip archive data");
-                return false;
-            }
-            continue;
-        }
-
-        found = true;
-
-        if (archive_entry_filetype(entry) != AE_IFREG) {
-            error = "the selected entry is not a regular file";
-            return false;
-        }
-        if (archive_entry_hardlink(entry) != nullptr) {
-            error = "the selected entry is a link, not a file with its own data";
-            return false;
-        }
-        if (!isExecutableName(entryName(entry))) {
-            error = "the selected entry is not an .exe file";
-            return false;
-        }
-        if (isEncrypted(entry)) {
-            error = "the selected entry is password-protected";
-            return false;
-        }
-
-        const la_int64_t declaredSize = archive_entry_size(entry);
-        const bool declaredSizeKnown =
-            archive_entry_size_is_set(entry) && declaredSize >= 0;
-        if (declaredSizeKnown &&
-            static_cast<std::uint64_t>(declaredSize) > MAX_HASH_BYTES) {
-            error = "the selected .exe exceeds the hash size limit";
-            return false;
-        }
-
-        FileHash::Sha256 hasher;
-        char buffer[64 * 1024];
-        std::uint64_t total = 0;
-        la_ssize_t got = 0;
-
-        while ((got = archive_read_data(archive.get(), buffer, sizeof(buffer))) > 0) {
-            if (cancelled && cancelled->load()) {
-                error = "cancelled";
-                return false;
-            }
-
-            total += static_cast<std::uint64_t>(got);
-            if (total > MAX_HASH_BYTES) {
-                error = "the selected .exe exceeds the hash size limit";
-                return false;
-            }
-            hasher.update(reinterpret_cast<const unsigned char*>(buffer),
-                          static_cast<size_t>(got));
-        }
-
-        if (got < 0) {
-            error = archiveError(archive.get(), "could not decompress the archive entry");
-            return false;
-        }
-
-        // A header is only a promise. If the stream ends early, the digest
-        // would describe a truncated file, not the program the header names.
-        if (declaredSizeKnown &&
-            total < static_cast<std::uint64_t>(declaredSize)) {
-            error = "the selected .exe ended before its declared size";
-            return false;
-        }
-
-        digestHex = hasher.finalHex();
-        return true;
-    }
-
-    if (status != ARCHIVE_EOF && error.empty()) {
-        error = archiveError(archive.get(), "could not read archive");
-    }
-    if (error.empty() && !found) {
-        error = "the archive entry was not found";
-    }
-    return false;
-#endif
 }

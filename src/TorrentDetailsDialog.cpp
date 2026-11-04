@@ -2,6 +2,7 @@
 #include "ArchiveInspector.h"
 #include "ArchivePreflight.h"
 #include "FileHash.h"
+#include "Format.h"
 #include "ReputationService.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
@@ -243,26 +244,26 @@ void TorrentDetailsDialog::updateInfo() {
 
 void TorrentDetailsDialog::updateGeneralInfo() {
     m_nameLabel->copy_label(formatLabel("Name", m_torrent->getName()).c_str());
-    m_sizeLabel->copy_label(formatLabel("Size", m_torrent->formatSize(m_torrent->getTotalSize())).c_str());
+    m_sizeLabel->copy_label(formatLabel("Size", Format::bytes(m_torrent->getTotalSize())).c_str());
     m_statusLabel->copy_label(formatLabel("Status", m_torrent->getStateString()).c_str());
     
     std::ostringstream progress;
     progress << std::fixed << std::setprecision(2) << (m_torrent->getProgress() * 100.0) << "%";
     m_downloadedLabel->copy_label(formatLabel("Downloaded", 
-        m_torrent->formatSize(m_torrent->getDownloaded()) + " (" + progress.str() + ")").c_str());
+        Format::bytes(m_torrent->getDownloaded()) + " (" + progress.str() + ")").c_str());
     
     m_uploadedLabel->copy_label(formatLabel("Uploaded", 
-        m_torrent->formatSize(m_torrent->getUploaded())).c_str());
+        Format::bytes(m_torrent->getUploaded())).c_str());
     
     std::ostringstream ratio;
     ratio << std::fixed << std::setprecision(3) << m_torrent->getRatio();
     m_ratioLabel->copy_label(formatLabel("Ratio", ratio.str()).c_str());
     
     m_downloadSpeedLabel->copy_label(formatLabel("Download Speed", 
-        m_torrent->formatSpeed(m_torrent->getDownloadRate())).c_str());
+        Format::perSecond(m_torrent->getDownloadRate())).c_str());
     
     m_uploadSpeedLabel->copy_label(formatLabel("Upload Speed", 
-        m_torrent->formatSpeed(m_torrent->getUploadRate())).c_str());
+        Format::perSecond(m_torrent->getUploadRate())).c_str());
     
     m_peersLabel->copy_label(formatLabel("Connected Peers", 
         std::to_string(m_torrent->getNumPeers())).c_str());
@@ -307,8 +308,8 @@ void TorrentDetailsDialog::updatePeers() {
     for (const auto& p : peers) {
         oss << std::left << std::setw(18) << p.ip << " | " 
             << std::setw(20) << p.client.substr(0, 19) << " | "
-            << std::setw(10) << TorrentItem::formatSpeed(p.downloadRate) << " | "
-            << std::setw(10) << TorrentItem::formatSpeed(p.uploadRate) << " | "
+            << std::setw(10) << Format::perSecond(p.downloadRate) << " | "
+            << std::setw(10) << Format::perSecond(p.uploadRate) << " | "
             << std::fixed << std::setprecision(1) << (p.progress * 100.0) << "%\n";
     }
     
@@ -458,7 +459,7 @@ void TorrentDetailsDialog::updateSecurity() {
 #endif
             for (int i = 0; i < storage.num_files() && !hasArchive; ++i) {
                 if (storage.pad_file_at(lt::file_index_t(i))) continue;
-                hasArchive = ArchiveInspector::isArchivePath(
+                hasArchive = ArchiveInspector::canListBeforeDownload(
                     std::string(storage.file_path(lt::file_index_t(i))));
             }
         }
@@ -480,7 +481,7 @@ void TorrentDetailsDialog::checkArchive() {
     const std::vector<TorrentItem::FileInfo> files = m_torrent->getFiles();
     const TorrentItem::FileInfo* archive = nullptr;
     for (const TorrentItem::FileInfo& file : files) {
-        if (ArchiveInspector::isArchivePath(file.path)) {
+        if (ArchiveInspector::canListBeforeDownload(file.path)) {
             archive = &file;
             break;
         }
@@ -537,8 +538,7 @@ void TorrentDetailsDialog::checkArchive() {
         delivery->dialog = this;
         delivery->alive = alive;
         delivery->line =
-            ok ? (note.empty() ? archiveSummary(path, entries)
-                               : note + " " + archiveSummary(path, entries))
+            ok ? archiveCheckMessage(path, entries, note)
                : "Archive: the index could not be read (" + error + ").";
         if (ok) delivery->entries = std::move(entries);
         Fl::awake([](void* data) {
@@ -724,7 +724,7 @@ void TorrentDetailsDialog::updateFiles() {
             row << "]";
         }
 
-        row << "  |  " << TorrentItem::formatSize(f.size)
+        row << "  |  " << Format::bytes(f.size)
             << "  |  " << std::fixed << std::setprecision(1)
             << (f.progress * 100.0) << "%";
         return row.str();

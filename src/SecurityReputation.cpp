@@ -95,6 +95,15 @@ std::string archiveSummary(const std::string& archivePath,
     return message;
 }
 
+std::string archiveCheckMessage(const std::string& archivePath,
+                                const std::vector<SecurityFile>& entries,
+                                const std::string& note) {
+    // The note goes first on purpose: the search row elides the end of the line,
+    // and "this list is partial" is the part the user must not miss.
+    if (note.empty()) return archiveSummary(archivePath, entries);
+    return note + " " + archiveSummary(archivePath, entries);
+}
+
 namespace {
 
 // True when any path segment is "..", which would leave the torrent folder.

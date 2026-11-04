@@ -1,4 +1,5 @@
 #include "TorrentItem.h"
+#include "Format.h"
 #include "SecurityHashes.h"
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/version.hpp>
@@ -110,10 +111,10 @@ int TorrentItem::getETA() const {
 
 std::string TorrentItem::getETAString() const {
     int eta = getETA();
-    if (eta < 0) return "∞";
+    if (eta < 0) return Format::duration(-1);
     if (eta == 0) return "Done";
-    
-    return formatTime(eta);
+
+    return Format::duration(eta);
 }
 
 double TorrentItem::getRatio() const {
@@ -121,45 +122,6 @@ double TorrentItem::getRatio() const {
         return m_uploaded > 0 ? 999.0 : 0.0;
     }
     return static_cast<double>(m_uploaded) / m_downloaded;
-}
-
-std::string TorrentItem::formatSize(int64_t bytes) {
-    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
-    int unit = 0;
-    double size = static_cast<double>(bytes);
-    
-    while (size >= 1024 && unit < 4) {
-        size /= 1024;
-        unit++;
-    }
-    
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << size << " " << units[unit];
-    return oss.str();
-}
-
-std::string TorrentItem::formatSpeed(int bytesPerSecond) {
-    if (bytesPerSecond <= 0) return "0 B/s";
-    return formatSize(bytesPerSecond) + "/s";
-}
-
-std::string TorrentItem::formatTime(int seconds) {
-    if (seconds < 0) return "∞";
-    
-    int h = seconds / 3600;
-    int m = (seconds % 3600) / 60;
-    int s = seconds % 60;
-    
-    std::ostringstream oss;
-    if (h > 0) {
-        oss << h << "h " << m << "m " << s << "s";
-    } else if (m > 0) {
-        oss << m << "m " << s << "s";
-    } else {
-        oss << s << "s";
-    }
-    
-    return oss.str();
 }
 
 void TorrentItem::updateState(const lt::torrent_status& status) {

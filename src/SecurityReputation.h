@@ -44,6 +44,13 @@ bool reputationHasDetections(const ReputationResult& result);
 std::string archiveSummary(const std::string& archivePath,
                            const std::vector<SecurityFile>& entries);
 
+// The line a check shows: the summary, prefixed by the partial-list note when
+// the walk stopped early. Kept here so the three surfaces that show the answer
+// cannot word it differently.
+std::string archiveCheckMessage(const std::string& archivePath,
+                                const std::vector<SecurityFile>& entries,
+                                const std::string& note);
+
 // Picks the file a reputation lookup may hash on this machine when the torrent
 // metadata carries no whole-file hash: it must be complete, it must be able to
 // run, and its path must stay inside the torrent. The returned target has an

@@ -1,6 +1,7 @@
 #include "NetworkMonitorDialog.h"
 #include "SecurityEvents.h"
 #include "TorrentItem.h"
+#include "Format.h"
 #include "TorrentManager.h"
 
 #include <FL/Fl.H>
@@ -37,8 +38,8 @@ std::string connectionLine(const std::string& torrent,
         << std::right << std::setw(6) << peer.port << "  "
         << std::left << std::setw(4) << (peer.outgoing ? "out" : "in")
         << std::setw(4) << (peer.encrypted ? "yes" : "no")
-        << std::setw(10) << TorrentItem::formatSpeed(peer.downloadRate) << "  "
-        << std::setw(10) << TorrentItem::formatSpeed(peer.uploadRate) << "  "
+        << std::setw(10) << Format::perSecond(peer.downloadRate) << "  "
+        << std::setw(10) << Format::perSecond(peer.uploadRate) << "  "
         << std::right << std::setw(5)
         << static_cast<int>(peer.progress * 100.0) << "%  "
         << std::left << peer.client;

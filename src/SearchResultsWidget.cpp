@@ -7,7 +7,7 @@
 #include "ReputationService.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
-#include "TorrentItem.h"   // formatSize, used for the size column
+#include "Format.h"
 
 #include <algorithm>
 #include <atomic>
@@ -301,7 +301,7 @@ bool SearchResultsWidget::shieldHit(int row, int x, int y) {
 int SearchResultsWidget::archiveIndexFor(
     const std::vector<TorrentFileEntry>& files) const {
     for (std::size_t i = 0; i < files.size(); ++i) {
-        if (ArchiveInspector::isArchivePath(files[i].path)) {
+        if (ArchiveInspector::canListBeforeDownload(files[i].path)) {
             return static_cast<int>(i);
         }
     }
@@ -406,8 +406,7 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
         delivery->alive = alive;
         delivery->key = key;
         delivery->line =
-            ok ? (note.empty() ? archiveSummary(path, entries)
-                               : note + " " + archiveSummary(path, entries))
+            ok ? archiveCheckMessage(path, entries, note)
                : "Archive: the index could not be read (" + error + ").";
         // The lock badge is driven by this count, and only by it: a failed or
         // skipped check leaves it at zero rather than guessing. Encrypted
@@ -923,7 +922,7 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         // per-file tags. Full path shows when the window is wide; "..." only
         // when narrow.
         fl_font(FL_HELVETICA, 11);
-        const std::string suffix = "  (" + TorrentItem::formatSize(f.size) + ")";
+        const std::string suffix = "  (" + Format::bytes(f.size) + ")";
         std::string tagsText;
         const std::vector<std::string> tags = SecurityAnalyzer::tagsForFile(f);
         if (!tags.empty()) {
@@ -1070,7 +1069,7 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
     std::string text;
     switch (col) {
         case COL_NAME:     text = r->name; break;
-        case COL_SIZE:     text = r->size > 0 ? TorrentItem::formatSize(r->size) : "?"; break;
+        case COL_SIZE:     text = r->size > 0 ? Format::bytes(r->size) : "?"; break;
         case COL_SEEDERS:  text = r->seeders >= 0 ? std::to_string(r->seeders) : "?"; break;
         case COL_LEECHERS: text = r->leechers >= 0 ? std::to_string(r->leechers) : "?"; break;
         case COL_SOURCE:   text = r->source; break;

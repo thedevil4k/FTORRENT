@@ -1,4 +1,5 @@
 #include "TorrentListWidget.h"
+#include "Format.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
 #include <FL/fl_draw.H>
@@ -399,7 +400,7 @@ void TorrentListWidget::drawCell(int row, int col, int x, int y, int w, int h) {
         }
             
         case COL_SIZE:
-            text = torrent->formatSize(torrent->getTotalSize());
+            text = Format::bytes(torrent->getTotalSize());
             fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
             
@@ -413,12 +414,12 @@ void TorrentListWidget::drawCell(int row, int col, int x, int y, int w, int h) {
             break;
             
         case COL_DOWN_SPEED:
-            text = torrent->formatSpeed(torrent->getDownloadRate());
+            text = Format::perSecond(torrent->getDownloadRate());
             fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
             
         case COL_UP_SPEED:
-            text = torrent->formatSpeed(torrent->getUploadRate());
+            text = Format::perSecond(torrent->getUploadRate());
             fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
             

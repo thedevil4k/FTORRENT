@@ -114,9 +114,6 @@ public:
     std::vector<SecurityFile> getSecurityFiles() const;
 
     // Utility
-    static std::string formatSize(int64_t bytes);
-    static std::string formatSpeed(int bytesPerSecond);
-    static std::string formatTime(int seconds);
     static std::string toHex(const lt::sha1_hash& hash);
 
 private:
