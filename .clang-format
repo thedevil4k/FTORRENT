@@ -1,0 +1,49 @@
+# Style of the existing sources, for editors and future formatting passes.
+# It is descriptive: the tree has not been reformatted with it yet, so a
+# clang-format run over a whole file is a separate commit, never mixed with a
+# behaviour change.
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 80
+
+# Functions put the brace on its own line; classes, enums and namespaces keep it
+# on the declaration line.
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterClass: false
+  AfterStruct: false
+  AfterEnum: false
+  AfterNamespace: false
+  AfterUnion: false
+  AfterExternBlock: false
+  AfterControlStatement: Never
+  BeforeElse: false
+  BeforeCatch: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: true
+
+# `public:` sits at column 0, members are indented inside it.
+AccessModifierOffset: -4
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+AlignAfterOpenBracket: Align
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerIndentWidth: 8
+ContinuationIndentWidth: 4
+DerivePointerAlignment: false
+IndentCaseLabels: true
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+SortIncludes: Never
+SpaceBeforeParens: ControlStatements

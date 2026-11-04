@@ -81,7 +81,9 @@
 - ✅ A High/Critical selection asks for confirmation before it is accepted
 - ✅ Clicking the shield asks VirusTotal and MalwareBazaar about the file hash;
   without one it shows `VT no disponible antes de descargar el archivo completo.`
-- ✅ "Check archive" reads a RAR/ZIP's index from its first and last piece in a
+- ✅ "Check archive" reads a RAR/ZIP's index without downloading the archive: two
+  pieces for ZIP and RAR5, a bounded header walk for RAR 1.5-4.x, which is then
+  labelled partial. (The wording below predates that walk.)
   temporary folder, and says whether any entry can run
 
 **Features:**
@@ -126,8 +128,8 @@ Shows full torrent information:
 #### Security Tab:
 - ✅ Shield and the metadata verdict for the torrent
 - ✅ Counts and every finding, worded as "no known indicators", never "safe"
-- ✅ **Check archive**: reads the first and last piece of a RAR/ZIP and lists
-  what it holds; runs only when pressed
+- ✅ **Check archive**: reads the index of a ZIP/RAR without downloading the
+  archive and lists what it holds; runs only when pressed
 - ✅ A Reputation section: clicking the shield asks about the metadata hash, or
   hashes a completed file locally and says so. Neither uploads anything
 - ✅ The shield's tooltip carries both verdicts

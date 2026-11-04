@@ -2,13 +2,13 @@
 #define ICONS_H
 
 /**
- * @brief Embedded icons for FLTorrent
+ * @brief Embedded icons for FTorrent
  * 
  * This file contains XPM format icons that can be embedded directly
  * into the application without requiring external image files.
  */
 
-// FLTorrent logo (32x32)
+// FTorrent logo (32x32)
 // inline constexpr, not static: a `static` array in a header is a private copy
 // in every translation unit that includes it, so every .cpp that reached
 // Resources.h duplicated all of these glyphs and warned about the copies it did

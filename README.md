@@ -4,7 +4,7 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/thedevil4k/FTORRENT)](https://github.com/thedevil4k/FTORRENT/releases)
-[![Build FLTorrent](https://github.com/thedevil4k/FTORRENT/actions/workflows/build.yml/badge.svg)](https://github.com/thedevil4k/FTORRENT/actions/workflows/build.yml)
+[![Build FTorrent](https://github.com/thedevil4k/FTORRENT/actions/workflows/build.yml/badge.svg)](https://github.com/thedevil4k/FTORRENT/actions/workflows/build.yml)
 [![GitHub stars](https://img.shields.io/github/stars/thedevil4k/FTORRENT?style=social)](https://github.com/thedevil4k/FTORRENT/stargazers)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/thedevil4k/FTORRENT/releases)
 
@@ -153,22 +153,25 @@ CI builds and runs the offline subset on pushes and pull requests that touch cod
 | `src/` | the application: `MainWindow`, `TorrentSession`/`TorrentManager`, `SearchEngine`, `PreferencesDialog`, `AssetLoader`, `Resources`, `ToolbarLayout` |
 | `tests/` | the CTest suite |
 | `scripts/` | dependency setup, compilation and packaging scripts per platform |
-| `docs/` | the public site sources (`index.html`) and its assets |
+| `docs/` | the public site sources (`index.html`) and its assets; `docs/history/` keeps the old phase reports |
 | `packaging/` | Arch, deb and rpm packaging |
 
-Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+Architecture notes live in **[ARCHITECTURE.md](ARCHITECTURE.md)**; the rules a
+change has to follow — invariants, module boundaries, test commands and recipes
+— live in **[AGENTS.md](AGENTS.md)**.
 
 ---
 
 ## Documentation
 
-- **[FUTURE_UPDATES_IDEAS.md](FUTURE_UPDATES_IDEAS.md)** — evaluated ideas we parked (and why), in Spanish and English
-- **[USER-GUIDE.md](USER-GUIDE.md)** — using the client
+- **[AGENTS.md](AGENTS.md)** — how to change this code: invariants, commands, module map, recipes
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the code is put together
-- **[UI-DESIGN.md](UI-DESIGN.md)** — interface and layout rules
+- **[USER-GUIDE.md](USER-GUIDE.md)** — using the client
+- **[FUTURE_UPDATES_IDEAS.md](FUTURE_UPDATES_IDEAS.md)** — evaluated ideas we parked (and why)
 - **[MULTITHREADING-ARCHITECTURE.md](MULTITHREADING-ARCHITECTURE.md)** — the asynchronous core
-- **[TECHNICAL-REFERENCE.md](TECHNICAL-REFERENCE.md)** — developer reference
+- **[COMPILE-GUIDE.md](COMPILE-GUIDE.md)** — building it yourself
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** — releases and packaging
+- **[docs/history/](docs/history/README.md)** — phase reports kept for their decisions, not current
 
 ---
 

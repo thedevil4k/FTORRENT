@@ -108,7 +108,7 @@ headless:
 | `security_badge` | risk labels and palette, name sanitising and the shield rendered offscreen |
 | `security_keys` | the key store: round trip, removal and the absence of the key from the stored bytes |
 | `reputation` | provider parsing from canned answers, the service's states, the choice of hash, and the exact no-hash sentence |
-| `archive_preflight` | piece arithmetic and a real ZIP/RAR5 listing rebuilt from only its first and last piece |
+| `archive_preflight` | piece arithmetic, the lazy RAR 1.5-4.x header walk over fixtures, and the partial/encrypted rulings |
 
 They link `ftorrent_core`, the same object library the app is built from, so a
 test exercises the objects that ship rather than a second copy that can drift.
@@ -246,20 +246,26 @@ requires.
 
 **`SecurityReputation`** picks the file a click should ask about (a runnable
 file wins over a picture) and words the answer. **`ArchivePreflight`** is the
-level-2 path: it computes which pieces hold a file's first and last byte from
-`file_offset()`/`file_size()`, fetches only those with `set_piece_deadline(...,
-alert_when_available)` in a throwaway session and directory, writes them into a
-sparse file of the real size, and lets `ArchiveInspector::listEntries()` read
-the index. The directory is removed before the call returns.
+level-2 path: it computes which pieces hold a file's bytes from
+`file_offset()`/`file_size()` and fetches only those in a throwaway session and
+directory. For ZIP and RAR5 the two ends hold the index, so two pieces are
+enough. A RAR 1.5-4.x has no central index, so libarchive walks its headers
+through a lazy stream: the reader asks for a header, the session fetches the
+piece that holds it and skips the packed data, under a budget of a tenth of the
+archive's own pieces (64 at most) and the check's deadline. When the walk stops
+early the result is labelled partial, with the number of entries read and the
+data fetched. An archive whose headers are encrypted cannot be listed at all
+and is reported as password-protected. Nothing is written to the download
+folder; the temporary directory is removed before the call returns.
 
 Two entry points, one body: `ArchivePreflight` accepts either a magnet or
 `.torrent` path (search rows, Add Torrent) or an `add_torrent_params` carrying
 the metadata (Details). The second one means a torrent the app already knows
 does not exchange metadata with the swarm a second time. The three surfaces
-share `archiveSummary()` for the wording and each keeps its own result line;
-the search-row line is hit-tested from the rectangle the draw recorded, and the
-archive worker reports through `Fl::awake()` behind the same `alive` flag the
-reputation lookups use.
+share `archiveSummary()` and `archiveCheckMessage()` for the wording and each
+keeps its own result line; the search-row line is hit-tested from the rectangle
+the draw recorded, and the archive worker reports through `Fl::awake()` behind
+the same `alive` flag the reputation lookups use.
 
 **Local hashing.** When the metadata has no whole-file hash, Details asks
 `findLocalHashTarget()` for a file that is complete, can run, and whose recorded

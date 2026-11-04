@@ -14,13 +14,14 @@
 #include "SecurityKeys.h"
 
 /**
- * @brief Diálogo de preferencias/configuración de FLTorrent
- * 
- * Organizado en pestañas:
- * - General: Rutas, comportamiento
- * - Connection: Puertos, límites de velocidad
- * - BitTorrent: DHT, PEX, LSD, UPnP
- * - Advanced: Configuraciones avanzadas
+ * @brief Preferences window of FTorrent.
+ *
+ * Organised in tabs:
+ * - General: paths and behaviour
+ * - Connection: port, speed and connection limits
+ * - BitTorrent: DHT, PEX, LSD, UPnP, NAT-PMP
+ * - Advanced: the user agent and anonymous mode
+ * - Security: the provider keys, stored by the OS and never in settings.ini
  */
 class PreferencesDialog : public Fl_Window {
 public:

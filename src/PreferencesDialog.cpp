@@ -2,6 +2,7 @@
 #include "SettingsManager.h"
 #include "SecurityKeys.h"
 #include "SystemUtils.h"
+#include "Version.h"
 #include <FL/Fl.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/fl_ask.H>
@@ -53,7 +54,7 @@ void PreferencesDialog::createGeneralTab() {
     m_browsePath->callback(onBrowsePath, this);
     
     // Start with system
-    m_startWithSystem = new Fl_Check_Button(20, 120, 250, 25, "Start FLTorrent on system startup");
+    m_startWithSystem = new Fl_Check_Button(20, 120, 250, 25, "Start FTorrent on system startup");
     
     // Minimize to tray
     m_minimizeToTray = new Fl_Check_Button(20, 150, 250, 25, "Minimize to system tray");
@@ -158,7 +159,7 @@ void PreferencesDialog::createAdvancedTab() {
     uaLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     
     m_userAgent = new Fl_Input(20, 75, 400, 30);
-    m_userAgent->value("FLTorrent/0.1.0");
+    m_userAgent->value(Version::defaultTrackerUserAgent().c_str());
     
     // Anonymous mode
     m_anonymousMode = new Fl_Check_Button(20, 120, 300, 25, "Anonymous mode (disable tracking)");
