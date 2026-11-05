@@ -96,6 +96,10 @@ set(SOURCES
     src/AssetLoader.cpp
     src/ToolbarLayout.cpp
     src/MainWindow.cpp
+    src/MainWindowSearch.cpp
+    src/MainWindowTheme.cpp
+    src/MainWindowActions.cpp
+    src/MainWindowTray.cpp
     src/TorrentListWidget.cpp
     src/PreferencesDialog.cpp
     src/AddTorrentDialog.cpp

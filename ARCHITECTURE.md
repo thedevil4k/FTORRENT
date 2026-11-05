@@ -1,5 +1,27 @@
 # FTorrent - Project Architecture
 
+## How the source tree is split
+
+`src/` is flat: no subdirectories, and no file grows past roughly 800 lines. A
+file that outgrew that was split by topic, moving whole functions unchanged
+rather than rewriting them, so the split is a move and not a behaviour change.
+
+`MainWindow` is the clearest example. The class still lives in
+`src/MainWindow.{h,cpp}`; its implementation is spread over four files that
+answer one question each:
+
+| File | What it holds |
+| :--- | :--- |
+| `src/MainWindow.cpp` | the window itself: construction, toolbar, torrent list, status bar, layout, window state |
+| `src/MainWindowSearch.cpp` | the search view, the engine reachability check and the search worker |
+| `src/MainWindowTheme.cpp` | theme, icons, limits, censorship and the status bar text |
+| `src/MainWindowActions.cpp` | the dialogs the menu and the toolbar open |
+| `src/MainWindowTray.cpp` | the Windows system tray, which is the only part of the window that is not portable |
+
+The split is a file-level decision, not a class-level one: `MainWindow` is
+still one class with one header, and the private members the other files touch
+stay in that header.
+
 ## Toolbar and assets: where things live
 
 Two small modules own the parts that are pure policy, so a change to either
