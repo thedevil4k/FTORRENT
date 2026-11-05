@@ -70,6 +70,13 @@ code's bug. A child that dies that way is retried, and a child that keeps
 dying fails the test with that as the reason, so an upstream crash is never
 mistaken for a broken archive check.
 
+The harness can fail too, and that is not the product's answer. A child
+whose loopback seeder never started, or whose fixture could not be written,
+exits with `SETUP_FAILED` (3) and the parent runs the scenario again; a
+scenario whose own checks fail exits with 1 and is never retried. The exit
+code is decoded the way each platform packs it (`WIFEXITED`/`WEXITSTATUS` on
+POSIX), so a failed check is never mistaken for a crash.
+
 Tests link `ftorrent_core`, the same object library the application is built
 from. There is no second copy of the code under `tests/`.
 

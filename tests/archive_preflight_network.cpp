@@ -25,6 +25,12 @@
 // the product's. A child that dies that way is retried, and a child that
 // keeps dying fails the test with that as the reason, so an upstream crash is
 // never mistaken for a broken archive check.
+//
+// The harness itself can also be unlucky: the loopback seeder sometimes does
+// not reach the seeding state within its timeout, and the fixture may not be
+// writable. Neither says anything about the code under test, so the child
+// exits with SETUP_FAILED for those and the parent runs the scenario again. A
+// scenario whose own checks fail exits with 1, and that is never retried.
 #include "ArchivePreflight.h"
 #include "ArchiveProbeSession.h"
 #include "SecurityTypes.h"
@@ -54,6 +60,11 @@
 #include <thread>
 #include <vector>
 
+#ifndef _WIN32
+// WIFEXITED and friends, to read a child's exit code out of the wait status.
+#include <sys/wait.h>
+#endif
+
 namespace fs = std::filesystem;
 namespace lt = libtorrent;
 
@@ -61,6 +72,27 @@ namespace {
 
 int checks = 0;
 int failures = 0;
+
+// The child exits with this when the loopback harness itself could not be set
+// up - the seeder never reached the seeding state, or the fixture could not
+// be written. That is not the product's answer, it is the test's own
+// machinery being unlucky, so the parent runs the scenario again instead of
+// reporting a failure that says nothing about the code under test.
+const int SETUP_FAILED = 3;
+
+// The child's exit code, whatever the platform's wait status encoding says.
+// Windows hands back the exit code as it is; a POSIX system packs it into the
+// status, so reading it raw would turn "the checks failed" into "the child
+// crashed" and make the parent retry a failure that must not be retried.
+int childExitCode(int status) {
+    if (status == -1) return -1;
+#ifdef _WIN32
+    return status;
+#else
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    return -2;   // killed by a signal
+#endif
+}
 
 void ok(bool condition, const std::string& what) {
     checks++;
@@ -282,11 +314,14 @@ void scenarioRarWalk(const fs::path& fixtures) {
 
     std::cout << "    seeding " << fixture.filename().string() << '\n';
     LocalSeeder seeder(fixture, pieceLength);
-    ok(seeder.ok(), "the fixture is seeded on the loopback interface");
     if (!seeder.ok()) {
-        std::cout << "        error: " << seeder.error() << '\n';
-        return;
+        // Not a failure of the code under test: the harness could not be set
+        // up, so the parent runs the scenario again.
+        std::cout << "        the loopback seeder did not start: "
+                  << seeder.error() << '\n';
+        std::exit(SETUP_FAILED);
     }
+    ok(seeder.ok(), "the fixture is seeded on the loopback interface");
 
     std::vector<SecurityFile> entries;
     std::string error;
@@ -329,11 +364,12 @@ void scenarioEncryptedHeaders(const fs::path& fixtures) {
         fixtures / "test_read_format_rar_encryption_header.rar";
     std::cout << "    seeding " << fixture.filename().string() << '\n';
     LocalSeeder seeder(fixture, 16384);
-    ok(seeder.ok(), "the fixture is seeded on the loopback interface");
     if (!seeder.ok()) {
-        std::cout << "        error: " << seeder.error() << '\n';
-        return;
+        std::cout << "        the loopback seeder did not start: "
+                  << seeder.error() << '\n';
+        std::exit(SETUP_FAILED);
     }
+    ok(seeder.ok(), "the fixture is seeded on the loopback interface");
 
     std::vector<SecurityFile> entries;
     std::string error;
@@ -365,15 +401,20 @@ void scenarioZipTwoEnds(const fs::path&) {
     std::error_code ec;
     fs::remove(source, ec);
     const bool built = createLargeZip(source, payloadBytes);
+    if (!built) {
+        fs::remove(source, ec);
+        std::exit(SETUP_FAILED);
+    }
     ok(built, "a megabyte ZIP could be written");
 
     LocalSeeder seeder(source, pieceLength);
-    ok(seeder.ok(), "the ZIP is seeded on the loopback interface");
     if (!seeder.ok()) {
-        std::cout << "        error: " << seeder.error() << '\n';
+        std::cout << "        the loopback seeder did not start: "
+                  << seeder.error() << '\n';
         fs::remove(source, ec);
-        return;
+        std::exit(SETUP_FAILED);
     }
+    ok(seeder.ok(), "the ZIP is seeded on the loopback interface");
 
     std::vector<SecurityFile> entries;
     std::string error;
@@ -403,11 +444,12 @@ void scenarioHostileNames(const fs::path& fixtures) {
     const fs::path fixture = fixtures / "setup.zip";
     std::cout << "    seeding " << fixture.filename().string() << '\n';
     LocalSeeder seeder(fixture, 16384);
-    ok(seeder.ok(), "the fixture is seeded on the loopback interface");
     if (!seeder.ok()) {
-        std::cout << "        error: " << seeder.error() << '\n';
-        return;
+        std::cout << "        the loopback seeder did not start: "
+                  << seeder.error() << '\n';
+        std::exit(SETUP_FAILED);
     }
+    ok(seeder.ok(), "the fixture is seeded on the loopback interface");
 
     std::vector<SecurityFile> entries;
     std::string error;
@@ -482,10 +524,11 @@ int main(int argc, char** argv) {
     for (const Scenario& scenario : SCENARIOS) {
         bool passed = false;
         bool crashed = false;
+        bool setupFailed = false;
         for (int attempt = 0; attempt <= CRASH_RETRIES; ++attempt) {
             const std::string command =
                 "\"" + exe + "\" --scenario " + scenario.name;
-            const int code = std::system(command.c_str());
+            const int code = childExitCode(std::system(command.c_str()));
             if (code == 0) {
                 passed = true;
                 break;
@@ -494,6 +537,15 @@ int main(int argc, char** argv) {
                 // The scenario ran and its checks failed. That is the
                 // product's answer, and it is not retried.
                 break;
+            }
+            if (code == SETUP_FAILED) {
+                // The harness could not be set up. libtorrent did not get the
+                // seeder going in time, which says nothing about the code
+                // under test, so the scenario runs again.
+                setupFailed = true;
+                std::cout << "\n    the loopback seeder did not start; "
+                          << "retrying\n";
+                continue;
             }
             if (code == -1) {
                 std::cout << "    the child process could not be started\n";
@@ -509,6 +561,10 @@ int main(int argc, char** argv) {
             if (crashed) {
                 std::cout << "    FAIL the scenario '" << scenario.name
                           << "' kept crashing inside libtorrent\n";
+            } else if (setupFailed) {
+                std::cout << "    FAIL the scenario '" << scenario.name
+                          << "' could not be set up on the loopback "
+                             "interface\n";
             }
         }
     }
