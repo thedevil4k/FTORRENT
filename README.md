@@ -139,6 +139,7 @@ ctest --test-dir build --output-on-failure
 | `search_parse` | a published magnet keeps its `tr=` trackers, each row gets its own `.torrent` link, and a relative link is never guessed |
 | `filelist` | the trackers and DHT nodes every probe uses, `.torrent` hashing and the sample-torrent parser |
 | `filelist_network` | against the real swarm: Nyaa's `.torrent`, the hash check that refuses a different torrent, a trackerless Pirate Bay magnet reaching its peers, and the wording of an empty swarm |
+| `quality_gates` | the promises that are about the tree and the wording rather than the behaviour: the file size limit, the exact no-hash sentence, the badge order, the shield on all four surfaces, the providers asked only from a click, and no API key in the binary |
 
 `flows` and `filelist_network` touch the network and are labelled `network`; drop them with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 

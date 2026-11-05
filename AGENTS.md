@@ -73,12 +73,25 @@ mistaken for a broken archive check.
 Tests link `ftorrent_core`, the same object library the application is built
 from. There is no second copy of the code under `tests/`.
 
+One test is not a program: `quality_gates` runs
+`scripts/quality/check_invariants.py`, which reads the source tree and checks
+the promises that are about its shape and its wording rather than about
+behaviour - the size limit, the exact no-hash sentence, the badge order, the
+shield on all four surfaces, the providers asked only from a click, no API key
+in the binary. It is labelled `unit` and it can also be run by hand:
+
+```bash
+python scripts/quality/check_invariants.py --root .
+```
+
 ## Where things live
 
-`src/` is flat and no file grows past roughly 800 lines. A file that outgrew
-that is split by topic: whole functions move unchanged into a new file that
-answers one question, and the class stays one class with one header. The
-private members the new files touch stay in that header.
+The code in `src/` is flat - one directory, the only exception being
+`src/assets/`, where the images live - and no file grows past roughly 800
+lines. A file that outgrew that is split by topic: whole functions move
+unchanged into a new file that answers one question, and the class stays one
+class with one header. The private members the new files touch stay in that
+header.
 
 | area | files |
 | :--- | :--- |

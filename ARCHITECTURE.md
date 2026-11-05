@@ -2,9 +2,11 @@
 
 ## How the source tree is split
 
-`src/` is flat: no subdirectories, and no file grows past roughly 800 lines. A
-file that outgrew that was split by topic, moving whole functions unchanged
-rather than rewriting them, so the split is a move and not a behaviour change.
+The code in `src/` is flat - one directory, the only exception being
+`src/assets/`, where the images live - and no file grows past roughly 800
+lines. A file that outgrew that was split by topic, moving whole functions
+unchanged rather than rewriting them, so the split is a move and not a
+behaviour change.
 
 `MainWindow` is the clearest example. The class still lives in
 `src/MainWindow.{h,cpp}`; its implementation is spread over four files that

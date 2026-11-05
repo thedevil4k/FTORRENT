@@ -32,6 +32,11 @@
 #                   lists its entries from a swarm and the seeder's upload
 #                   counter proves the archive was never downloaded
 #   security_events the engine event log: order, cap and what it drops
+#   quality_gates   not a program: it reads the source tree and checks the
+#                   promises that are about its shape and its wording rather
+#                   than about behaviour - the size limit, the exact no-hash
+#                   sentence, the badge order, the shield on all four
+#                   surfaces, the providers asked only from a click
 #
 # Sources are listed by hand rather than globbed, so adding a file is a decision
 # someone makes rather than something that happens.
@@ -137,10 +142,43 @@ add_test(NAME filelist COMMAND filelist)
 add_test(NAME filelist_network COMMAND filelist_network)
 add_test(NAME format COMMAND format)
 
+# quality_gates is not a program: it reads the source tree and checks the
+# product invariants that are about its shape and its wording rather than about
+# behaviour - a file that outgrew the size limit, a badge drawn in the wrong
+# order, a verdict that starts saying "safe", a provider asked from a fourth
+# place. The other suites check behaviour; this one checks the promises.
+#
+# It needs Python, which every machine that builds the project has, but a
+# missing interpreter must not break the configure step: the test is simply
+# not registered and the checker can still be run by hand.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(NOT Python3_EXECUTABLE)
+    find_package(PythonInterp QUIET)
+endif()
+if(Python3_EXECUTABLE OR PYTHON_EXECUTABLE)
+    if(Python3_EXECUTABLE)
+        set(FTORRENT_PYTHON ${Python3_EXECUTABLE})
+    else()
+        set(FTORRENT_PYTHON ${PYTHON_EXECUTABLE})
+    endif()
+    add_test(NAME quality_gates
+        COMMAND ${FTORRENT_PYTHON}
+                ${CMAKE_SOURCE_DIR}/scripts/quality/check_invariants.py
+                --root ${CMAKE_SOURCE_DIR})
+    set(FTORRENT_QUALITY_GATES TRUE)
+else()
+    message(STATUS
+        "Python not found: the quality_gates test is not registered. "
+        "Run scripts/quality/check_invariants.py by hand instead.")
+endif()
+
 set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
     security_analyzer security_badge security_keys reputation archive_preflight
     archive_preflight_network security_events search_results search_scope
     search_parse filelist filelist_network format)
+if(FTORRENT_QUALITY_GATES)
+    list(APPEND FTORRENT_TESTS quality_gates)
+endif()
 if(FTORRENT_HAVE_LIBARCHIVE)
     add_test(NAME archive_inspector COMMAND archive_inspector)
     list(APPEND FTORRENT_TESTS archive_inspector)
@@ -173,6 +211,9 @@ set_tests_properties(archive_preflight_network PROPERTIES LABELS "network")
 # though nothing is drawn and no network is touched.
 set_tests_properties(reputation PROPERTIES LABELS "ui")
 set_tests_properties(archive_preflight security_events PROPERTIES LABELS "unit")
+if(FTORRENT_QUALITY_GATES)
+    set_tests_properties(quality_gates PROPERTIES LABELS "unit")
+endif()
 if(FTORRENT_HAVE_LIBARCHIVE)
     target_compile_definitions(archive_preflight PRIVATE
         FTORRENT_ARCHIVE_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/archives")
