@@ -143,7 +143,7 @@ ctest --test-dir build --output-on-failure
 
 `flows` and `filelist_network` touch the network and are labelled `network`; drop them with `ctest --test-dir build -LE network` for an offline run. Tests redirect the settings directory to their own scratch space and never read or delete yours.
 
-CI builds and runs the offline subset on pushes and pull requests that touch code; see [.github/workflows/build.yml](.github/workflows/build.yml).
+CI builds and runs the offline subset on pushes and pull requests that touch code, and a `quality` job holds the tree to its own gates: the compiler is asked to fail on its own warnings (`-DFTORRENT_WARNINGS_AS_ERRORS=ON`) and the product invariants are checked against the source tree; see [.github/workflows/build.yml](.github/workflows/build.yml).
 
 ---
 
