@@ -9,8 +9,12 @@
 #include <shlobj.h>
 #include <shellapi.h>
 #include <wininet.h>
+#ifdef _MSC_VER
+// MSVC links these from the pragma; other compilers link them through
+// CMake, and do not know what a #pragma comment is.
 #pragma comment(lib, "psapi.lib")
 #pragma comment(lib, "wininet.lib")
+#endif
 #elif __APPLE__
 #include <mach/mach.h>
 #include <unistd.h>

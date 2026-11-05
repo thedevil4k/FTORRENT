@@ -60,7 +60,7 @@ void MainWindow::removeTrayIcon() {
     m_trayHasIcon = false;
 }
 
-int MainWindow::win_event_handler(int event) {
+int MainWindow::win_event_handler(int) {
     extern MSG fl_msg;
 
     // ── WM_DROPFILES: user dropped files from Windows Explorer ────────────

@@ -243,8 +243,9 @@ void SearchResultsWidget::updateRowHeight(int row) {
     row_height(row, BASE_ROW_HEIGHT + lines * FILE_LINE_HEIGHT);
 }
 
-void SearchResultsWidget::drawExpandCell(int row, int x, int y, int w, int h) {
-    (void)h;   // The triangle is drawn inside the top slice of the row.
+// The triangle is drawn inside the top slice of the row, so the height of the
+// cell is not needed here.
+void SearchResultsWidget::drawExpandCell(int row, int x, int y, int w, int) {
     const SearchResult* r = getResultAt(row);
     if (!r) return;
 

@@ -293,7 +293,7 @@ bool AddTorrentDialog::show_modal() {
 }
 
 // Static callbacks
-void AddTorrentDialog::onBrowseFile(Fl_Widget* w, void* data) {
+void AddTorrentDialog::onBrowseFile(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = (AddTorrentDialog*)data;
     
     const char* filename = PathUtils::showFileChooser(
@@ -310,7 +310,7 @@ void AddTorrentDialog::onBrowseFile(Fl_Widget* w, void* data) {
     }
 }
 
-void AddTorrentDialog::onBrowseSavePath(Fl_Widget* w, void* data) {
+void AddTorrentDialog::onBrowseSavePath(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = (AddTorrentDialog*)data;
     
     const char* dir = PathUtils::showDirChooser(
@@ -323,7 +323,7 @@ void AddTorrentDialog::onBrowseSavePath(Fl_Widget* w, void* data) {
     }
 }
 
-void AddTorrentDialog::onOK(Fl_Widget* w, void* data) {
+void AddTorrentDialog::onOK(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = (AddTorrentDialog*)data;
     
     if (dlg->validate()) {
@@ -332,7 +332,7 @@ void AddTorrentDialog::onOK(Fl_Widget* w, void* data) {
     }
 }
 
-void AddTorrentDialog::onCancel(Fl_Widget* w, void* data) {
+void AddTorrentDialog::onCancel(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = (AddTorrentDialog*)data;
     dlg->m_okClicked = false;
     dlg->hide();
@@ -367,7 +367,7 @@ void AddTorrentDialog::updateOriginDot() {
     m_magnetOriginDot->redraw();
 }
 
-void AddTorrentDialog::onMagnetFieldChanged(Fl_Widget* w, void* data) {
+void AddTorrentDialog::onMagnetFieldChanged(Fl_Widget*, void* data) {
     ((AddTorrentDialog*)data)->updateOriginDot();
 }
 
@@ -593,8 +593,7 @@ void AddTorrentDialog::updateSecurityPanel() {
     refreshReputationLabel();
 }
 
-void AddTorrentDialog::onCheckArchive(Fl_Widget* w, void* data) {
-    (void)w;
+void AddTorrentDialog::onCheckArchive(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
     if (dlg) dlg->checkArchive();
 }
@@ -773,14 +772,12 @@ void AddTorrentDialog::refreshReputationLabel() {
     m_reputationLabel->redraw();
 }
 
-void AddTorrentDialog::onFileSelectionChanged(Fl_Widget* w, void* data) {
-    (void)w;
+void AddTorrentDialog::onFileSelectionChanged(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
     if (dlg) dlg->updateSecurityPanel();
 }
 
-void AddTorrentDialog::onSelectNonExecutables(Fl_Widget* w, void* data) {
-    (void)w;
+void AddTorrentDialog::onSelectNonExecutables(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
     if (!dlg || !dlg->m_fileBrowser) return;
 

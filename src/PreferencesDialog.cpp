@@ -307,30 +307,26 @@ void PreferencesDialog::clearKeyFor(SecurityKeys::Provider provider,
     refreshKeyStatus();
 }
 
-void PreferencesDialog::onSaveKey(Fl_Widget* w, void* data) {
-    (void)w;
+void PreferencesDialog::onSaveKey(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
     if (!dlg) return;
     dlg->saveKeyFromField(SecurityKeys::Provider::VirusTotal, dlg->m_virusTotalKey);
 }
 
-void PreferencesDialog::onClearKey(Fl_Widget* w, void* data) {
-    (void)w;
+void PreferencesDialog::onClearKey(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
     if (!dlg) return;
     dlg->clearKeyFor(SecurityKeys::Provider::VirusTotal, dlg->m_virusTotalKey);
 }
 
-void PreferencesDialog::onSaveBazaarKey(Fl_Widget* w, void* data) {
-    (void)w;
+void PreferencesDialog::onSaveBazaarKey(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
     if (!dlg) return;
     dlg->saveKeyFromField(SecurityKeys::Provider::MalwareBazaar,
                           dlg->m_malwareBazaarKey);
 }
 
-void PreferencesDialog::onClearBazaarKey(Fl_Widget* w, void* data) {
-    (void)w;
+void PreferencesDialog::onClearBazaarKey(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = static_cast<PreferencesDialog*>(data);
     if (!dlg) return;
     dlg->clearKeyFor(SecurityKeys::Provider::MalwareBazaar,
@@ -338,15 +334,11 @@ void PreferencesDialog::onClearBazaarKey(Fl_Widget* w, void* data) {
 }
 
 // The key pages, not the home page: the user lands where the key is issued.
-void PreferencesDialog::onGetVirusTotalKey(Fl_Widget* w, void* data) {
-    (void)w;
-    (void)data;
+void PreferencesDialog::onGetVirusTotalKey(Fl_Widget*, void*) {
     SystemUtils::openUrl("https://www.virustotal.com/gui/my-apikey");
 }
 
-void PreferencesDialog::onGetBazaarKey(Fl_Widget* w, void* data) {
-    (void)w;
-    (void)data;
+void PreferencesDialog::onGetBazaarKey(Fl_Widget*, void*) {
     SystemUtils::openUrl("https://auth.abuse.ch/");
 }
 
@@ -483,7 +475,7 @@ void PreferencesDialog::generateRandomPort() {
 }
 
 // Static callbacks
-void PreferencesDialog::onBrowsePath(Fl_Widget* w, void* data) {
+void PreferencesDialog::onBrowsePath(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = (PreferencesDialog*)data;
     
     const char* dir = PathUtils::showDirChooser("Select Default Download Directory", dlg->m_downloadPath->value());
@@ -492,7 +484,7 @@ void PreferencesDialog::onBrowsePath(Fl_Widget* w, void* data) {
     }
 }
 
-void PreferencesDialog::onRandomPort(Fl_Widget* w, void* data) {
+void PreferencesDialog::onRandomPort(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = (PreferencesDialog*)data;
     
     if (dlg->m_randomPort->value()) {
@@ -503,7 +495,7 @@ void PreferencesDialog::onRandomPort(Fl_Widget* w, void* data) {
     }
 }
 
-void PreferencesDialog::onOK(Fl_Widget* w, void* data) {
+void PreferencesDialog::onOK(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = (PreferencesDialog*)data;
     
     if (dlg->validateSettings()) {
@@ -513,13 +505,13 @@ void PreferencesDialog::onOK(Fl_Widget* w, void* data) {
     }
 }
 
-void PreferencesDialog::onCancel(Fl_Widget* w, void* data) {
+void PreferencesDialog::onCancel(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = (PreferencesDialog*)data;
     dlg->m_okClicked = false;
     dlg->hide();
 }
 
-void PreferencesDialog::onApply(Fl_Widget* w, void* data) {
+void PreferencesDialog::onApply(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = (PreferencesDialog*)data;
     dlg->applySettings();
 }

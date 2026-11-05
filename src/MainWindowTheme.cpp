@@ -320,10 +320,9 @@ void MainWindow::updateRamModeButton() {
     m_btnRamMode->redraw();
 }
 
-void MainWindow::onRamModeCycle(Fl_Widget* w, void* data) {
+void MainWindow::onRamModeCycle(Fl_Widget*, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (!win || !win->m_manager) return;
-    (void)w;
     int cur = SettingsManager::instance().getRamMode();
     int next = (cur == 1) ? 2 : (cur == 2) ? 0 : 1;   // NORMAL->TURBO->ECO
     SettingsManager::instance().setRamMode(next);

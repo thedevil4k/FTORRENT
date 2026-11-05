@@ -37,7 +37,7 @@ void MainWindow::createSearchView() {
     m_choiceSearchEngine = new Fl_Choice(10, barY, 150, barH);
     m_choiceSearchEngine->box(FL_FLAT_BOX);
     m_choiceSearchEngine->tooltip("Search engine (green = reachable, red = unreachable, gray = not checked yet)");
-    m_choiceSearchEngine->callback([](Fl_Widget* w, void* data) {
+    m_choiceSearchEngine->callback([](Fl_Widget*, void* data) {
         MainWindow* win = (MainWindow*)data;
         if (win) win->updateCategoryChoice();
     }, this);
@@ -50,7 +50,7 @@ void MainWindow::createSearchView() {
     m_searchInput = new Fl_Input(170, barY, 300, barH);
     m_searchInput->tooltip("Type what to look for and press Enter");
     m_searchInput->when(FL_WHEN_ENTER_KEY);
-    m_searchInput->callback([](Fl_Widget* w, void* data) {
+    m_searchInput->callback([](Fl_Widget*, void* data) {
         MainWindow* win = (MainWindow*)data;
         if (win) win->startSearch();
     }, this);
@@ -682,7 +682,7 @@ void MainWindow::finishSearch() {
     setSearchStatus(text);
 }
 
-void MainWindow::onSearchCancelClick(Fl_Widget* w, void* data) {
+void MainWindow::onSearchCancelClick(Fl_Widget*, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (!win || !win->m_searching) return;
     

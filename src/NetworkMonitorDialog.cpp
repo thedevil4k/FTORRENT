@@ -193,16 +193,14 @@ void NetworkMonitorDialog::onTimer(void* data) {
     Fl::repeat_timeout(1.0, onTimer, data);
 }
 
-void NetworkMonitorDialog::onRefresh(Fl_Widget* w, void* data) {
-    (void)w;
+void NetworkMonitorDialog::onRefresh(Fl_Widget*, void* data) {
     NetworkMonitorDialog* dialog = static_cast<NetworkMonitorDialog*>(data);
     if (!dialog) return;
     dialog->refreshConnections();
     dialog->refreshEvents();
 }
 
-void NetworkMonitorDialog::onClear(Fl_Widget* w, void* data) {
-    (void)w;
+void NetworkMonitorDialog::onClear(Fl_Widget*, void* data) {
     NetworkMonitorDialog* dialog = static_cast<NetworkMonitorDialog*>(data);
     if (!dialog) return;
     SecurityEvents::instance().clear();
@@ -210,8 +208,7 @@ void NetworkMonitorDialog::onClear(Fl_Widget* w, void* data) {
     if (dialog->m_eventList) dialog->m_eventList->clear();
 }
 
-void NetworkMonitorDialog::onClose(Fl_Widget* w, void* data) {
-    (void)w;
+void NetworkMonitorDialog::onClose(Fl_Widget*, void* data) {
     NetworkMonitorDialog* dialog = static_cast<NetworkMonitorDialog*>(data);
     if (dialog) dialog->hide();
 }

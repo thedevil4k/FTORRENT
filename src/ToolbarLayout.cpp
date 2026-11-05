@@ -52,12 +52,11 @@ ToolbarLayout::Level ToolbarLayout::forWidth(int available) {
     return ICONS;
 }
 
-bool ToolbarLayout::spacerStaysVisible(int width) {
+bool ToolbarLayout::spacerStaysVisible(int) {
     // Every width, zero included. The width is the argument rather than a
     // constant so the rule reads as a question about the widget it is asked
     // about, and so a caller cannot quietly pass something the pack would treat
     // as a real gap.
-    (void)width;
     return true;
 }
 

@@ -42,13 +42,13 @@ int RemoveConfirmDialog::show_modal() {
     return m_result;
 }
 
-void RemoveConfirmDialog::onRemove(Fl_Widget* w, void* data) {
+void RemoveConfirmDialog::onRemove(Fl_Widget*, void* data) {
     RemoveConfirmDialog* self = (RemoveConfirmDialog*)data;
     self->m_result = 1;
     self->hide();
 }
 
-void RemoveConfirmDialog::onCancel(Fl_Widget* w, void* data) {
+void RemoveConfirmDialog::onCancel(Fl_Widget*, void* data) {
     RemoveConfirmDialog* self = (RemoveConfirmDialog*)data;
     self->m_result = 0;
     self->hide();

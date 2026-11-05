@@ -179,8 +179,8 @@ void TorrentListWidget::removeTorrent(const std::string& hash) {
     }
 }
 
-void TorrentListWidget::updateTorrent(TorrentItem* torrent) {
-    (void)torrent;   // The item is updated in place; only the paint is stale.
+// The item is updated in place; only the paint is stale.
+void TorrentListWidget::updateTorrent(TorrentItem*) {
     redraw();
 }
 

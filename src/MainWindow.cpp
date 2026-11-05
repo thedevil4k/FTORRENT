@@ -575,50 +575,49 @@ void MainWindow::resize(int x, int y, int w, int h) {
     }
 }
 
-void MainWindow::onAddTorrent(Fl_Widget* w, void* data) {
+void MainWindow::onAddTorrent(Fl_Widget*, void* data) {
     ((MainWindow*)data)->showAddTorrentDialog();
 }
 
-void MainWindow::onCreateTorrent(Fl_Widget* w, void* data) {
+void MainWindow::onCreateTorrent(Fl_Widget*, void* data) {
     ((MainWindow*)data)->showCreateTorrentDialog();
 }
 
-void MainWindow::onTogglePause(Fl_Widget* w, void* data) {
+void MainWindow::onTogglePause(Fl_Widget*, void* data) {
     ((MainWindow*)data)->toggleSelectedTorrents();
 }
 
-void MainWindow::onRemove(Fl_Widget* w, void* data) {
+void MainWindow::onRemove(Fl_Widget*, void* data) {
     ((MainWindow*)data)->removeSelectedTorrents();
 }
 
-void MainWindow::onPreferences(Fl_Widget* w, void* data) {
+void MainWindow::onPreferences(Fl_Widget*, void* data) {
     ((MainWindow*)data)->showPreferencesDialog();
 }
 
-void MainWindow::onToggleTheme(Fl_Widget* w, void* data) {
+void MainWindow::onToggleTheme(Fl_Widget*, void* data) {
     ((MainWindow*)data)->toggleDarkMode();
 }
 
-void MainWindow::onToggleLimit(Fl_Widget* w, void* data) {
+void MainWindow::onToggleLimit(Fl_Widget*, void* data) {
     ((MainWindow*)data)->toggleNetworkLimit();
 }
 
-void MainWindow::onToggleCensorship(Fl_Widget* w, void* data) {
+void MainWindow::onToggleCensorship(Fl_Widget*, void* data) {
     ((MainWindow*)data)->toggleCensorship();
 }
 
-void MainWindow::onSearchToggle(Fl_Widget* w, void* data) {
+void MainWindow::onSearchToggle(Fl_Widget*, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (win) win->switchView(!win->m_showSearchView);
 }
 
-void MainWindow::onSearchGo(Fl_Widget* w, void* data) {
+void MainWindow::onSearchGo(Fl_Widget*, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (win) win->startSearch();
 }
 
-void MainWindow::onNetworkMonitor(Fl_Widget* w, void* data) {
-    (void)w;
+void MainWindow::onNetworkMonitor(Fl_Widget*, void* data) {
     MainWindow* win = static_cast<MainWindow*>(data);
     if (!win || !win->m_manager) return;
     // Modal, like the other windows, so the list behind it cannot be removed

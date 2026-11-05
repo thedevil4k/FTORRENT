@@ -202,25 +202,25 @@ bool CreateTorrentDialog::show_modal() {
     return m_okClicked;
 }
 
-void CreateTorrentDialog::onSelectFile(Fl_Widget* w, void* data) {
+void CreateTorrentDialog::onSelectFile(Fl_Widget*, void* data) {
     const char* f = PathUtils::showFileChooser("Select File", "*", nullptr, Fl_File_Chooser::SINGLE);
     if (f) ((CreateTorrentDialog*)data)->m_sourcePath->value(f);
 }
 
-void CreateTorrentDialog::onSelectFolder(Fl_Widget* w, void* data) {
+void CreateTorrentDialog::onSelectFolder(Fl_Widget*, void* data) {
     const char* d = PathUtils::showDirChooser("Select Folder", nullptr);
     if (d) ((CreateTorrentDialog*)data)->m_sourcePath->value(d);
 }
 
-void CreateTorrentDialog::onCreate(Fl_Widget* w, void* data) {
+void CreateTorrentDialog::onCreate(Fl_Widget*, void* data) {
     ((CreateTorrentDialog*)data)->processCreate();
 }
 
-void CreateTorrentDialog::onCancel(Fl_Widget* w, void* data) {
+void CreateTorrentDialog::onCancel(Fl_Widget*, void* data) {
     ((CreateTorrentDialog*)data)->hide();
 }
 
-void CreateTorrentDialog::onAddGenericTrackers(Fl_Widget* w, void* data) {
+void CreateTorrentDialog::onAddGenericTrackers(Fl_Widget*, void* data) {
     CreateTorrentDialog* dlg = (CreateTorrentDialog*)data;
     
     // Get existing trackers and put them in a set for easy lookup
@@ -346,7 +346,7 @@ void CreateTorrentDialog::processCreate() {
         if (parentPathStr.empty()) parentPathStr = ".";
 
         lt::error_code ec;
-        lt::set_piece_hashes(ct, parentPathStr, [this](lt::piece_index_t p) {
+        lt::set_piece_hashes(ct, parentPathStr, [this](lt::piece_index_t) {
             // Update progress if we were in a thread, but here we just keep it blocking
         }, ec);
 

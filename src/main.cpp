@@ -6,7 +6,7 @@
 #include <memory>
 #include <iostream>
 
-int main(int argc, char **argv) {
+int main(int, char**) {
     // Makes the FLTK toolkit usable from the worker threads below.
     //
     // The search feature hands its results back to this thread with

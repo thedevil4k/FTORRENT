@@ -468,8 +468,7 @@ void TorrentDetailsDialog::updateSecurity() {
     }
 }
 
-void TorrentDetailsDialog::onCheckArchiveClicked(Fl_Widget* w, void* data) {
-    (void)w;
+void TorrentDetailsDialog::onCheckArchiveClicked(Fl_Widget*, void* data) {
     TorrentDetailsDialog* dlg = static_cast<TorrentDetailsDialog*>(data);
     if (dlg) dlg->checkArchive();
 }
@@ -775,14 +774,12 @@ void TorrentDetailsDialog::show_modal() {
 }
 
 // Static callbacks
-void TorrentDetailsDialog::onRefresh(Fl_Widget* w, void* data) {
-    (void)w;
+void TorrentDetailsDialog::onRefresh(Fl_Widget*, void* data) {
     TorrentDetailsDialog* dlg = (TorrentDetailsDialog*)data;
     dlg->updateInfo();
 }
 
-void TorrentDetailsDialog::onClose(Fl_Widget* w, void* data) {
-    (void)w;
+void TorrentDetailsDialog::onClose(Fl_Widget*, void* data) {
     TorrentDetailsDialog* dlg = (TorrentDetailsDialog*)data;
     dlg->hide();
 }
