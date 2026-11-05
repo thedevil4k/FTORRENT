@@ -94,6 +94,50 @@ private:
 
     static const ColumnInfo COLUMN_INFO[COL_COUNT];
 
+    // The numbers that decide how a row is drawn. They live in the class so
+    // that the drawing code can live in more than one file without repeating
+    // them: one place owns the answer.
+    static constexpr int BASE_ROW_HEIGHT = 25;   // matches initializeColumns()
+    static constexpr int FILE_LINE_HEIGHT = 16;
+    // Enough to see what is inside without turning a row into a wall of text.
+    static constexpr int MAX_SHOWN_FILES = 12;
+    // Same idea for the entries an archive check lists: the row shows this
+    // many and summarises the rest, which stay visible in Details.
+    static constexpr int MAX_SHOWN_ARCHIVE_ENTRIES = 8;
+    // Minimum pixel width the Name column is allowed to shrink to. Keeps the
+    // table usable at the 720px minimum window width and avoids a zero/negative
+    // col_width() when the window is at its smallest.
+    static constexpr int MIN_NAME_WIDTH = 120;
+
+    // The shield and every content badge share one box, so the tag group reads
+    // as a single size. The shield's polygon is inset one pixel; the badge art
+    // keeps its own transparent padding, so both end up visually the same
+    // height.
+    static constexpr int SHIELD_BOX = 15;
+    static constexpr int BADGE_BOX = SHIELD_BOX;
+    static constexpr int BADGE_GAP = 4;
+
+    // The badges may not eat the name: below this many pixels the row stops
+    // adding them, so a narrow column still shows the torrent it is
+    // describing. Distinct from MIN_NAME_WIDTH, which is the column's own
+    // floor.
+    static constexpr int MIN_BADGED_NAME_WIDTH = 40;
+
+    // How much of the badge shows when it comes from the title alone. Dimmed
+    // on purpose: the title is written by the publisher, so this is a hint, and
+    // it must not look like the badge the real file list produces.
+    static constexpr double HINT_ALPHA = 0.55;
+
+    // Ellipsis by pixels, not by characters: with a proportional font 60 chars
+    // can be far narrower (or wider) than the cell. The caller must have set
+    // the same fl_font() it will draw with, since fl_width() measures that
+    // font. Returns the full text when it fits, so a maximised window shows
+    // the absolute name, and only adds "..." when the cell is really too
+    // narrow (square window). Uses only fl_width(), available in FLTK 1.3 and
+    // 1.4 on every backend we build (Windows x86/ARM64, Linux 32/64, Arch,
+    // Flatpak).
+    static std::string elideToWidth(const std::string& text, int maxPixels);
+
     // What is known about the file list of one torrent, and how it was keyed.
     std::vector<SearchResult> m_results;
     std::vector<int> m_sortedIndices;

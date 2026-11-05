@@ -18,9 +18,20 @@ answer one question each:
 | `src/MainWindowActions.cpp` | the dialogs the menu and the toolbar open |
 | `src/MainWindowTray.cpp` | the Windows system tray, which is the only part of the window that is not portable |
 
+`SearchResultsWidget` follows the same rule:
+
+| File | What it holds |
+| :--- | :--- |
+| `src/SearchResultsWidget.cpp` | the table itself: columns, rows, sorting, theme, and the drawing of a cell |
+| `src/SearchResultsWidgetBadges.cpp` | the shield, the content badges and the reputation lookup a shield click starts |
+| `src/SearchResultsWidgetArchive.cpp` | the archive check line under an expanded row |
+| `src/SearchResultsWidgetFiles.cpp` | the file list of a row: the fetch, the expansion and its drawing |
+
 The split is a file-level decision, not a class-level one: `MainWindow` is
 still one class with one header, and the private members the other files touch
-stay in that header.
+stay in that header. The numbers that decide how a search row is drawn moved
+into `SearchResultsWidget` as `static constexpr` members, so the files that
+draw the row share one answer instead of each carrying a copy.
 
 ## Toolbar and assets: where things live
 

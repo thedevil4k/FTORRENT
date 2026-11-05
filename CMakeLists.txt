@@ -116,6 +116,9 @@ set(SOURCES
     src/SearchEngine.cpp
     src/SearchManager.cpp
     src/SearchResultsWidget.cpp
+    src/SearchResultsWidgetBadges.cpp
+    src/SearchResultsWidgetArchive.cpp
+    src/SearchResultsWidgetFiles.cpp
     src/TorrentFileList.cpp
     src/FileListService.cpp
     src/SecurityAnalyzer.cpp
