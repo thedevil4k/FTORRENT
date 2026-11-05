@@ -114,6 +114,8 @@ set(SOURCES
     src/SystemUtils.cpp
     src/HttpClient.cpp
     src/SearchEngine.cpp
+    src/SearchEngineParse.cpp
+    src/SearchEngineCatalogue.cpp
     src/SearchManager.cpp
     src/SearchResultsWidget.cpp
     src/SearchResultsWidgetBadges.cpp

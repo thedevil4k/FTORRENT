@@ -179,6 +179,21 @@ private:
     static int64_t parseSize(const std::string& text);
     static int parseCount(const std::string& text);
 
+    // URL-encodes a query string (%s slot of the engine URL). It lives in the
+    // class because the URL builder and the detail resolver both need it.
+    static std::string urlEncode(const std::string& in);
+
+    // Very small helper: minimal JSON string/number extraction by dotted path.
+    // Deliberately not a full JSON parser: the engines only need flat fields.
+    // It lives in the class because the page reader and the detail resolver
+    // both need it.
+    static bool jsonField(const std::string& json, const std::string& path,
+                          std::string& out);
+
+    // Fills in what a row is missing and tidies what it carries. It lives in
+    // the class because the page reader and the detail resolver both need it.
+    static void normalizeResult(SearchResult& r);
+
     // Site code for a dropdown category, with safe fallbacks
     std::string categoryCode(const std::string& category) const;
 };
