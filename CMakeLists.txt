@@ -190,6 +190,38 @@ set(HEADERS
     src/Version.h
 )
 
+# The window logo is compiled into the binary: the window must carry its icon
+# even when the assets folder is not next to the executable. The PNG itself is
+# the source of truth, and this turns it into the C array that Resources.cpp
+# hands to FLTK. Generating the header keeps a 40 KB blob out of the source
+# tree, where it used to be 3 300 lines of hex nobody could read.
+set(FTORRENT_LOGO_PNG "${CMAKE_CURRENT_SOURCE_DIR}/src/assets/window-logo.png")
+file(SIZE "${FTORRENT_LOGO_PNG}" ftorrent_logo_size)
+file(READ "${FTORRENT_LOGO_PNG}" ftorrent_logo_hex HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1, " ftorrent_logo_bytes
+    "${ftorrent_logo_hex}")
+# Sixteen bytes per line: a source line has to stay inside what the compiler
+# accepts, and the file is generated anyway.
+set(ftorrent_logo_group "")
+foreach(i RANGE 1 16)
+    string(APPEND ftorrent_logo_group "0x.., ")
+endforeach()
+string(REGEX REPLACE "(${ftorrent_logo_group})" "\\1\n" ftorrent_logo_body
+    "${ftorrent_logo_bytes}")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/LogoIcon.h"
+"// Generated from src/assets/window-logo.png. Do not edit.\n"
+"#ifndef FTORRENT_LOGO_PNG_H\n"
+"#define FTORRENT_LOGO_PNG_H\n"
+"\n"
+"static const unsigned char ftorrent_logo_png[] = {\n${ftorrent_logo_body}};\n"
+"\n"
+"static const int ftorrent_logo_png_size = ${ftorrent_logo_size};\n"
+"\n"
+"#endif\n")
+# A change to the PNG has to reach the build.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${FTORRENT_LOGO_PNG}")
+
 # The shared body of the app: everything except main(). An OBJECT library, so
 # the executable and every test compile each translation unit once and link the
 # same code, and a change to a source file is one rebuild rather than N.
@@ -203,6 +235,7 @@ target_compile_definitions(ftorrent_core PUBLIC
 target_include_directories(ftorrent_core PUBLIC
     ${FLTK_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
 target_link_libraries(ftorrent_core PUBLIC
