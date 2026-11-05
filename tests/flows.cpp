@@ -379,11 +379,6 @@ int main() {
             if (table) rows = table->rowCount();
             std::string now = readSearchStatus();
             if (!now.empty()) lastStatus = now;
-            Fl_Box* sb = nullptr;
-            // the status line is the first Fl_Box in the search view with text
-            sb = nullptr;
-            // Read it through the toolbar-independent route: the status text is
-            // set by setSearchStatus(), which copies it into this box.
             if (rows > 0) break;
         }
         printf("    search finished with %d rows\n", rows);

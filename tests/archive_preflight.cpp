@@ -49,10 +49,6 @@ std::vector<std::string> namesOf(const std::vector<ArchiveInspector::Entry>& ent
     return names;
 }
 
-fs::path scratch(const std::string& name) {
-    return fs::temp_directory_path() / ("ftorrent-preflight-" + name);
-}
-
 } // namespace
 
 int main() {

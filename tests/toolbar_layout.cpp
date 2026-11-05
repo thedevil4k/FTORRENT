@@ -157,8 +157,16 @@ int main() {
        dead.empty() ? "" : " -> ", dead.empty() ? "" : std::to_string(dead[0]).c_str());
     ok(asym.empty(), "every width is centred: %zu widths are not%s%s", asym.size(),
        asym.empty() ? "" : " -> ", asym.empty() ? "" : std::to_string(asym[0]).c_str());
-    if (!dead.empty())  printf("  dead-bar widths:"); for (int w : dead) printf(" %d", w); printf("\n");
-    if (!asym.empty())  printf("  off-centre widths:"); for (int w : asym) printf(" %d", w); printf("\n");
+    if (!dead.empty()) {
+        printf("  dead-bar widths:");
+        for (int w : dead) printf(" %d", w);
+        printf("\n");
+    }
+    if (!asym.empty()) {
+        printf("  off-centre widths:");
+        for (int w : asym) printf(" %d", w);
+        printf("\n");
+    }
     printf("  one-pixel-short widths (slack 1, unsplittable):");
     for (int w : unsplittable) printf(" %d", w);
     printf("\n");

@@ -222,10 +222,43 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/LogoIcon.h"
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${FTORRENT_LOGO_PNG}")
 
+# --- Warnings ---
+#
+# The compiler is asked for its warnings on every build, so a warning is
+# visible while the code is being written instead of years later.
+# FTORRENT_WARNINGS_AS_ERRORS turns them into failures, which is what the
+# quality job in CI uses and what a developer can turn on locally:
+#
+#   cmake -S . -B build -DFTORRENT_WARNINGS_AS_ERRORS=ON
+#
+# The flags are the ones each compiler understands. GCC and Clang get
+# -Wall -Wextra; MSVC gets /W4, its strictest level. The tree is warning-free
+# under -Wall -Wextra, which is the level this project can actually check on
+# every build.
+option(FTORRENT_WARNINGS_AS_ERRORS
+    "Treat compiler warnings as errors" OFF)
+
+if(MSVC)
+    set(FTORRENT_WARNING_FLAGS /W4)
+    if(FTORRENT_WARNINGS_AS_ERRORS)
+        list(APPEND FTORRENT_WARNING_FLAGS /WX)
+    endif()
+else()
+    set(FTORRENT_WARNING_FLAGS -Wall -Wextra)
+    if(FTORRENT_WARNINGS_AS_ERRORS)
+        list(APPEND FTORRENT_WARNING_FLAGS -Werror)
+    endif()
+endif()
+
 # The shared body of the app: everything except main(). An OBJECT library, so
 # the executable and every test compile each translation unit once and link the
 # same code, and a change to a source file is one rebuild rather than N.
 add_library(ftorrent_core OBJECT ${SOURCES} ${HEADERS})
+
+# PUBLIC, so the application and every test program are held to the same
+# standard as the code they share: a warning in a test is as much a defect as
+# a warning in the app.
+target_compile_options(ftorrent_core PUBLIC ${FTORRENT_WARNING_FLAGS})
 
 # One version, from project(FTorrent VERSION ...) above. src/Version.h turns it
 # into the user agents the app reports, so a release bumps one number here.

@@ -43,6 +43,19 @@ ctest --test-dir build --output-on-failure -LE network   # offline suite
 ctest --test-dir build --output-on-failure -L unit       # headless subset
 ```
 
+The build asks the compiler for its warnings (`-Wall -Wextra`, or `/W4` on
+MSVC), and the same flags reach the tests, so a warning in a test program is
+as much a defect as a warning in the app. `-DFTORRENT_WARNINGS_AS_ERRORS=ON`
+turns them into failures; that is the gate CI uses:
+
+```bash
+cmake -S . -B build -DFTORRENT_BUILD_TESTS=ON -DFTORRENT_WARNINGS_AS_ERRORS=ON
+```
+
+A parameter the body never reads has no name in the definition; the
+declarations in the headers keep their names. A parameter that one branch of a
+conditional reads and another does not keeps its name and a `(void)` cast.
+
 On this machine (MSYS2/MinGW-w64) CMake and the compiler live under
 `C:/msys64/mingw64/bin/`. The test labels are `unit` (headless, offline), `ui`
 (FLTK, no network) and `network` (real trackers/DHT; `flows` and

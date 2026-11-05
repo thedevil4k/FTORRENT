@@ -352,7 +352,7 @@ void scenarioEncryptedHeaders(const fs::path& fixtures) {
     ok(entries.empty(), "with no invented entries");
 }
 
-void scenarioZipTwoEnds(const fs::path& fixtures) {
+void scenarioZipTwoEnds(const fs::path&) {
     section("a ZIP lists from its two ends");
     // A megabyte of ZIP, so the archive spans sixty-four pieces and the check
     // has to pick two of them. This is the rule the product states: the
