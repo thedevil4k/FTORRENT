@@ -62,11 +62,16 @@ from. There is no second copy of the code under `tests/`.
 
 ## Where things live
 
+`src/` is flat and no file grows past roughly 800 lines. A file that outgrew
+that is split by topic: whole functions move unchanged into a new file that
+answers one question, and the class stays one class with one header. The
+private members the new files touch stay in that header.
+
 | area | files |
 | :--- | :--- |
-| Entry point and wiring | `src/main.cpp`, `src/MainWindow.*` |
+| Entry point and wiring | `src/main.cpp`, `src/MainWindow.*` (the window, its search view, its theme, its actions and its tray) |
 | Torrent engine | `src/TorrentSession.*`, `src/TorrentManager.*`, `src/TorrentItem.*` |
-| Search | `src/SearchEngine.*` (fetch/parse/definitions), `src/SearchScope.*`, `src/SearchResultsWidget.*`, `src/SearchManager.*` |
+| Search | `src/SearchEngine.*` (the engine, the page reader and the catalogue), `src/SearchScope.*`, `src/SearchResultsWidget.*` (the table, its badges, its archive line and its file list), `src/SearchManager.*` |
 | File list of a magnet | `src/TorrentFileList.*` (metadata over the swarm), `src/FileListService.*` (queued, one worker per row) |
 | Security analysis | `src/SecurityAnalyzer.*` (metadata rules), `src/SecurityTypes.h`, `src/SecurityBadge.*`, `src/SecurityEvents.*` |
 | Reputation | `src/Reputation.*` (providers/parsers), `src/ReputationService.*` (cache, one request per hash), `src/SecurityReputation.*` (which hash, wording), `src/SecurityKeys.*` |
@@ -74,6 +79,11 @@ from. There is no second copy of the code under `tests/`.
 | HTTP | `src/HttpClient.*` (WinInet on Windows, libcurl elsewhere) |
 | UI shell | `src/PreferencesDialog.*`, `src/AddTorrentDialog.*`, `src/TorrentDetailsDialog.*`, `src/TorrentListWidget.*`, `src/NetworkMonitorDialog.*` |
 | Policies without FLTK | `src/ToolbarLayout.*`, `src/SecurityHashes.*`, `src/PathUtils.*`, `src/Format.*` |
+
+The window logo is the one binary payload in the tree. The PNG
+(`src/assets/window-logo.png`) is the source of truth and CMake turns it into
+the C array that `Resources.cpp` hands to FLTK, so the logo stays compiled
+into the binary and the source tree holds a picture instead of a wall of hex.
 
 ## One rule, one place
 

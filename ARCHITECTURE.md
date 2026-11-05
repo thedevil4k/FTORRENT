@@ -27,11 +27,28 @@ answer one question each:
 | `src/SearchResultsWidgetArchive.cpp` | the archive check line under an expanded row |
 | `src/SearchResultsWidgetFiles.cpp` | the file list of a row: the fetch, the expansion and its drawing |
 
+`SearchEngine` follows it too:
+
+| File | What it holds |
+| :--- | :--- |
+| `src/SearchEngine.cpp` | the engine: URLs, categories, the fetch, the search and the details a row needs |
+| `src/SearchEngineParse.cpp` | the page reader: the selectors, the JSON paths, the magnet harvester and the number parsing |
+| `src/SearchEngineCatalogue.cpp` | the catalogue: the built-in sites and the INI format a site is described in |
+
 The split is a file-level decision, not a class-level one: `MainWindow` is
 still one class with one header, and the private members the other files touch
 stay in that header. The numbers that decide how a search row is drawn moved
 into `SearchResultsWidget` as `static constexpr` members, so the files that
-draw the row share one answer instead of each carrying a copy.
+draw the row share one answer instead of each carrying a copy. The three
+helpers that more than one of the `SearchEngine` files need - `urlEncode()`,
+`jsonField()` and `normalizeResult()` - became private static members of
+`SearchEngine` for the same reason.
+
+One file was not code at all: `src/LogoIcon.h` held the window logo as 3 300
+lines of hex bytes. The PNG is the source of truth now
+(`src/assets/window-logo.png`), and CMake turns it into the same C array at
+configure time, so the logo is still compiled into the binary and the source
+tree holds a picture instead of a wall of hex.
 
 ## Toolbar and assets: where things live
 
