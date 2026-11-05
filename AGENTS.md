@@ -46,7 +46,16 @@ ctest --test-dir build --output-on-failure -L unit       # headless subset
 On this machine (MSYS2/MinGW-w64) CMake and the compiler live under
 `C:/msys64/mingw64/bin/`. The test labels are `unit` (headless, offline), `ui`
 (FLTK, no network) and `network` (real trackers/DHT; `flows` and
-`filelist_network`).
+`filelist_network`). `archive_preflight_network` is also labelled `network`,
+but it is a loopback test: a seeder in the same process on 127.0.0.1, so
+nothing leaves the machine. It runs every scenario in a child process, because
+libtorrent 2.1.2 (the version this machine has) has an intermittent
+use-after-free of its own: a session that is torn down while its disk thread
+is still working dies with an access violation in a background thread. It
+reproduces with a program that contains no FTorrent code, so it is not this
+code's bug. A child that dies that way is retried, and a child that keeps
+dying fails the test with that as the reason, so an upstream crash is never
+mistaken for a broken archive check.
 
 Tests link `ftorrent_core`, the same object library the application is built
 from. There is no second copy of the code under `tests/`.
@@ -61,7 +70,7 @@ from. There is no second copy of the code under `tests/`.
 | File list of a magnet | `src/TorrentFileList.*` (metadata over the swarm), `src/FileListService.*` (queued, one worker per row) |
 | Security analysis | `src/SecurityAnalyzer.*` (metadata rules), `src/SecurityTypes.h`, `src/SecurityBadge.*`, `src/SecurityEvents.*` |
 | Reputation | `src/Reputation.*` (providers/parsers), `src/ReputationService.*` (cache, one request per hash), `src/SecurityReputation.*` (which hash, wording), `src/SecurityKeys.*` |
-| Archive check | `src/ArchivePreflight.*` (pieces, budget), `src/ArchiveInspector.*` (libarchive), `src/ArchiveCheckTask.*` (worker + UI delivery) |
+| Archive check | `src/ArchivePreflight.*` (what to read and what to say), `src/ArchiveProbeSession.*` (the throwaway libtorrent session that fetches pieces), `src/ArchiveInspector.*` (libarchive), `src/ArchiveCheckTask.*` (worker + UI delivery) |
 | HTTP | `src/HttpClient.*` (WinInet on Windows, libcurl elsewhere) |
 | UI shell | `src/PreferencesDialog.*`, `src/AddTorrentDialog.*`, `src/TorrentDetailsDialog.*`, `src/TorrentListWidget.*`, `src/NetworkMonitorDialog.*` |
 | Policies without FLTK | `src/ToolbarLayout.*`, `src/SecurityHashes.*`, `src/PathUtils.*`, `src/Format.*` |
@@ -102,6 +111,16 @@ The owner of each rule:
   instead of writing a fourth copy of that pattern.
 - **Never introduce a magic timeout or size**: give it a named constant where it
   is used and say what it protects.
+- **A throwaway libtorrent session is closed in one order**: the torrent is
+  removed, the removal is waited for (the handle stops being valid once
+  libtorrent's own I/O tasks are done with it), and only then is the session
+  destroyed and its files deleted. libtorrent keeps the torrent alive while
+  that work is queued, and a session torn down before it is gone leaves the
+  disk thread working on freed memory. `ArchiveProbeSession::shutdown()` is
+  that sequence; use it instead of writing another one.
+- **A probe that already knows its peers does not join the DHT.** The
+  discovery is off when the caller handed the session its endpoints, which
+  also keeps the probe from talking to the public routers.
 
 ## Recipes
 

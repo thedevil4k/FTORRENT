@@ -122,6 +122,8 @@ set(SOURCES
     src/SecurityHashes.cpp
     src/SecurityReputation.cpp
     src/ArchivePreflight.cpp
+    src/ArchiveProbeSession.cpp
+    src/ArchiveCheckTask.cpp
     src/SecurityEvents.cpp
     src/NetworkMonitorDialog.cpp
     src/SearchScope.cpp
@@ -170,6 +172,8 @@ set(HEADERS
     src/SecurityHashes.h
     src/SecurityReputation.h
     src/ArchivePreflight.h
+    src/ArchiveProbeSession.h
+    src/ArchiveCheckTask.h
     src/SecurityEvents.h
     src/NetworkMonitorDialog.h
     src/SearchScope.h

@@ -13,6 +13,8 @@
 #include <unordered_map>
 #include <vector>
 
+class ArchiveCheckTask;
+
 /**
  * @brief Table showing the results of a torrent search.
  *
@@ -181,6 +183,11 @@ private:
         int bottom = 0;
     };
     std::unordered_map<std::string, ArchiveAction> m_archive;
+    // The archive checks currently running, so the destructor can stop them
+    // instead of leaving them to run out their deadlines. Keyed like
+    // m_archive: one check per row at a time.
+    std::unordered_map<std::string, std::shared_ptr<ArchiveCheckTask>>
+        m_archiveTasks;
     int archiveIndexFor(const std::vector<TorrentFileEntry>& files) const;
     // Password-protected entries found by the last archive check for this row,
     // 0 when none was run or the index held none.

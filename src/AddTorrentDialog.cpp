@@ -4,7 +4,7 @@
 #include "SecurityBadge.h"
 #include "SecurityReputation.h"
 #include "ReputationService.h"
-#include "ArchivePreflight.h"
+#include "ArchiveCheckTask.h"
 #include "ArchiveInspector.h"
 #include "Format.h"
 #include <FL/Fl.H>
@@ -17,22 +17,11 @@
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/file_storage.hpp>
 #include <algorithm>
-#include <atomic>
-#include <thread>
 #include <iomanip>
 #include <filesystem>
 #include <FL/fl_draw.H>
 
 namespace {
-
-// Carried from the archive worker to the UI thread. The dialog pointer is only
-// used after checking 'alive', which the dialog clears in its destructor.
-struct ArchiveCheckDelivery {
-    AddTorrentDialog* dialog = nullptr;
-    std::shared_ptr<bool> alive;
-    std::string message;
-    std::vector<SecurityFile> entries;
-};
 
 // The green dot that sits at the right end of the magnet field. Drawn rather
 // than imaged, so it needs no asset and no theme lookup.
@@ -69,6 +58,9 @@ AddTorrentDialog::~AddTorrentDialog() {
     // A lookup started from this dialog may still be in flight. Saying so here
     // keeps its completion from touching widgets that no longer exist.
     if (m_alive) *m_alive = false;
+    // The archive check stops too, instead of running out its deadline in a
+    // swarm nobody is waiting for.
+    if (m_archiveTask) m_archiveTask->cancel();
 }
 
 void AddTorrentDialog::createUI() {
@@ -664,38 +656,29 @@ void AddTorrentDialog::checkArchive() {
     const int index = archive->fileIndex;
     const std::string path = archive->path;
     std::shared_ptr<bool> alive = m_alive;
-    std::thread([this, alive, index, path, torrentPath, magnet, torrentUrl,
-                 body]() {
-        std::vector<SecurityFile> entries;
-        std::string error;
-        std::string note;
-        std::atomic<bool> cancelled{false};
-        bool ok = false;
-        if (!body.empty()) {
-            ok = ArchivePreflight::inspectTorrent(body, index, entries, error,
-                                                  &cancelled, 120, &note);
-        }
-        if (!ok && body.empty()) {
-            ok = ArchivePreflight::inspect(magnet, torrentPath.empty()
-                                                        ? torrentUrl
-                                                        : torrentPath,
-                                           index, entries, error, &cancelled,
-                                           120, &note);
-        }
+    AddTorrentDialog* self = this;
 
-        ArchiveCheckDelivery* delivery = new ArchiveCheckDelivery;
-        delivery->dialog = this;
-        delivery->alive = alive;
-        if (!ok) {
-            delivery->message =
-                "Archive: the index could not be read (" + error + ").";
-        } else {
-            delivery->message =
-                archiveCheckMessage(path, entries, note);
-            delivery->entries = std::move(entries);
-        }
-        Fl::awake(&AddTorrentDialog::deliverArchiveCheck, delivery);
-    }).detach();
+    // One task owns the worker thread, the cancellation and the hop back to the
+    // UI thread; this dialog only says what to check and what to do with the
+    // answer. The same task serves the search row and Details.
+    auto deliver = [self, alive](ArchiveCheckTask::Result result) {
+        if (!alive || !*alive) return;
+        self->m_archiveRunning = false;
+        self->m_checkLine = result.message;
+        self->m_archiveEntries = std::move(result.entries);
+        self->refreshReputationLabel();
+        self->updateSecurityPanel();
+        self->showArchiveEntries();
+    };
+
+    if (!body.empty()) {
+        m_archiveTask =
+            ArchiveCheckTask::startFromTorrentBody(body, index, path, deliver);
+    } else {
+        m_archiveTask = ArchiveCheckTask::startFromMagnet(
+            magnet, torrentPath.empty() ? torrentUrl : torrentPath, index, path,
+            deliver);
+    }
 }
 
 void AddTorrentDialog::showArchiveEntries() {
@@ -713,24 +696,6 @@ void AddTorrentDialog::showArchiveEntries() {
     }
     m_archiveBrowser->show();
     redraw();
-}
-
-void AddTorrentDialog::deliverArchiveCheck(void* data) {
-    auto* delivery = static_cast<ArchiveCheckDelivery*>(data);
-    if (!delivery) return;
-    AddTorrentDialog* dialog = delivery->dialog;
-    const bool alive = delivery->alive && *delivery->alive;
-    const std::string message = delivery->message;
-    std::vector<SecurityFile> entries = std::move(delivery->entries);
-    delete delivery;
-
-    if (!alive || !dialog) return;
-    dialog->m_archiveRunning = false;
-    dialog->m_checkLine = message;
-    dialog->m_archiveEntries = std::move(entries);
-    dialog->refreshReputationLabel();
-    dialog->updateSecurityPanel();
-    dialog->showArchiveEntries();
 }
 
 void AddTorrentDialog::checkReputation() {

@@ -15,6 +15,8 @@
 #include "SecurityBadge.h"
 #include "SecurityReputation.h"
 
+class ArchiveCheckTask;
+
 /**
  * @brief Diálogo de detalles de un torrent específico
  * 
@@ -90,7 +92,9 @@ private:
     // Every entry that answer listed, in archive order. Names and sizes only:
     // the check reads headers, never file data.
     std::vector<SecurityFile> m_archiveEntries;
-    std::shared_ptr<std::atomic<bool>> m_archiveCancel;
+    // The check currently running, so the destructor can stop it. Null when
+    // nothing is being read.
+    std::shared_ptr<ArchiveCheckTask> m_archiveTask;
     // Level 3 fallback: a file that is already complete on disk is hashed
     // locally, never uploaded, and only after the user asked.
     bool m_hashingLocally = false;

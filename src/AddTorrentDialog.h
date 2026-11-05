@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+class ArchiveCheckTask;
+
 /**
  * @brief Diálogo avanzado para añadir torrents
  * 
@@ -135,6 +137,9 @@ private:
     // Cleared in the destructor so a lookup that lands later cannot touch a
     // dialog that is already gone.
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
+    // The archive check currently running, so the destructor can stop it.
+    // Null when nothing is being read.
+    std::shared_ptr<ArchiveCheckTask> m_archiveTask;
     
     // UI Creation
     void createUI();
@@ -165,7 +170,6 @@ private:
     void refreshReputationLabel();
     void checkArchive();
     static void onCheckArchive(Fl_Widget* w, void* data);
-    static void deliverArchiveCheck(void* data);
     bool confirmRiskySelection();
     std::string fileRowLabel(const TorrentFileEntry& file) const;
     // Shows or hides the green dot, following the same precedence validate()

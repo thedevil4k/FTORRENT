@@ -27,6 +27,10 @@
 #   archive_preflight
 #                   piece arithmetic and a real ZIP/RAR5 listing rebuilt from
 #                   only its first and last piece
+#   archive_preflight_network
+#                   the same check against a loopback seeder: a RAR 1.5-4.x
+#                   lists its entries from a swarm and the seeder's upload
+#                   counter proves the archive was never downloaded
 #   security_events the engine event log: order, cap and what it drops
 #
 # Sources are listed by hand rather than globbed, so adding a file is a decision
@@ -74,6 +78,7 @@ ftorrent_add_test(security_badge security_badge.cpp)
 ftorrent_add_test(security_keys security_keys.cpp)
 ftorrent_add_test(reputation reputation.cpp)
 ftorrent_add_test(archive_preflight archive_preflight.cpp)
+ftorrent_add_test(archive_preflight_network archive_preflight_network.cpp)
 ftorrent_add_test(security_events security_events.cpp)
 ftorrent_add_test(search_results search_results.cpp)
 ftorrent_add_test(search_scope search_scope.cpp)
@@ -123,6 +128,7 @@ add_test(NAME security_badge COMMAND security_badge)
 add_test(NAME security_keys COMMAND security_keys)
 add_test(NAME reputation COMMAND reputation)
 add_test(NAME archive_preflight COMMAND archive_preflight)
+add_test(NAME archive_preflight_network COMMAND archive_preflight_network)
 add_test(NAME security_events COMMAND security_events)
 add_test(NAME search_results COMMAND search_results)
 add_test(NAME search_scope COMMAND search_scope)
@@ -133,8 +139,8 @@ add_test(NAME format COMMAND format)
 
 set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
     security_analyzer security_badge security_keys reputation archive_preflight
-    security_events search_results search_scope search_parse filelist
-    filelist_network format)
+    archive_preflight_network security_events search_results search_scope
+    search_parse filelist filelist_network format)
 if(FTORRENT_HAVE_LIBARCHIVE)
     add_test(NAME archive_inspector COMMAND archive_inspector)
     list(APPEND FTORRENT_TESTS archive_inspector)
@@ -160,12 +166,18 @@ set_tests_properties(file_hash security_analyzer security_keys
 set_tests_properties(search_parse filelist format PROPERTIES LABELS "unit")
 # The swarm probe: real trackers, real DHT, real .torrent downloads.
 set_tests_properties(filelist_network PROPERTIES LABELS "network")
+# The loopback archive check: a real libtorrent session and a real peer, but
+# both on this machine, so nothing leaves it.
+set_tests_properties(archive_preflight_network PROPERTIES LABELS "network")
 # reputation drives Fl::awake() delivery, so it needs the FLTK event loop even
 # though nothing is drawn and no network is touched.
 set_tests_properties(reputation PROPERTIES LABELS "ui")
 set_tests_properties(archive_preflight security_events PROPERTIES LABELS "unit")
 if(FTORRENT_HAVE_LIBARCHIVE)
     target_compile_definitions(archive_preflight PRIVATE
+        FTORRENT_ARCHIVE_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/archives")
+    # The loopback swarm test reads the same fixtures and needs the same path.
+    target_compile_definitions(archive_preflight_network PRIVATE
         FTORRENT_ARCHIVE_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/archives")
 endif()
 set_tests_properties(flows PROPERTIES LABELS "network")

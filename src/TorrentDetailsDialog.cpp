@@ -1,6 +1,6 @@
 #include "TorrentDetailsDialog.h"
+#include "ArchiveCheckTask.h"
 #include "ArchiveInspector.h"
-#include "ArchivePreflight.h"
 #include "FileHash.h"
 #include "Format.h"
 #include "ReputationService.h"
@@ -53,7 +53,7 @@ TorrentDetailsDialog::~TorrentDetailsDialog() {
     if (m_alive) *m_alive = false;
     // Stop a local hash, and a two-piece read, that are still running.
     if (m_hashCancel) m_hashCancel->store(true);
-    if (m_archiveCancel) m_archiveCancel->store(true);
+    if (m_archiveTask) m_archiveTask->cancel();
     
     delete m_trackersBuffer;
     delete m_peersBuffer;
@@ -514,44 +514,24 @@ void TorrentDetailsDialog::checkArchive() {
     m_archiveRunning = true;
     m_archiveLine.clear();
     m_archiveEntries.clear();
-    auto cancel = std::make_shared<std::atomic<bool>>(false);
-    m_archiveCancel = cancel;
     updateSecurity();
 
-    struct Delivery {
-        TorrentDetailsDialog* dialog = nullptr;
-        std::shared_ptr<bool> alive;
-        std::string line;
-        std::vector<SecurityFile> entries;
+    std::shared_ptr<bool> alive = m_alive;
+    TorrentDetailsDialog* self = this;
+
+    // One task owns the worker thread, the cancellation and the hop back to the
+    // UI thread; this dialog only says what to check and what to do with the
+    // answer.
+    auto deliver = [self, alive](ArchiveCheckTask::Result result) {
+        if (!alive || !*alive) return;
+        self->m_archiveRunning = false;
+        self->m_archiveLine = result.message;
+        self->m_archiveEntries = std::move(result.entries);
+        self->updateSecurity();
     };
 
-    std::shared_ptr<bool> alive = m_alive;
-    std::thread([this, alive, cancel, params, index, path]() {
-        std::vector<SecurityFile> entries;
-        std::string error;
-        std::string note;
-        const bool ok = ArchivePreflight::inspect(params, index, entries,
-                                                  error, cancel.get(), 120,
-                                                  &note);
-
-        Delivery* delivery = new Delivery;
-        delivery->dialog = this;
-        delivery->alive = alive;
-        delivery->line =
-            ok ? archiveCheckMessage(path, entries, note)
-               : "Archive: the index could not be read (" + error + ").";
-        if (ok) delivery->entries = std::move(entries);
-        Fl::awake([](void* data) {
-            std::unique_ptr<Delivery> delivery(
-                static_cast<Delivery*>(data));
-            if (!delivery->alive || !*delivery->alive) return;
-            TorrentDetailsDialog* dialog = delivery->dialog;
-            dialog->m_archiveRunning = false;
-            dialog->m_archiveLine = delivery->line;
-            dialog->m_archiveEntries = std::move(delivery->entries);
-            dialog->updateSecurity();
-        }, delivery);
-    }).detach();
+    m_archiveTask = ArchiveCheckTask::startFromParams(
+        std::move(params), index, path, deliver);
 }
 
 void TorrentDetailsDialog::checkReputation() {

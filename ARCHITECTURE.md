@@ -109,6 +109,8 @@ headless:
 | `security_keys` | the key store: round trip, removal and the absence of the key from the stored bytes |
 | `reputation` | provider parsing from canned answers, the service's states, the choice of hash, and the exact no-hash sentence |
 | `archive_preflight` | piece arithmetic, the lazy RAR 1.5-4.x header walk over fixtures, and the partial/encrypted rulings |
+| `archive_preflight_network` | the same check against a seeder on 127.0.0.1: a RAR 1.5-4.x lists its entries from a swarm, and the seeder's upload counter is the witness that the archive was never downloaded. Labelled `network`, but nothing leaves the machine. Each scenario runs in a child process, because libtorrent itself crashes now and then |
+| `format` | the exact strings a size, a rate and a duration print as |
 
 They link `ftorrent_core`, the same object library the app is built from, so a
 test exercises the objects that ship rather than a second copy that can drift.
@@ -246,26 +248,64 @@ requires.
 
 **`SecurityReputation`** picks the file a click should ask about (a runnable
 file wins over a picture) and words the answer. **`ArchivePreflight`** is the
-level-2 path: it computes which pieces hold a file's bytes from
-`file_offset()`/`file_size()` and fetches only those in a throwaway session and
-directory. For ZIP and RAR5 the two ends hold the index, so two pieces are
-enough. A RAR 1.5-4.x has no central index, so libarchive walks its headers
-through a lazy stream: the reader asks for a header, the session fetches the
-piece that holds it and skips the packed data, under a budget of a tenth of the
-archive's own pieces (64 at most) and the check's deadline. When the walk stops
-early the result is labelled partial, with the number of entries read and the
-data fetched. An archive whose headers are encrypted cannot be listed at all
-and is reported as password-protected. Nothing is written to the download
-folder; the temporary directory is removed before the call returns.
+level-2 path: it decides what has to be read and what the answer says.
+**`ArchiveProbeSession`** is the throwaway libtorrent session that reads the
+pieces: it computes which pieces hold a file's bytes from
+`file_offset()`/`file_size()` and fetches only those, into a temporary
+directory that never touches the download folder. For ZIP and RAR5 the two ends
+hold the index, so two pieces are enough. A RAR 1.5-4.x has no central index,
+so libarchive walks its headers through a lazy stream: the reader asks for a
+header, the session fetches the piece that holds it and skips the packed data,
+under a budget of a tenth of the archive's own pieces (64 at most) and the
+check's deadline. When the walk stops early the result is labelled partial,
+with the number of entries read and the data fetched. An archive whose headers
+are encrypted cannot be listed at all and is reported as password-protected.
+The temporary directory is removed before the call returns.
+
+Two libtorrent behaviours make that session work, and both were found with a
+local seeder. With every file deselected the torrent is marked "finished" as
+soon as the last wanted piece lands, and then drops its peers; the session
+therefore remembers the endpoints it was seen with, and revives the torrent by
+clearing the peer list and connecting again. And a piece that is already in
+hand must stop being wanted: otherwise the revival serves the same piece from
+the new peer a second time.
+
+The session is closed in a fixed order, because libtorrent does not close it
+for us: the torrent is removed, the removal is waited for (the handle stops
+being valid once libtorrent's own I/O tasks are done with it), and only then
+is the session destroyed and the temporary directory deleted. A session torn
+down while that work is still queued leaves the disk thread running on freed
+memory. `ArchiveProbeSession::shutdown()` is that sequence, and the loopback
+test uses the same one for its seeder.
+
+A probe that was handed its peers does not join the DHT: the discovery is off
+when the caller already knows the endpoints, which spares the probe a trip to
+the public routers and one more thing that can go wrong on the way.
+
+libtorrent 2.1.2, the version this machine has, has an intermittent
+use-after-free of its own: a session with transfers in flight that is torn
+down can leave its disk thread touching freed memory, and the process dies
+with an access violation in a background thread. It reproduces with a program
+that contains no FTorrent code, so it is an upstream bug rather than one of
+these. The order above and the missing DHT cut it down a long way, and the
+loopback test isolates what is left: every scenario runs in a child process,
+a child that dies with an access violation is retried, and a child that keeps
+dying fails the test saying so.
 
 Two entry points, one body: `ArchivePreflight` accepts either a magnet or
 `.torrent` path (search rows, Add Torrent) or an `add_torrent_params` carrying
 the metadata (Details). The second one means a torrent the app already knows
-does not exchange metadata with the swarm a second time. The three surfaces
-share `archiveSummary()` and `archiveCheckMessage()` for the wording and each
-keeps its own result line; the search-row line is hit-tested from the rectangle
-the draw recorded, and the archive worker reports through `Fl::awake()` behind
-the same `alive` flag the reputation lookups use.
+does not exchange metadata with the swarm a second time.
+
+**`ArchiveCheckTask`** is what the three surfaces actually call. It owns the
+worker thread, the cancellation flag and the hop back to the UI thread, and it
+is the only place that builds the answer line: a surface says which archive to
+check and what to do with the result, and cannot word it differently from the
+others. It reports through `Fl::awake()` behind the same `alive` flag the
+reputation lookups use, and the surfaces that own one keep it so their
+destructor can stop it. The three surfaces share `archiveSummary()` and
+`archiveCheckMessage()` for the wording and each keeps its own result line;
+the search-row line is hit-tested from the rectangle the draw recorded.
 
 **Local hashing.** When the metadata has no whole-file hash, Details asks
 `findLocalHashTarget()` for a file that is complete, can run, and whose recorded

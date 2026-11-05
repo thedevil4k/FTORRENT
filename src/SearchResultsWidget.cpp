@@ -1,8 +1,8 @@
 #include "SearchResultsWidget.h"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
+#include "ArchiveCheckTask.h"
 #include "ArchiveInspector.h"
-#include "ArchivePreflight.h"
 #include "AssetLoader.h"
 #include "ReputationService.h"
 #include "SecurityAnalyzer.h"
@@ -10,11 +10,9 @@
 #include "Format.h"
 
 #include <algorithm>
-#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -201,6 +199,11 @@ SearchResultsWidget::~SearchResultsWidget() {
     // A lookup started from this table may still be running; its completion
     // must not touch rows that no longer exist.
     if (m_alive) *m_alive = false;
+    // The archive checks stop too, instead of running out their deadlines in
+    // swarms nobody is waiting for.
+    for (const auto& task : m_archiveTasks) {
+        if (task.second) task.second->cancel();
+    }
     clearBadgeIcons();
 }
 
@@ -362,22 +365,13 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
     entry.encrypted = 0;
     entry.entries.clear();
 
-    struct Delivery {
-        SearchResultsWidget* widget = nullptr;
-        std::shared_ptr<bool> alive;
-        std::string key;
-        std::string line;
-        int encrypted = 0;
-        std::vector<SecurityFile> entries;
-    };
-
     const int index = entry.fileIndex;
     const std::string path = entry.path;
     const std::string magnet = entry.magnet;
     const std::string torrentUrl = entry.torrentUrl;
     // The file list the row already resolved carries the .torrent bytes, so
-    // the check can go straight to the two pieces instead of repeating the
-    // metadata exchange with the swarm.
+    // the check can go straight to the index instead of repeating the metadata
+    // exchange with the swarm.
     const FileListService::Entry known = m_files.find(key);
     const std::string torrentBody = known.state == FileListState::Loaded
                                         ? known.torrentBody
@@ -385,61 +379,37 @@ void SearchResultsWidget::startArchiveCheck(const std::string& key) {
     std::shared_ptr<bool> alive = m_alive;
     SearchResultsWidget* self = this;
 
-    std::thread([self, alive, key, index, path, magnet, torrentUrl,
-                 torrentBody]() {
-        std::vector<SecurityFile> entries;
-        std::string error;
-        std::string note;
-        bool encryptedHeaders = false;
-        std::atomic<bool> cancelled{false};
-        const bool ok = !torrentBody.empty()
-                            ? ArchivePreflight::inspectTorrent(
-                                  torrentBody, index, entries, error,
-                                  &cancelled, 120, &note, &encryptedHeaders)
-                            : ArchivePreflight::inspect(magnet, torrentUrl,
-                                                        index, entries, error,
-                                                        &cancelled, 120, &note,
-                                                        &encryptedHeaders);
-
-        Delivery* delivery = new Delivery;
-        delivery->widget = self;
-        delivery->alive = alive;
-        delivery->key = key;
-        delivery->line =
-            ok ? archiveCheckMessage(path, entries, note)
-               : "Archive: the index could not be read (" + error + ").";
-        // The lock badge is driven by this count, and only by it: a failed or
-        // skipped check leaves it at zero rather than guessing. Encrypted
-        // headers are the exception that is not a guess: libarchive refused to
-        // open the archive because it needs a password, so the lock is a fact.
-        if (encryptedHeaders) delivery->encrypted = 1;
-        if (ok) {
-            for (const SecurityFile& entry : entries) {
-                if (entry.encrypted) ++delivery->encrypted;
-            }
-            // Kept for the row's list. This is the same vector the summary was
-            // built from, so the two cannot disagree about what is inside.
-            delivery->entries = std::move(entries);
+    // One task owns the worker thread, the cancellation and the hop back to the
+    // UI thread; this widget only decides where the answer goes.
+    auto deliver = [self, alive, key](ArchiveCheckTask::Result result) {
+        if (!alive || !*alive) return;
+        auto found = self->m_archive.find(key);
+        if (found != self->m_archive.end()) {
+            found->second.running = false;
+            found->second.line = result.message;
+            found->second.encrypted = result.encrypted;
+            found->second.entries = std::move(result.entries);
         }
-        Fl::awake([](void* data) {
-            std::unique_ptr<Delivery> delivery(static_cast<Delivery*>(data));
-            if (!delivery->alive || !*delivery->alive) return;
-            SearchResultsWidget* widget = delivery->widget;
-            auto found = widget->m_archive.find(delivery->key);
-            if (found != widget->m_archive.end()) {
-                found->second.running = false;
-                found->second.line = delivery->line;
-                found->second.encrypted = delivery->encrypted;
-                found->second.entries = std::move(delivery->entries);
+        self->forEachRow([&](int row, const SearchResult& r) {
+            if (SearchResultsWidget::cacheKey(r) == key) {
+                self->updateRowHeight(row);
             }
-            widget->forEachRow([&](int row, const SearchResult& r) {
-                if (SearchResultsWidget::cacheKey(r) == delivery->key) {
-                    widget->updateRowHeight(row);
-                }
-            });
-            widget->redraw();
-        }, delivery);
-    }).detach();
+        });
+        self->redraw();
+    };
+
+    if (!torrentBody.empty()) {
+        // A check already running for this row is stopped first: the row only
+        // shows one answer, and the older one would arrive late and overwrite
+        // it.
+        if (m_archiveTasks[key]) m_archiveTasks[key]->cancel();
+        m_archiveTasks[key] = ArchiveCheckTask::startFromTorrentBody(
+            torrentBody, index, path, deliver);
+    } else {
+        if (m_archiveTasks[key]) m_archiveTasks[key]->cancel();
+        m_archiveTasks[key] = ArchiveCheckTask::startFromMagnet(
+            magnet, torrentUrl, index, path, deliver);
+    }
 
     forEachRow([&](int row, const SearchResult& r) {
         if (cacheKey(r) == key) updateRowHeight(row);
