@@ -59,14 +59,8 @@ static Fl_Widget* byTooltip(Fl_Widget* w, const char* tip) {
 
 // Fl_Pack moves its children while it draws, so a headless probe sees the
 // positions from the last real draw unless it lets one happen. Rendering into an
-// offscreen surface is the same code path the window runs on every frame.
-static void forceLayout(Fl_Widget* g) {
-    Fl_Image_Surface surf(g->w(), g->h());
-    testsupport::SurfaceScope here(&surf);
-    g->draw();
-    Fl_RGB_Image* img = surf.image();
-    delete img;
-}
+// offscreen surface is the same code path the window runs on every frame: that
+// is what testsupport::forceLayout() does.
 
 static bool isMagenta(Fl_Button* b) {
     return b->color() == fl_rgb_color(255, 0, 255);
@@ -103,128 +97,18 @@ static bool observedLevel(Fl_Button* add, Fl_Button* create, Fl_Button* prefs,
 // a question about pixels, not about pointers: AssetLoader::load() returns a
 // fresh copy on every call, so the object a button holds is never equal to
 // anything the suite can load itself, and never equal to the compiled-in glyph.
-static bool samePixels(Fl_Image* a, Fl_Image* b) {
-    if (!a || !b || a->w() != b->w() || a->h() != b->h()) return false;
-    const int w = a->w(), h = a->h();
-    Fl_Image_Surface surf(w, h);
-    std::vector<unsigned char> pa, pb;
-    for (int pass = 0; pass < 2; pass++) {
-        Fl_RGB_Image* out = nullptr;
-        {
-            testsupport::SurfaceScope here(&surf);
-            fl_color(FL_BLACK);                       // same backdrop for both
-            fl_rectf(0, 0, w, h);
-            (pass == 0 ? a : b)->draw(0, 0);
-            out = surf.image();
-        }
-        if (!out || out->d() != 3 || out->w() != w || out->h() != h) {
-            if (out) delete out;
-            return false;
-        }
-        (pass == 0 ? pa : pb).assign(out->array,
-                                     out->array + (size_t)w * h * 3);
-        delete out;
-    }
-    return pa == pb;
-}
+// The probe itself lives in test_support.h, next to the other offscreen
+// helpers.
 
 static const char* levelName(ToolbarLayout::Level lv) {
     return lv == ToolbarLayout::FULL ? "FULL" : lv == ToolbarLayout::SHORT ? "SHORT" : "ICONS";
 }
 
-struct Rgb { unsigned char r, g, b; };
-
-// Renders the widget offscreen and reports the background it fills itself with
-// plus the extent of everything else it draws (the icon). Rendered pixels, not
-// the colour attributes, because those are what the user actually sees.
-struct Rendered { Rgb bg; int x0, y0, x1, y1, ink; bool ok; };
-static Rendered renderWidget(Fl_Widget* w) {
-    Rendered r{};
-    r.ok = false; r.x0 = r.y0 = r.x1 = r.y1 = -1; r.ink = 0;
-    Fl_Image_Surface surf(w->w(), w->h());
-    testsupport::SurfaceScope here(&surf);
-    surf.draw(w);
-    Fl_RGB_Image* img = surf.image();
-    if (!img || !img->array || img->d() != 3 || img->w() != w->w() || img->h() != w->h()) {
-        if (img) delete img;
-        return r;
-    }
-    const unsigned char* px = img->array;
-    auto at = [&](int x, int y) {
-        const unsigned char* q = px + (y * img->w() + x) * 3;
-        return Rgb{q[0], q[1], q[2]};
-    };
-    r.bg = at(1, 1);
-    int maxx = -1, maxy = -1;
-    for (int y = 0; y < img->h(); y++)
-        for (int x = 0; x < img->w(); x++) {
-            Rgb p = at(x, y);
-            if (abs(p.r - r.bg.r) <= 6 && abs(p.g - r.bg.g) <= 6 && abs(p.b - r.bg.b) <= 6) continue;
-            r.ink++;
-            if (r.x0 < 0 || x < r.x0) r.x0 = x;
-            if (x > maxx) maxx = x;
-            if (r.y0 < 0 || y < r.y0) r.y0 = y;
-            if (y > maxy) maxy = y;
-        }
-    if (r.x0 >= 0) { r.x1 = maxx; r.y1 = maxy; }
-    r.ok = true;
-    delete img;
-    return r;
-}
-
-// Extent of what a paint call actually covers on a black backdrop, in pixels.
-// The badge group is judged on this rather than on the decoded image size: a
-// PNG whose art fills its box and the shield inside the same box do not paint
-// the same area, and the difference is what the eye reads as "bigger".
-struct InkBox {
-    int w = 0, h = 0;
-    bool ok = false;
-};
-
-static InkBox inkOfPaint(int side, const std::function<void()>& paint) {
-    InkBox box;
-    Fl_Image_Surface surf(side, side);
-    Fl_RGB_Image* img = nullptr;
-    {
-        testsupport::SurfaceScope here(&surf);
-        fl_color(FL_BLACK);
-        fl_rectf(0, 0, side, side);
-        paint();
-        img = surf.image();
-    }
-    if (!img || !img->array || img->d() != 3) {
-        if (img) delete img;
-        return box;
-    }
-    const unsigned char* px = img->array;
-    int x0 = side, y0 = side, x1 = -1, y1 = -1;
-    for (int y = 0; y < side; y++) {
-        for (int x = 0; x < side; x++) {
-            const unsigned char* q = px + (y * side + x) * 3;
-            if (!q[0] && !q[1] && !q[2]) continue;
-            if (x < x0) x0 = x;
-            if (y < y0) y0 = y;
-            if (x > x1) x1 = x;
-            if (y > y1) y1 = y;
-        }
-    }
-    delete img;
-    if (x1 < 0) return box;
-    box.w = x1 - x0 + 1;
-    box.h = y1 - y0 + 1;
-    box.ok = true;
-    return box;
-}
-
 // The risk shield as the Name cell draws it: a 15 px square.
-static InkBox inkOfShield(int side) {
-    return inkOfPaint(side + 8, [side] {
+static testsupport::InkBox inkOfShield(int side) {
+    return testsupport::inkOfPaint(side + 8, [side] {
         SecurityBadge::drawShield(0, 0, side, side, RiskLevel::Medium);
     });
-}
-
-static InkBox inkOfImage(int w, int h, Fl_Image* img) {
-    return inkOfPaint((w > h ? w : h) + 8, [img] { img->draw(0, 0); });
 }
 
 int main(int argc, char** argv) {
@@ -273,17 +157,17 @@ int main(int argc, char** argv) {
             std::unique_ptr<Fl_Image> fromDisk(
                 AssetLoader::load("find.png", ToolbarLayout::kIconSize));
             ok(fromDisk != nullptr, "find.png is installed and decodes");
-            ok(fromDisk && samePixels(search->image(), fromDisk.get()),
+            ok(fromDisk && testsupport::samePixels(search->image(), fromDisk.get()),
                "search button draws the supplied PNG's pixels, not something else");
-            ok(search->image() && !samePixels(search->image(), Resources::getSearchIcon()),
+            ok(search->image() && !testsupport::samePixels(search->image(), Resources::getSearchIcon()),
                "search button is NOT falling back to the compiled-in magnifier");
         }
-        ok(search->image() && !samePixels(search->image(), Resources::getPauseIcon()),
+        ok(search->image() && !testsupport::samePixels(search->image(), Resources::getPauseIcon()),
            "the search icon is not the pause glyph");
         ok(limit->image() != nullptr, "limit button carries an icon");
         ok(limit->image() && limit->image()->w() == ToolbarLayout::kIconSize,
            "limit button icon is at the toolbar icon size");
-        ok(search->image() && !samePixels(search->image(), limit->image()),
+        ok(search->image() && !testsupport::samePixels(search->image(), limit->image()),
            "the two buttons do not share one picture");
         {
             // The badge the search rows draw when a torrent contains a
@@ -327,7 +211,7 @@ int main(int argc, char** argv) {
             // to it must cover the same area. Measuring the decoded image is
             // not enough -- it would pass even when the art fills the box and
             // the shield, inset by its own outline, does not.
-            const InkBox shield = inkOfShield(15);
+            const testsupport::InkBox shield = inkOfShield(15);
             ok(shield.ok, "the shield renders");
             if (shield.ok) {
                 struct BadgeArt {
@@ -346,7 +230,7 @@ int main(int argc, char** argv) {
                     std::unique_ptr<Fl_Image> badge(
                         AssetLoader::load(art.file, 15));
                     if (!badge) continue;   // covered by the checks above
-                    const InkBox ink = inkOfImage(badge->w(), badge->h(), badge.get());
+                    const testsupport::InkBox ink = testsupport::inkOfImage(badge->w(), badge->h(), badge.get());
                     // One pixel of slack: the shield's polygon is inset by its
                     // outline, so a badge with no transparent padding paints
                     // one row and one column more. Anything wider than that is
@@ -377,7 +261,7 @@ int main(int argc, char** argv) {
            "the executable badge asset is absent too");
         ok(AssetLoader::load("encrypted.png", 15) == nullptr,
            "the lock badge asset is absent too");
-        ok(search->image() && samePixels(search->image(), Resources::getSearchIcon()),
+        ok(search->image() && testsupport::samePixels(search->image(), Resources::getSearchIcon()),
            "search button draws the compiled-in magnifier's pixels");
         ok(search->image() && search->image()->w() == ToolbarLayout::kIconSize &&
            search->image()->h() == ToolbarLayout::kIconSize,
@@ -449,7 +333,7 @@ int main(int argc, char** argv) {
                   1024, 1400, 1920}) {
         win->resize(0, 0, w, 900);
         Fl_Button* add = (Fl_Button*)byTooltip(top, "Add Torrent");
-        forceLayout(add->parent());   // let the pack place its children
+        testsupport::forceLayout(add->parent());   // let the pack place its children
         const ToolbarLayout::Level lv = ToolbarLayout::forWidth(w);
         const int slack = w - ToolbarLayout::requiredWidth(lv);
         const int grow = ToolbarLayout::growPerButton(slack);
@@ -550,7 +434,7 @@ int main(int argc, char** argv) {
             const int w = pass ? wB : wA;
             win->resize(0, 0, w, 900);
             Fl_Button* b = (Fl_Button*)byTooltip(top, "Add Torrent");
-            forceLayout(b->parent());
+            testsupport::forceLayout(b->parent());
             const int slack = w - ToolbarLayout::requiredWidth(ToolbarLayout::forWidth(w));
             const int margin = ToolbarLayout::margin(slack);
             if (pass) { wideB = b->w(); marB = margin; }
@@ -609,7 +493,7 @@ int main(int argc, char** argv) {
         snprintf(msg, sizeof msg,
                  "%s button draws the compiled-in glyph's own pixels, not a copy of them",
                  g.name);
-        ok(samePixels(b->image(), g.compiledIn), msg);
+        ok(testsupport::samePixels(b->image(), g.compiledIn), msg);
         // A pixmap would be nearest-neighbour stretched with no alpha to blend
         // the edge; this is what makes it read as the same family as the PNGs.
         snprintf(msg, sizeof msg,
@@ -622,12 +506,12 @@ int main(int argc, char** argv) {
     // it used to be a 10x11 speck in a 44px button, which is what this change
     // is about. Compared against the PNG icons measured the same way.
     {
-        Rendered magnifier = renderWidget((Fl_Button*)byTooltip(top, "Search torrents"));
+        testsupport::Rendered magnifier = testsupport::renderWidget((Fl_Button*)byTooltip(top, "Search torrents"));
         int refH = magnifier.ok ? magnifier.y1 - magnifier.y0 + 1 : 0;
         for (const Glyph& g : glyphs) {
             Fl_Button* b = (Fl_Button*)byTooltip(top, g.tip);
             if (!b) continue;
-            Rendered r = renderWidget(b);
+            testsupport::Rendered r = testsupport::renderWidget(b);
             int w = r.x1 - r.x0 + 1, h = r.y1 - r.y0 + 1;
             char msg[192];
             snprintf(msg, sizeof msg,
@@ -673,7 +557,7 @@ int main(int argc, char** argv) {
             for (const Glyph& g : glyphs) {
                 Fl_Button* b = (Fl_Button*)byTooltip(top, g.tip);
                 if (!b) continue;
-                Rendered r = renderWidget(b);
+                testsupport::Rendered r = testsupport::renderWidget(b);
                 char msg[192];
                 snprintf(msg, sizeof msg,
                          "%s at %s (%dpx): icon is %dx%d",
@@ -708,7 +592,7 @@ int main(int argc, char** argv) {
         snprintf(msg, sizeof msg, "the play glyph carries an alpha channel too");
         ok(play && play->d() == 4, msg);
 
-        // Rendered straight onto a surface, the way the button draws it, so the
+        // testsupport::Rendered straight onto a surface, the way the button draws it, so the
         // claim is about pixels and not about a w() accessor.
         struct { const char* name; Fl_Image* img; } both[] = {
             {"pause", pause}, {"play", play},
@@ -755,8 +639,8 @@ int main(int argc, char** argv) {
     // pixels that actually get drawn, not on the colour attribute.
     auto neighbour = [&]() { return (Fl_Button*)byTooltip(top, "Add Torrent"); };
     auto sameBackground = [&](const char* what) {
-        Rendered mine = renderWidget(limit);
-        Rendered theirs = renderWidget(neighbour());
+        testsupport::Rendered mine = testsupport::renderWidget(limit);
+        testsupport::Rendered theirs = testsupport::renderWidget(neighbour());
         char msg[192];
         snprintf(msg, sizeof msg,
                  "%s: limit bg rgb(%u,%u,%u) == Add bg rgb(%u,%u,%u)",
@@ -769,7 +653,7 @@ int main(int argc, char** argv) {
 
     // --- the bolt is drawn big enough to read, and still inside the button
     if (mode == "full") {
-        Rendered bolt = renderWidget(limit);
+        testsupport::Rendered bolt = testsupport::renderWidget(limit);
         ok(bolt.ok, "limit button rendered offscreen");
         int bw = bolt.x1 - bolt.x0 + 1, bh = bolt.y1 - bolt.y0 + 1;
         char msg[160];
@@ -787,7 +671,7 @@ int main(int argc, char** argv) {
     ok(isMagenta(limit), "limit button turns magenta when the limit is on");
     ok(limit->label() == nullptr, "toggling the limit does not add text back");
     {
-        Rendered on = renderWidget(limit);
+        testsupport::Rendered on = testsupport::renderWidget(limit);
         char msg[96];
         snprintf(msg, sizeof msg, "limit on renders bg rgb(%u,%u,%u)",
                  on.bg.r, on.bg.g, on.bg.b);

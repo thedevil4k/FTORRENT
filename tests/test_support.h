@@ -29,15 +29,19 @@
 #  undef B0
 #endif
 #include <FL/Fl.H>
+#include <FL/Fl_Image.H>
 #include <FL/Fl_Image_Surface.H>
 #include <FL/Fl_RGB_Image.H>
 #include <FL/Fl_Widget.H>
+#include <FL/fl_draw.H>
 
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <string>
+#include <vector>
 
 namespace testsupport {
 
@@ -171,6 +175,125 @@ inline void forceLayout(Fl_Widget* w) {
 inline int report(const char* suite) {
     printf("\n%s checks=%d failures=%d\n", suite, checks, failures);
     return failures ? 1 : 0;
+}
+
+// Renders an image and compares the pixels. Which picture a widget is drawing
+// is a question about pixels, not about pointers: AssetLoader::load() returns
+// a fresh copy on every call, so the object a widget holds is never equal to
+// anything the suite can load itself, and never equal to the compiled-in glyph.
+inline bool samePixels(Fl_Image* a, Fl_Image* b) {
+    if (!a || !b || a->w() != b->w() || a->h() != b->h()) return false;
+    const int w = a->w(), h = a->h();
+    Fl_Image_Surface surf(w, h);
+    std::vector<unsigned char> pa, pb;
+    for (int pass = 0; pass < 2; pass++) {
+        Fl_RGB_Image* out = nullptr;
+        {
+            SurfaceScope here(&surf);
+            fl_color(FL_BLACK);                       // same backdrop for both
+            fl_rectf(0, 0, w, h);
+            (pass == 0 ? a : b)->draw(0, 0);
+            out = surf.image();
+        }
+        if (!out || out->d() != 3 || out->w() != w || out->h() != h) {
+            if (out) delete out;
+            return false;
+        }
+        (pass == 0 ? pa : pb).assign(out->array,
+                                     out->array + (size_t)w * h * 3);
+        delete out;
+    }
+    return pa == pb;
+}
+
+struct Rgb { unsigned char r, g, b; };
+
+// Renders the widget offscreen and reports the background it fills itself with
+// plus the extent of everything else it draws (the icon). Rendered pixels, not
+// the colour attributes, because those are what the user actually sees.
+struct Rendered { Rgb bg; int x0, y0, x1, y1, ink; bool ok; };
+
+inline Rendered renderWidget(Fl_Widget* w) {
+    Rendered r{};
+    r.ok = false; r.x0 = r.y0 = r.x1 = r.y1 = -1; r.ink = 0;
+    Fl_Image_Surface surf(w->w(), w->h());
+    SurfaceScope here(&surf);
+    surf.draw(w);
+    Fl_RGB_Image* img = surf.image();
+    if (!img || !img->array || img->d() != 3 || img->w() != w->w() || img->h() != w->h()) {
+        if (img) delete img;
+        return r;
+    }
+    const unsigned char* px = img->array;
+    auto at = [&](int x, int y) {
+        const unsigned char* q = px + (y * img->w() + x) * 3;
+        return Rgb{q[0], q[1], q[2]};
+    };
+    r.bg = at(1, 1);
+    int maxx = -1, maxy = -1;
+    for (int y = 0; y < img->h(); y++)
+        for (int x = 0; x < img->w(); x++) {
+            Rgb p = at(x, y);
+            if (std::abs(p.r - r.bg.r) <= 6 && std::abs(p.g - r.bg.g) <= 6 &&
+                std::abs(p.b - r.bg.b) <= 6) continue;
+            r.ink++;
+            if (r.x0 < 0 || x < r.x0) r.x0 = x;
+            if (x > maxx) maxx = x;
+            if (r.y0 < 0 || y < r.y0) r.y0 = y;
+            if (y > maxy) maxy = y;
+        }
+    if (r.x0 >= 0) { r.x1 = maxx; r.y1 = maxy; }
+    r.ok = true;
+    delete img;
+    return r;
+}
+
+// Extent of what a paint call actually covers on a black backdrop, in pixels.
+// The badge group is judged on this rather than on the decoded image size: a
+// PNG whose art fills its box and the shield inside the same box do not paint
+// the same area, and the difference is what the eye reads as "bigger".
+struct InkBox {
+    int w = 0, h = 0;
+    bool ok = false;
+};
+
+inline InkBox inkOfPaint(int side, const std::function<void()>& paint) {
+    InkBox box;
+    Fl_Image_Surface surf(side, side);
+    Fl_RGB_Image* img = nullptr;
+    {
+        SurfaceScope here(&surf);
+        fl_color(FL_BLACK);
+        fl_rectf(0, 0, side, side);
+        paint();
+        img = surf.image();
+    }
+    if (!img || !img->array || img->d() != 3) {
+        if (img) delete img;
+        return box;
+    }
+    const unsigned char* px = img->array;
+    int x0 = side, y0 = side, x1 = -1, y1 = -1;
+    for (int y = 0; y < side; y++) {
+        for (int x = 0; x < side; x++) {
+            const unsigned char* q = px + (y * side + x) * 3;
+            if (!q[0] && !q[1] && !q[2]) continue;
+            if (x < x0) x0 = x;
+            if (y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+        }
+    }
+    delete img;
+    if (x1 < 0) return box;
+    box.w = x1 - x0 + 1;
+    box.h = y1 - y0 + 1;
+    box.ok = true;
+    return box;
+}
+
+inline InkBox inkOfImage(int w, int h, Fl_Image* img) {
+    return inkOfPaint((w > h ? w : h) + 8, [img] { img->draw(0, 0); });
 }
 
 }  // namespace testsupport
