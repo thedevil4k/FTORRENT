@@ -21,6 +21,9 @@ namespace {
 // installers; they exist to stop a hostile archive, not to judge a big game.
 constexpr int MAX_ENTRIES = 100000;
 
+// The Windows wide-character entry point takes a UTF-8 path; every other
+// platform opens the narrow string directly and never needs this helper.
+#ifdef _WIN32
 std::filesystem::path pathFromUtf8(const std::string& text) {
 #if defined(__cpp_char8_t)
     return std::filesystem::path(std::u8string(
@@ -29,6 +32,7 @@ std::filesystem::path pathFromUtf8(const std::string& text) {
     return std::filesystem::u8path(text);
 #endif
 }
+#endif
 
 struct ArchiveCloser {
     void operator()(archive* value) const {
