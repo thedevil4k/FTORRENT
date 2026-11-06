@@ -240,9 +240,11 @@ jobs:
       run: xvfb-run -a ctest --test-dir build_quality --output-on-failure -LE network
 
   test-windows:
-    # The offline `unit` label keeps this job to file_hash and archive_inspector:
-    # they need no display, no network and no FLTK window. The GUI suites still
-    # run on Linux under xvfb, where their geometry assertions are maintained.
+    # The offline `unit` label covers every headless program, so the whole test
+    # tree is built here rather than two targets: building only some of them
+    # left the rest as "Not Run" even though the code compiled. The GUI suites
+    # are built too, which checks that MSVC compiles them; they still run on
+    # Linux under xvfb, where their geometry assertions are maintained.
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
@@ -266,8 +268,8 @@ jobs:
       run: |
         cmake -S . -B build_tests "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DFTORRENT_BUILD_TESTS=ON
 
-    - name: Build the unit tests
-      run: cmake --build build_tests --config Release --target file_hash archive_inspector
+    - name: Build the tests
+      run: cmake --build build_tests --config Release
 
     - name: Run the unit tests
       run: ctest --test-dir build_tests -C Release --output-on-failure -L unit
