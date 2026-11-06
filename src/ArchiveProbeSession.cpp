@@ -6,6 +6,7 @@
 #include <libtorrent/alert_types.hpp>
 #include <libtorrent/posix_disk_io.hpp>
 #include <libtorrent/settings_pack.hpp>
+#include <libtorrent/version.hpp>
 
 #include <algorithm>
 #include <system_error>
@@ -414,7 +415,12 @@ void ArchiveProbeSession::reviveSwarm(bool force) {
         return;
     }
     for (const lt::peer_info& peer : connected) {
+        // libtorrent 2.1 removed peer_info::ip; 2.0 only has that spelling.
+#if LIBTORRENT_VERSION_NUM >= 20100
         rememberPeer(peer.remote_endpoint());
+#else
+        rememberPeer(peer.ip);
+#endif
     }
     if (!connected.empty() || m_seenPeers.empty()) return;
 
