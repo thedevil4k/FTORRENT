@@ -106,13 +106,16 @@ ProviderVerdict verdictOf(const std::string& provider, bool answered,
 }
 
 // Runs the UI loop until the service has nothing in flight, so the delivery
-// through Fl::awake() actually happens.
+// through Fl::awake() actually happens. Under headless xvfb, Fl::wait() may
+// not process Fl::awake() callbacks on every iteration, so each pass also
+// sleeps briefly to let the worker thread finish and the UI loop catch up.
 bool waitFor(ReputationService& service, int timeoutMs = 5000) {
     const auto deadline =
         std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     while (service.pending() > 0) {
         if (std::chrono::steady_clock::now() > deadline) return false;
-        Fl::wait(0.02);
+        Fl::wait(0.1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return true;
 }
