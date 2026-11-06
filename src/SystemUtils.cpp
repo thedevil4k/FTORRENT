@@ -158,10 +158,16 @@ void SystemUtils::openFolder(const std::string& path) {
     ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
 #elif __APPLE__
     std::string cmd = "open \"" + path + "\"";
-    system(cmd.c_str());
+    // The launchers are best effort: a desktop without the opener installed
+    // is not an error the caller can act on. system() declares its result
+    // warn_unused_result, so the status is captured and then deliberately
+    // ignored.
+    const int status = system(cmd.c_str());
+    (void)status;
 #else
     std::string cmd = "xdg-open \"" + path + "\"";
-    system(cmd.c_str());
+    const int status = system(cmd.c_str());
+    (void)status;
 #endif
 }
 
@@ -172,10 +178,14 @@ void SystemUtils::openUrl(const std::string& url) {
     ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 #elif __APPLE__
     std::string cmd = "open \"" + url + "\"";
-    system(cmd.c_str());
+    // Same best-effort launch as openFolder: the status is captured and
+    // deliberately ignored.
+    const int status = system(cmd.c_str());
+    (void)status;
 #else
     std::string cmd = "xdg-open \"" + url + "\"";
-    system(cmd.c_str());
+    const int status = system(cmd.c_str());
+    (void)status;
 #endif
 }
 
@@ -184,8 +194,12 @@ void SystemUtils::setProcessPriority(bool high) {
     SetPriorityClass(GetCurrentProcess(),
                      high ? HIGH_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS);
 #else
-    // Nice value for Linux/Mac
-    nice(high ? -10 : 0);
+    // Nice value for Linux/Mac. Raising the priority of an unprivileged
+    // process fails with EPERM, which is the normal case, so nice() declares
+    // its result warn_unused_result and the status is captured here only to
+    // be deliberately ignored.
+    const int status = nice(high ? -10 : 0);
+    (void)status;
 #endif
 }
 
