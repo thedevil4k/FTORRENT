@@ -49,8 +49,7 @@ public:
      *                  stops the read and reports a cancellation as an error.
      * @return true when the whole file was read and hashed.
      */
-    static bool sha256File(const std::string& path,
-                           std::string& digestHex,
+    static bool sha256File(const std::string& path, std::string& digestHex,
                            std::string& error,
                            const std::atomic<bool>* cancelled = nullptr);
 };

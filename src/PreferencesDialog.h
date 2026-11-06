@@ -27,14 +27,14 @@ class PreferencesDialog : public Fl_Window {
 public:
     PreferencesDialog();
     ~PreferencesDialog();
-    
+
     // Show dialog and return true if OK was clicked
     bool show_modal();
-    
+
 private:
     // Tabs
     Fl_Tabs* m_tabs;
-    
+
     // General tab widgets
     Fl_Group* m_generalTab;
     Fl_Input* m_downloadPath;
@@ -42,7 +42,7 @@ private:
     Fl_Check_Button* m_startWithSystem;
     Fl_Check_Button* m_minimizeToTray;
     Fl_Check_Button* m_showPublicIp;
-    
+
     // Connection tab widgets
     Fl_Group* m_connectionTab;
     Fl_Int_Input* m_listenPort;
@@ -51,7 +51,7 @@ private:
     Fl_Int_Input* m_maxUploadRate;
     Fl_Int_Input* m_maxConnections;
     Fl_Check_Button* m_limitLocalNetwork;
-    
+
     // BitTorrent tab widgets
     Fl_Group* m_bittorrentTab;
     Fl_Check_Button* m_enableDHT;
@@ -59,7 +59,7 @@ private:
     Fl_Check_Button* m_enableLSD;
     Fl_Check_Button* m_enableUPnP;
     Fl_Check_Button* m_enableNATPMP;
-    
+
     // Advanced tab widgets
     Fl_Group* m_advancedTab;
     Fl_Input* m_userAgent;
@@ -77,15 +77,15 @@ private:
     Fl_Button* m_saveBazaarKey;
     Fl_Button* m_clearBazaarKey;
     Fl_Box* m_keyStatus;
-    
+
     // Buttons
     Fl_Button* m_okButton;
     Fl_Button* m_cancelButton;
     Fl_Button* m_applyButton;
-    
+
     // State
     bool m_okClicked;
-    
+
     // UI Creation
     void createGeneralTab();
     void createConnectionTab();
@@ -105,22 +105,22 @@ private:
     static void onClearBazaarKey(Fl_Widget* w, void* data);
     static void onGetVirusTotalKey(Fl_Widget* w, void* data);
     static void onGetBazaarKey(Fl_Widget* w, void* data);
-    
+
     // Load/Save
     void loadSettings();
     void saveSettings();
     void applySettings();
-    
+
     // Validation
     bool validateSettings();
-    
+
     // Callbacks
     static void onBrowsePath(Fl_Widget* w, void* data);
     static void onRandomPort(Fl_Widget* w, void* data);
     static void onOK(Fl_Widget* w, void* data);
     static void onCancel(Fl_Widget* w, void* data);
     static void onApply(Fl_Widget* w, void* data);
-    
+
     // Helper
     void generateRandomPort();
 };

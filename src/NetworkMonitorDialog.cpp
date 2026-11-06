@@ -33,15 +33,13 @@ std::string clockOf(std::int64_t when) {
 std::string connectionLine(const std::string& torrent,
                            const TorrentItem::PeerInfo& peer) {
     std::ostringstream out;
-    out << std::left << std::setw(18) << torrent.substr(0, 18)
-        << std::setw(16) << peer.ip
-        << std::right << std::setw(6) << peer.port << "  "
+    out << std::left << std::setw(18) << torrent.substr(0, 18) << std::setw(16)
+        << peer.ip << std::right << std::setw(6) << peer.port << "  "
         << std::left << std::setw(4) << (peer.outgoing ? "out" : "in")
-        << std::setw(4) << (peer.encrypted ? "yes" : "no")
-        << std::setw(10) << Format::perSecond(peer.downloadRate) << "  "
-        << std::setw(10) << Format::perSecond(peer.uploadRate) << "  "
-        << std::right << std::setw(5)
-        << static_cast<int>(peer.progress * 100.0) << "%  "
+        << std::setw(4) << (peer.encrypted ? "yes" : "no") << std::setw(10)
+        << Format::perSecond(peer.downloadRate) << "  " << std::setw(10)
+        << Format::perSecond(peer.uploadRate) << "  " << std::right
+        << std::setw(5) << static_cast<int>(peer.progress * 100.0) << "%  "
         << std::left << peer.client;
     return out.str();
 }
@@ -148,8 +146,8 @@ void NetworkMonitorDialog::refreshConnections() {
     }
 
     std::ostringstream summary;
-    summary << links << " connection(s) across " << torrents
-            << " torrent(s), " << outgoing << " outgoing, " << encrypted
+    summary << links << " connection(s) across " << torrents << " torrent(s), "
+            << outgoing << " outgoing, " << encrypted
             << " encrypted. This shows the peers FTorrent talks to, not packet "
                "contents.";
     if (m_summary) m_summary->copy_label(summary.str().c_str());
@@ -166,7 +164,8 @@ void NetworkMonitorDialog::refreshConnections() {
 void NetworkMonitorDialog::refreshEvents() {
     if (!m_eventList) return;
 
-    const std::vector<SecurityEvent> events = SecurityEvents::instance().snapshot();
+    const std::vector<SecurityEvent> events =
+        SecurityEvents::instance().snapshot();
     if (events.size() < m_shownEvents) {
         // The log was cleared from elsewhere, or wrapped: start again.
         m_eventList->clear();

@@ -52,7 +52,8 @@ const std::string INFO_DICT =
     "12:piece lengthi16384e"
     "6:pieces20:" +
     std::string("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e"
-                "\x0f\x10\x11\x12\x13\x14", 20) +
+                "\x0f\x10\x11\x12\x13\x14",
+                20) +
     "e";
 
 std::string torrentBody() {
@@ -71,11 +72,13 @@ std::string expectedInfoHash() {
 int main() {
     section("default trackers reach a trackerless magnet");
     {
-        const std::vector<std::string>& trackers = TorrentFileList::defaultTrackers();
+        const std::vector<std::string>& trackers =
+            TorrentFileList::defaultTrackers();
         ok(!trackers.empty(), "there is a default tracker list");
         bool allAnnounce = true;
         for (const std::string& tracker : trackers) {
-            if (tracker.find("/announce") == std::string::npos) allAnnounce = false;
+            if (tracker.find("/announce") == std::string::npos)
+                allAnnounce = false;
         }
         ok(allAnnounce, "every default tracker is an announce URL");
 
@@ -84,11 +87,13 @@ int main() {
         ok(none.size() == trackers.size(),
            "an empty list gets exactly the defaults");
 
-        std::vector<std::string> withOne = { trackers[0], "udp://mine.example:80/announce" };
+        std::vector<std::string> withOne = {trackers[0],
+                                            "udp://mine.example:80/announce"};
         TorrentFileList::addDefaultTrackers(withOne);
         ok(withOne.size() == trackers.size() + 1,
            "a tracker already present is not added twice");
-        ok(withOne[0] == trackers[0] && withOne[1] == "udp://mine.example:80/announce",
+        ok(withOne[0] == trackers[0] &&
+               withOne[1] == "udp://mine.example:80/announce",
            "the magnet's own trackers keep their place at the front");
     }
 
@@ -101,7 +106,8 @@ int main() {
            "and so is the second one");
         ok(nodes.find("router.bittorrent.com:6881") != std::string::npos,
            "libtorrent's default router is still there for other networks");
-        ok(nodes.find(':') != std::string::npos && nodes.find(' ') == std::string::npos,
+        ok(nodes.find(':') != std::string::npos &&
+               nodes.find(' ') == std::string::npos,
            "host:port comma-separated, as the setting expects");
     }
 
@@ -109,10 +115,12 @@ int main() {
     {
         const std::string lower = "13df974956a3ff5584247f850539c1a6dad6a7e4";
         ok(TorrentFileList::magnetHash(
-               "magnet:?xt=urn:btih:13DF974956A3FF5584247F850539C1A6DAD6A7E4&dn=x") == lower,
+               "magnet:?xt=urn:btih:13DF974956A3FF5584247F850539C1A6DAD6A7E4&"
+               "dn=x") == lower,
            "hex is lowercased");
         ok(TorrentFileList::magnetHash(
-               "magnet:?xt=urn:btih:CPPZOSKWUP7VLBBEP6CQKOOBU3NNNJ7E&dn=x") == lower,
+               "magnet:?xt=urn:btih:CPPZOSKWUP7VLBBEP6CQKOOBU3NNNJ7E&dn=x") ==
+               lower,
            "base32 becomes the same hex");
         ok(TorrentFileList::magnetHash(
                "magnet:?xt=urn:btih:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") ==
@@ -166,7 +174,8 @@ int main() {
         std::vector<TorrentFileEntry> files;
         std::string error;
 
-        ok(!TorrentFileList::resolve("", "http://example.com/a.torrent", files, error, 1),
+        ok(!TorrentFileList::resolve("", "http://example.com/a.torrent", files,
+                                     error, 1),
            "a plain-http .torrent link is refused");
         ok(error.find("https") != std::string::npos,
            "the message names the https rule");
@@ -177,6 +186,7 @@ int main() {
         ok(!error.empty(), "with an explanation");
     }
 
-    std::cout << "\nfilelist checks=" << checks << " failures=" << failures << "\n";
+    std::cout << "\nfilelist checks=" << checks << " failures=" << failures
+              << "\n";
     return failures ? 1 : 0;
 }

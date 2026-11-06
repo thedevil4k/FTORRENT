@@ -32,10 +32,9 @@ int SearchResultsWidget::archiveEntryRows(const ArchiveAction& action) {
         return 0;
     }
     const int shown = static_cast<int>(action.entries.size());
-    const int listed = shown > MAX_SHOWN_ARCHIVE_ENTRIES
-                           ? MAX_SHOWN_ARCHIVE_ENTRIES
-                           : shown;
-    return listed + (shown > listed ? 1 : 0);   // +1 for "... and N more"
+    const int listed =
+        shown > MAX_SHOWN_ARCHIVE_ENTRIES ? MAX_SHOWN_ARCHIVE_ENTRIES : shown;
+    return listed + (shown > listed ? 1 : 0); // +1 for "... and N more"
 }
 
 bool SearchResultsWidget::archiveLineHit(int row, int x, int y) {

@@ -18,8 +18,7 @@ const int MAX_IN_FLIGHT = 4;
 } // namespace
 
 FileListService::FileListService()
-    : m_shared(std::make_shared<Shared>())
-{
+    : m_shared(std::make_shared<Shared>()) {
     m_shared->maxCached = MAX_CACHED;
     m_shared->maxInFlight = MAX_IN_FLIGHT;
 }
@@ -55,8 +54,7 @@ void FileListService::clear() {
     m_shared->queue.clear();
 }
 
-bool FileListService::request(const std::string& key,
-                              const std::string& magnet,
+bool FileListService::request(const std::string& key, const std::string& magnet,
                               const std::string& torrentUrl,
                               const Completion& done) {
     {
@@ -66,14 +64,15 @@ bool FileListService::request(const std::string& key,
             (it->second.state == FileListState::Loaded ||
              it->second.state == FileListState::Loading ||
              it->second.state == FileListState::Queued)) {
-            return false;                     // known, or already on its way
+            return false; // known, or already on its way
         }
         // Claim it, so a double click cannot start two probes.
         Entry& entry = m_shared->entries[key];
         entry = Entry{};
         entry.state = FileListState::Queued;
         if (it == m_shared->entries.end()) m_shared->order.push_back(key);
-        m_shared->queue.push_back(Shared::Pending{key, magnet, torrentUrl, done});
+        m_shared->queue.push_back(
+            Shared::Pending{key, magnet, torrentUrl, done});
     }
     // Starts it now when a slot is free, or leaves it queued when not. Either
     // way the request is owned by the service from here on.
@@ -98,7 +97,7 @@ void FileListService::pump(const std::shared_ptr<Shared>& shared) {
                 continue;
             }
             it->second.state = FileListState::Loading;
-            shared->inFlight.fetch_add(1);    // taken under the lock
+            shared->inFlight.fetch_add(1); // taken under the lock
             start.push_back(std::move(pending));
         }
     }
@@ -124,10 +123,10 @@ void FileListService::startWorker(std::shared_ptr<Shared> shared,
         try {
             // resolve() never throws, but a bad_alloc in a worker must not take
             // the process down either.
-            if (TorrentFileList::resolve(magnet, torrentUrl, d->entry.files,
-                                         d->entry.error,
-                                         TorrentFileList::DEFAULT_TIMEOUT_SECONDS,
-                                         &d->entry.torrentBody)) {
+            if (TorrentFileList::resolve(
+                    magnet, torrentUrl, d->entry.files, d->entry.error,
+                    TorrentFileList::DEFAULT_TIMEOUT_SECONDS,
+                    &d->entry.torrentBody)) {
                 d->entry.state = FileListState::Loaded;
             }
         } catch (const std::exception& e) {
@@ -145,7 +144,7 @@ void FileListService::startWorker(std::shared_ptr<Shared> shared,
 void FileListService::deliver(void* data) {
     std::unique_ptr<Delivery> d(static_cast<Delivery*>(data));
     const std::shared_ptr<Shared>& shared = d->shared;
-    if (!shared->alive.load()) return;        // the owner is gone; drop it
+    if (!shared->alive.load()) return; // the owner is gone; drop it
 
     // The slot is released here rather than in the worker, because the counter
     // has to be touched by the thread that owns it. It matters that this runs

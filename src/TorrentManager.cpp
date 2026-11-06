@@ -12,8 +12,7 @@ TorrentManager::TorrentManager()
     : m_initialized(false)
     , m_running(false)
     , m_publicIp("")
-    , m_countryCode("")
-{
+    , m_countryCode("") {
     m_session = std::make_unique<TorrentSession>();
     // Make sure first check happens immediately
     m_lastIpCheck = std::chrono::steady_clock::now() - std::chrono::hours(1);
@@ -33,20 +32,21 @@ bool TorrentManager::initialize() {
         return false;
     }
 
-    m_session->setErrorCallback([this](const std::string& error) {
-        notifyError(error);
-    });
+    m_session->setErrorCallback(
+        [this](const std::string& error) { notifyError(error); });
 
     m_running.store(true);
     m_initialized.store(true);
-    
+
     // Get number of hardware threads for info
-    size_t numThreads = std::max(2u, std::min(8u, std::thread::hardware_concurrency()));
-    std::cout << "TorrentManager initialized (using " << numThreads << " CPU cores available)" << std::endl;
-    
+    size_t numThreads =
+        std::max(2u, std::min(8u, std::thread::hardware_concurrency()));
+    std::cout << "TorrentManager initialized (using " << numThreads
+              << " CPU cores available)" << std::endl;
+
     // Load resident torrents (persistence)
     m_session->loadResidentTorrents();
-    
+
     return true;
 }
 
@@ -63,7 +63,7 @@ void TorrentManager::shutdown() {
         std::lock_guard<std::mutex> lock(m_torrentsMutex);
         m_torrents.clear();
     }
-    
+
     if (m_session) {
         m_session->shutdown();
     }
@@ -73,18 +73,24 @@ void TorrentManager::shutdown() {
 }
 
 // Async operations for non-blocking UI
-std::future<bool> TorrentManager::addTorrentFileAsync(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities) {
+std::future<bool>
+TorrentManager::addTorrentFileAsync(const std::string& torrentFile,
+                                    const std::string& savePath,
+                                    const std::vector<int>& file_priorities) {
     // For now, execute synchronously but return as future
     auto promise = std::make_shared<std::promise<bool>>();
     auto future = promise->get_future();
-    
+
     bool result = addTorrentFile(torrentFile, savePath, file_priorities);
     promise->set_value(result);
-    
+
     return future;
 }
 
-std::future<bool> TorrentManager::addMagnetLinkAsync(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities) {
+std::future<bool>
+TorrentManager::addMagnetLinkAsync(const std::string& magnetLink,
+                                   const std::string& savePath,
+                                   const std::vector<int>& file_priorities) {
     // For now, execute synchronously but return as future
     auto promise = std::make_shared<std::promise<bool>>();
     auto future = promise->get_future();
@@ -96,14 +102,17 @@ std::future<bool> TorrentManager::addMagnetLinkAsync(const std::string& magnetLi
 }
 
 // Synchronous operations
-bool TorrentManager::addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities) {
+bool TorrentManager::addTorrentFile(const std::string& torrentFile,
+                                    const std::string& savePath,
+                                    const std::vector<int>& file_priorities) {
     if (!m_initialized.load()) {
         notifyError("Session not initialized");
         return false;
     }
 
-    bool success = m_session->addTorrentFile(torrentFile, savePath, file_priorities);
-    
+    bool success =
+        m_session->addTorrentFile(torrentFile, savePath, file_priorities);
+
     if (success) {
         std::lock_guard<std::mutex> lock(m_torrentsMutex);
         syncTorrentsInternal();
@@ -112,14 +121,17 @@ bool TorrentManager::addTorrentFile(const std::string& torrentFile, const std::s
     return success;
 }
 
-bool TorrentManager::addMagnetLink(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities) {
+bool TorrentManager::addMagnetLink(const std::string& magnetLink,
+                                   const std::string& savePath,
+                                   const std::vector<int>& file_priorities) {
     if (!m_initialized.load()) {
         notifyError("Session not initialized");
         return false;
     }
 
-    bool success = m_session->addMagnetLink(magnetLink, savePath, file_priorities);
-    
+    bool success =
+        m_session->addMagnetLink(magnetLink, savePath, file_priorities);
+
     if (success) {
         std::lock_guard<std::mutex> lock(m_torrentsMutex);
         syncTorrentsInternal();
@@ -130,11 +142,11 @@ bool TorrentManager::addMagnetLink(const std::string& magnetLink, const std::str
 
 void TorrentManager::removeTorrent(const std::string& hash, bool deleteFiles) {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
-    
+
     auto it = std::find_if(m_torrents.begin(), m_torrents.end(),
-        [&hash](const std::unique_ptr<TorrentItem>& item) {
-            return item && item->getHash() == hash;
-        });
+                           [&hash](const std::unique_ptr<TorrentItem>& item) {
+                               return item && item->getHash() == hash;
+                           });
 
     if (it == m_torrents.end()) {
         return;
@@ -142,11 +154,11 @@ void TorrentManager::removeTorrent(const std::string& hash, bool deleteFiles) {
 
     // Keep handle for removal
     lt::torrent_handle handle = (*it)->getHandle();
-    
+
     // Remove from session
     m_session->removeTorrent(handle, deleteFiles);
     m_session->removeResumeData(hash);
-    
+
     // Notify before erasing while pointer is still valid
     notifyTorrentRemoved(hash);
 
@@ -156,7 +168,7 @@ void TorrentManager::removeTorrent(const std::string& hash, bool deleteFiles) {
 
 void TorrentManager::pauseTorrent(const std::string& hash) {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
-    
+
     auto* torrent = findTorrentInternal(hash);
     if (torrent) {
         m_session->pauseTorrent(torrent->getHandle());
@@ -166,7 +178,7 @@ void TorrentManager::pauseTorrent(const std::string& hash) {
 
 void TorrentManager::resumeTorrent(const std::string& hash) {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
-    
+
     auto* torrent = findTorrentInternal(hash);
     if (torrent) {
         m_session->resumeTorrent(torrent->getHandle());
@@ -176,7 +188,7 @@ void TorrentManager::resumeTorrent(const std::string& hash) {
 
 void TorrentManager::pauseAll() {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
-    
+
     for (auto& torrent : m_torrents) {
         m_session->pauseTorrent(torrent->getHandle());
         torrent->update();
@@ -185,7 +197,7 @@ void TorrentManager::pauseAll() {
 
 void TorrentManager::resumeAll() {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
-    
+
     for (auto& torrent : m_torrents) {
         m_session->resumeTorrent(torrent->getHandle());
         torrent->update();
@@ -218,11 +230,11 @@ std::vector<TorrentItem*> TorrentManager::getAllTorrents() {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
     std::vector<TorrentItem*> result;
     result.reserve(m_torrents.size());
-    
+
     for (auto& torrent : m_torrents) {
         result.push_back(torrent.get());
     }
-    
+
     return result;
 }
 
@@ -230,11 +242,11 @@ std::vector<const TorrentItem*> TorrentManager::getAllTorrents() const {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
     std::vector<const TorrentItem*> result;
     result.reserve(m_torrents.size());
-    
+
     for (const auto& torrent : m_torrents) {
         result.push_back(torrent.get());
     }
-    
+
     return result;
 }
 
@@ -260,11 +272,11 @@ int TorrentManager::getTotalUploadRate() const {
 int TorrentManager::getActiveTorrentsCount() const {
     std::lock_guard<std::mutex> lock(m_torrentsMutex);
     return std::count_if(m_torrents.begin(), m_torrents.end(),
-        [](const std::unique_ptr<TorrentItem>& item) {
-            auto state = item->getState();
-            return state == TorrentItem::State::Downloading || 
-                   state == TorrentItem::State::Seeding;
-        });
+                         [](const std::unique_ptr<TorrentItem>& item) {
+                             auto state = item->getState();
+                             return state == TorrentItem::State::Downloading ||
+                                    state == TorrentItem::State::Seeding;
+                         });
 }
 
 std::string TorrentManager::getSessionStats() const {
@@ -295,10 +307,10 @@ void TorrentManager::update() {
     // Sync and update torrents
     {
         std::lock_guard<std::mutex> lock(m_torrentsMutex);
-        
+
         // Sync with libtorrent session
         syncTorrentsInternal();
-        
+
         // Update all torrent items
         for (auto& torrent : m_torrents) {
             torrent->update();
@@ -310,22 +322,25 @@ void TorrentManager::update() {
     // Skipped entirely when the public IP display is disabled in Preferences,
     // so we never contact the external service at all.
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::minutes>(now - m_lastIpCheck).count() >= 15
-        && SettingsManager::instance().getShowPublicIp()) {
+    if (std::chrono::duration_cast<std::chrono::minutes>(now - m_lastIpCheck)
+                .count() >= 15 &&
+        SettingsManager::instance().getShowPublicIp()) {
         m_lastIpCheck = now;
-        SystemUtils::fetchPublicIpAndCountry([this](std::string ip, std::string country) {
-            {
-                std::lock_guard<std::mutex> lock(m_ipMutex);
-                m_publicIp = ip;
-                m_countryCode = country;
-            }
-            notifyStatsUpdated();
-        });
+        SystemUtils::fetchPublicIpAndCountry(
+            [this](std::string ip, std::string country) {
+                {
+                    std::lock_guard<std::mutex> lock(m_ipMutex);
+                    m_publicIp = ip;
+                    m_countryCode = country;
+                }
+                notifyStatsUpdated();
+            });
     }
 
     // Periodic resume data saving (every 30 seconds)
     static auto lastSave = std::chrono::steady_clock::now();
-    if (std::chrono::steady_clock::now() - lastSave > std::chrono::seconds(30)) {
+    if (std::chrono::steady_clock::now() - lastSave >
+        std::chrono::seconds(30)) {
         m_session->triggerSaveResumeData();
         lastSave = std::chrono::steady_clock::now();
     }
@@ -373,40 +388,40 @@ void TorrentManager::setOnError(ErrorCallback callback) {
 
 void TorrentManager::syncTorrentsInternal() {
     // IMPORTANT: Caller must hold m_torrentsMutex
-    
+
     if (!m_initialized.load()) {
         return;
     }
 
     auto handles = m_session->getTorrents();
-    
+
     // 1. Identify torrents to remove
     std::vector<std::string> toRemove;
     for (const auto& item : m_torrents) {
         if (!item) continue;
-        
+
         std::string hash = item->getHash();
         auto it = std::find_if(handles.begin(), handles.end(),
-            [&hash](const lt::torrent_handle& h) {
-                return h.is_valid() && 
-                       TorrentItem::toHex(h.info_hashes().v1) == hash;
-            });
-            
+                               [&hash](const lt::torrent_handle& h) {
+                                   return h.is_valid() &&
+                                          TorrentItem::toHex(
+                                              h.info_hashes().v1) == hash;
+                               });
+
         if (it == handles.end()) {
             toRemove.push_back(hash);
         }
     }
-    
+
     // 2. Remove identified torrents
     for (const auto& hash : toRemove) {
         notifyTorrentRemoved(hash);
         m_torrents.erase(
             std::remove_if(m_torrents.begin(), m_torrents.end(),
-                [&hash](const std::unique_ptr<TorrentItem>& item) {
-                    return item && item->getHash() == hash;
-                }),
-            m_torrents.end()
-        );
+                           [&hash](const std::unique_ptr<TorrentItem>& item) {
+                               return item && item->getHash() == hash;
+                           }),
+            m_torrents.end());
     }
 
     // 3. Add new torrents
@@ -416,7 +431,7 @@ void TorrentManager::syncTorrentsInternal() {
         }
 
         std::string hash = TorrentItem::toHex(handle.info_hashes().v1);
-        
+
         if (!findTorrentInternal(hash)) {
             // Add extra trackers for better connectivity
             std::ifstream trackerFile("trackersadd.txt");
@@ -442,23 +457,24 @@ void TorrentManager::syncTorrentsInternal() {
 
 TorrentItem* TorrentManager::findTorrentInternal(const std::string& hash) {
     // IMPORTANT: Caller must hold m_torrentsMutex
-    
+
     auto it = std::find_if(m_torrents.begin(), m_torrents.end(),
-        [&hash](const std::unique_ptr<TorrentItem>& item) {
-            return item->getHash() == hash;
-        });
-    
+                           [&hash](const std::unique_ptr<TorrentItem>& item) {
+                               return item->getHash() == hash;
+                           });
+
     return it != m_torrents.end() ? it->get() : nullptr;
 }
 
-const TorrentItem* TorrentManager::findTorrentInternal(const std::string& hash) const {
+const TorrentItem*
+TorrentManager::findTorrentInternal(const std::string& hash) const {
     // IMPORTANT: Caller must hold m_torrentsMutex
-    
+
     auto it = std::find_if(m_torrents.begin(), m_torrents.end(),
-        [&hash](const std::unique_ptr<TorrentItem>& item) {
-            return item->getHash() == hash;
-        });
-    
+                           [&hash](const std::unique_ptr<TorrentItem>& item) {
+                               return item->getHash() == hash;
+                           });
+
     return it != m_torrents.end() ? it->get() : nullptr;
 }
 

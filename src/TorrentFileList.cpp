@@ -15,7 +15,7 @@
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/alert_types.hpp>
-#include <libtorrent/write_resume_data.hpp>   // write_torrent_file_buf
+#include <libtorrent/write_resume_data.hpp> // write_torrent_file_buf
 
 #include <algorithm>
 #include <chrono>
@@ -79,9 +79,11 @@ std::string scratchPath() {
 }
 
 // Fills 'out' from an already-parsed torrent_info.
-void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out) {
+void collectFiles(const lt::torrent_info& ti,
+                  std::vector<TorrentFileEntry>& out) {
 #if LIBTORRENT_VERSION_NUM >= 20100
-    // torrent_info::files() was removed in libtorrent 2.1, use layout() instead.
+    // torrent_info::files() was removed in libtorrent 2.1, use layout()
+    // instead.
     const lt::file_storage& fs = ti.layout();
 #else
     const lt::file_storage& fs = ti.files();
@@ -105,8 +107,7 @@ void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out
         e.hidden = static_cast<bool>(flags & lt::file_storage::flag_hidden);
         e.executable =
             static_cast<bool>(flags & lt::file_storage::flag_executable);
-        e.symlink =
-            static_cast<bool>(flags & lt::file_storage::flag_symlink);
+        e.symlink = static_cast<bool>(flags & lt::file_storage::flag_symlink);
         e.absolutePath = fs.file_absolute_path(lt::file_index_t(i));
         if (e.symlink) {
             e.symlinkPath = fs.symlink(lt::file_index_t(i));
@@ -118,7 +119,8 @@ void collectFiles(const lt::torrent_info& ti, std::vector<TorrentFileEntry>& out
     }
 }
 
-bool resolveFromTorrentUrl(const std::string& url, std::vector<TorrentFileEntry>& out,
+bool resolveFromTorrentUrl(const std::string& url,
+                           std::vector<TorrentFileEntry>& out,
                            std::string& error, std::string* infoHashHex,
                            std::string* torrentBody) {
     HttpClient::Response res = HttpClient::get(url, USER_AGENT, 15);
@@ -131,7 +133,8 @@ bool resolveFromTorrentUrl(const std::string& url, std::vector<TorrentFileEntry>
         return false;
     }
     std::string parseError;
-    if (!TorrentFileList::parseTorrentFile(res.body, out, parseError, infoHashHex)) {
+    if (!TorrentFileList::parseTorrentFile(res.body, out, parseError,
+                                           infoHashHex)) {
         error = parseError;
         return false;
     }
@@ -139,9 +142,9 @@ bool resolveFromTorrentUrl(const std::string& url, std::vector<TorrentFileEntry>
     return true;
 }
 
-bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>& out,
-                       std::string& error, int timeoutSeconds,
-                       std::string* torrentBody) {
+bool resolveFromMagnet(const std::string& magnet,
+                       std::vector<TorrentFileEntry>& out, std::string& error,
+                       int timeoutSeconds, std::string* torrentBody) {
     lt::error_code ec;
     lt::add_torrent_params atp = lt::parse_magnet_uri(magnet, ec);
     if (ec) {
@@ -161,7 +164,7 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
     lt::settings_pack sp;
     sp.set_int(lt::settings_pack::alert_mask,
                lt::alert_category::error | lt::alert_category::dht |
-               lt::alert_category::tracker | lt::alert_category::status);
+                   lt::alert_category::tracker | lt::alert_category::status);
     // The metadata only ever comes from peers, and peers reach us over UDP
     // (DHT) or are handed to us by trackers, so both must be on.
     sp.set_bool(lt::settings_pack::enable_dht, true);
@@ -219,7 +222,8 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
     // exchange, which per-handle makes every probe fail (measured: 0 peers,
     // every time).
 
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeoutSeconds);
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(timeoutSeconds);
     // "Done" means the metadata is really there, not merely that libtorrent
     // says so: right after a magnet is added, torrent_file() already returns
     // a placeholder carrying only the infohash, and trusting that would report
@@ -266,7 +270,8 @@ bool resolveFromMagnet(const std::string& magnet, std::vector<TorrentFileEntry>&
             std::vector<lt::alert*> alerts;
             ses->pop_alerts(&alerts);
             for (const lt::alert* a : alerts) {
-                if (const auto* reply = lt::alert_cast<lt::tracker_reply_alert>(a)) {
+                if (const auto* reply =
+                        lt::alert_cast<lt::tracker_reply_alert>(a)) {
                     ++trackerReplies;
                     trackerPeers += reply->num_peers;
                 } else if (lt::alert_cast<lt::tracker_error_alert>(a)) {
@@ -387,16 +392,18 @@ std::string TorrentFileList::magnetHash(const std::string& magnet) {
     at += 9;
     size_t end = at;
     while (end < magnet.size() &&
-           (std::isalnum(static_cast<unsigned char>(magnet[end])) || magnet[end] == '-'))
+           (std::isalnum(static_cast<unsigned char>(magnet[end])) ||
+            magnet[end] == '-'))
         ++end;
     if (end == at) return std::string();
 
     std::string raw = magnet.substr(at, end - at);
-    if (raw.size() == 40) {   // already hex
-        for (auto& c : raw) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (raw.size() == 40) { // already hex
+        for (auto& c : raw)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         return raw;
     }
-    if (raw.size() != 32) return std::string();   // neither hex nor base32
+    if (raw.size() != 32) return std::string(); // neither hex nor base32
 
     // Base32 (RFC 4648, uppercase) to hex, so the key is engine independent.
     static const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -406,7 +413,9 @@ std::string TorrentFileList::magnetHash(const std::string& magnet) {
     unsigned buffer = 0;
     int bits = 0;
     for (char ch : raw) {
-        const char* p = std::strchr(alphabet, static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
+        const char* p = std::strchr(
+            alphabet,
+            static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
         if (!p) return std::string();
         buffer = (buffer << 5) | static_cast<unsigned>(p - alphabet);
         bits += 5;
@@ -426,8 +435,7 @@ std::string TorrentFileList::magnetHash(const std::string& magnet) {
 bool TorrentFileList::resolve(const std::string& magnet,
                               const std::string& torrentUrl,
                               std::vector<TorrentFileEntry>& out,
-                              std::string& error,
-                              int timeoutSeconds,
+                              std::string& error, int timeoutSeconds,
                               std::string* torrentBody) {
     out.clear();
     error.clear();
@@ -448,7 +456,8 @@ bool TorrentFileList::resolve(const std::string& magnet,
             if (!resolveFromTorrentUrl(torrentUrl, fromFile, fileError, &actual,
                                        torrentBody)) {
                 torrentError = fileError;
-            } else if (expected.empty() || actual.empty() || actual == expected) {
+            } else if (expected.empty() || actual.empty() ||
+                       actual == expected) {
                 // Either it matches the magnet, or there is no hash to compare
                 // (v2-only torrents carry btmh, not btih).
                 out = std::move(fromFile);
@@ -472,7 +481,8 @@ bool TorrentFileList::resolve(const std::string& magnet,
     }
 
     std::string magnetError;
-    if (resolveFromMagnet(magnet, out, magnetError, timeoutSeconds, torrentBody)) {
+    if (resolveFromMagnet(magnet, out, magnetError, timeoutSeconds,
+                          torrentBody)) {
         return true;
     }
     out.clear();

@@ -8,12 +8,14 @@
 // Every user agent and every package name derives from it, so a release is one
 // number in one file rather than four strings that drift apart.
 #ifndef APP_VERSION_STRING
-#  define APP_VERSION_STRING "0.0.0-unknown"
+#define APP_VERSION_STRING "0.0.0-unknown"
 #endif
 
 namespace Version {
 
-inline const char* string() { return APP_VERSION_STRING; }
+inline const char* string() {
+    return APP_VERSION_STRING;
+}
 
 // "FTorrent/0.6.0": the HTTP user agent used for provider lookups and for
 // fetching .torrent files.

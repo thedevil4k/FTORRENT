@@ -48,8 +48,7 @@ const char* const HASH =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 std::filesystem::path scratchDir() {
-    return std::filesystem::temp_directory_path() /
-           "ftorrent-test-reputation";
+    return std::filesystem::temp_directory_path() / "ftorrent-test-reputation";
 }
 
 // Keeps the no-key check from reading a real key the developer may have saved.
@@ -93,8 +92,8 @@ private:
     int m_delayMs;
 };
 
-ProviderVerdict verdictOf(const std::string& provider, bool answered, bool known,
-                          int malicious, int total,
+ProviderVerdict verdictOf(const std::string& provider, bool answered,
+                          bool known, int malicious, int total,
                           const std::string& summary) {
     ProviderVerdict v;
     v.provider = provider;
@@ -109,8 +108,8 @@ ProviderVerdict verdictOf(const std::string& provider, bool answered, bool known
 // Runs the UI loop until the service has nothing in flight, so the delivery
 // through Fl::awake() actually happens.
 bool waitFor(ReputationService& service, int timeoutMs = 5000) {
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::milliseconds(timeoutMs);
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     while (service.pending() > 0) {
         if (std::chrono::steady_clock::now() > deadline) return false;
         Fl::wait(0.02);
@@ -127,9 +126,11 @@ int main() {
     ok(isSha256Hex(HASH), "a 64-character hex digest is a SHA-256");
     ok(!isSha256Hex(std::string(HASH).substr(0, 63)),
        "63 characters is not a SHA-256");
-    ok(!isSha256Hex("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"),
+    ok(!isSha256Hex(
+           "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"),
        "non-hex characters are not a SHA-256");
-    ok(isSha256Hex("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"),
+    ok(isSha256Hex(
+           "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"),
        "uppercase hex is accepted");
     ok(normalizeSha256("E3B0") == "e3b0", "normalising lowercases");
     ok(VirusTotalProvider::reportPageUrl(HASH) ==
@@ -176,8 +177,8 @@ int main() {
 
     section("MalwareBazaar parsing");
     {
-        const ProviderVerdict v =
-            MalwareBazaarProvider::parseReport("{\"query_status\":\"hash_not_found\"}");
+        const ProviderVerdict v = MalwareBazaarProvider::parseReport(
+            "{\"query_status\":\"hash_not_found\"}");
         ok(v.answered, "hash_not_found is a real answer");
         ok(!v.known, "hash_not_found is not a record");
         ok(contains(v.summary, "No record"), "hash_not_found says so plainly");
@@ -196,7 +197,8 @@ int main() {
     {
         // A tag is remote text and must not be able to break a label.
         const ProviderVerdict v = MalwareBazaarProvider::parseReport(
-            "{\"query_status\":\"ok\",\"data\":[{\"signature\":\"Evil\\nFamily\"}]}");
+            "{\"query_status\":\"ok\",\"data\":[{\"signature\":"
+            "\"Evil\\nFamily\"}]}");
         ok(v.known, "a tag with a control character is still a record");
         ok(!contains(v.summary, "\n"), "the tag's newline is dropped");
     }
@@ -219,8 +221,9 @@ int main() {
         // Nothing is uploaded either way: a provider only ever sees a hash.
         const char* live = std::getenv("FTORRENT_LIVE_PROVIDERS");
         if (!live || std::string(live) != "1") {
-            std::cout << "    skipped: set FTORRENT_LIVE_PROVIDERS=1 to ask the "
-                         "real providers\n";
+            std::cout
+                << "    skipped: set FTORRENT_LIVE_PROVIDERS=1 to ask the "
+                   "real providers\n";
         } else {
             const std::atomic<bool> cancel{false};
 
@@ -228,15 +231,16 @@ int main() {
             // went rather than pretending the provider is open.
             const char* bazaarKey = std::getenv("FTORRENT_MB_API_KEY");
             MalwareBazaarProvider bazaar;
-            const ProviderVerdict bazaarVerdict =
-                bazaar.query(HASH, bazaarKey ? bazaarKey : std::string(), cancel);
+            const ProviderVerdict bazaarVerdict = bazaar.query(
+                HASH, bazaarKey ? bazaarKey : std::string(), cancel);
             std::cout << "    MalwareBazaar: " << bazaarVerdict.summary << '\n';
             if (bazaarKey && *bazaarKey) {
                 ok(bazaarVerdict.answered,
                    "MalwareBazaar answered when given an Auth-Key");
             } else {
                 ok(!bazaarVerdict.answered &&
-                       bazaarVerdict.summary.find("Auth-Key") != std::string::npos,
+                       bazaarVerdict.summary.find("Auth-Key") !=
+                           std::string::npos,
                    "without an Auth-Key MalwareBazaar says which key it wants");
             }
             ok(bazaarVerdict.summary.find("safe") == std::string::npos,
@@ -285,10 +289,11 @@ int main() {
         ReputationService service(providers);
         ReputationResult got;
         bool called = false;
-        ok(service.request(HASH, [&](const ReputationResult& r) {
-               called = true;
-               got = r;
-           }) == ReputationService::Start::Started,
+        ok(service.request(HASH,
+                           [&](const ReputationResult& r) {
+                               called = true;
+                               got = r;
+                           }) == ReputationService::Start::Started,
            "a valid hash starts a lookup");
         ok(waitFor(service), "the lookup finishes");
         ok(called, "the completion runs on the UI thread");
@@ -336,7 +341,8 @@ int main() {
         ReputationResult got;
         service.request(HASH, [&](const ReputationResult& r) { got = r; });
         ok(waitFor(service), "the lookup finishes");
-        ok(got.state == ReputationState::Known, "a zero-detection record exists");
+        ok(got.state == ReputationState::Known,
+           "a zero-detection record exists");
         ok(contains(got.message, "not a guarantee"),
            "a clean record is explicitly not a guarantee");
     }
@@ -410,7 +416,7 @@ int main() {
         big.path = "movie.mp4";
         big.size = 900000;
         big.sha256 = std::string(64, 'b');
-        big.sha256Complete = false;   // a Merkle root, not a file hash
+        big.sha256Complete = false; // a Merkle root, not a file hash
 
         ReputationTarget target = findReputationTarget({picture, big});
         ok(target.found(), "a complete hash is found");
@@ -419,7 +425,8 @@ int main() {
         target = findReputationTarget({picture, tool});
         ok(target.sha256 == tool.sha256,
            "a runnable file is preferred over a picture");
-        ok(target.path == "setup.exe", "the target names the file it belongs to");
+        ok(target.path == "setup.exe",
+           "the target names the file it belongs to");
 
         target = findReputationTarget({big});
         ok(!target.found(), "a hash that is not the whole file is never used");
@@ -454,7 +461,8 @@ int main() {
         SecurityFile locked;
         locked.path = "private/photo.jpg";
         locked.encrypted = true;
-        const std::string guarded = archiveSummary("pack.zip", {readme, locked});
+        const std::string guarded =
+            archiveSummary("pack.zip", {readme, locked});
         ok(contains(guarded, "1 entry is password-protected"),
            "a password-protected entry is stated in the summary");
         ok(contains(guarded, "cannot be inspected"),
@@ -464,8 +472,7 @@ int main() {
 
         SecurityFile locked2 = locked;
         locked2.path = "private/notes.txt";
-        const std::string two =
-            archiveSummary("pack.zip", {locked, locked2});
+        const std::string two = archiveSummary("pack.zip", {locked, locked2});
         ok(contains(two, "2 entries are password-protected"),
            "the plural wording follows the count");
     }
@@ -477,8 +484,7 @@ int main() {
         const std::string shown = hashSmallPrint(HASH, "setup.exe");
         ok(contains(shown, HASH),
            "the whole hash is printed, not a truncated one");
-        ok(contains(shown, "setup.exe"),
-           "and it names the file it belongs to");
+        ok(contains(shown, "setup.exe"), "and it names the file it belongs to");
         ok(!contains(shown, "safe"),
            "the small print never claims anything is safe");
 
@@ -509,18 +515,16 @@ int main() {
         absolute.size = 10;
         absolute.absolutePath = true;
 
-        ReputationTarget target = findLocalHashTarget(
-            {pendingExe, doneExe}, {false, true});
-        ok(target.path == "setup.exe",
-           "a completed runnable file is chosen");
+        ReputationTarget target =
+            findLocalHashTarget({pendingExe, doneExe}, {false, true});
+        ok(target.path == "setup.exe", "a completed runnable file is chosen");
         ok(target.sha256.empty(),
            "a local target has no hash yet: the caller must compute it");
 
         target = findLocalHashTarget({doneExe}, {false});
         ok(target.path.empty(), "an unfinished file is never hashed");
 
-        target = findLocalHashTarget({escaping, absolute},
-                                     {true, true});
+        target = findLocalHashTarget({escaping, absolute}, {true, true});
         ok(target.path.empty(),
            "a path that leaves the torrent folder is never read");
 
@@ -542,8 +546,7 @@ int main() {
            "the no-hash line is the required sentence");
 
         const std::string notAsked = reputationLine(ReputationResult{});
-        ok(contains(notAsked, "shield"),
-           "an unasked lookup says how to ask");
+        ok(contains(notAsked, "shield"), "an unasked lookup says how to ask");
         ok(!contains(notAsked, "safe"), "an unasked lookup never says safe");
 
         ReputationResult querying;
@@ -564,8 +567,7 @@ int main() {
 
         ReputationResult miss;
         miss.state = ReputationState::Unknown;
-        ok(!reputationHasDetections(miss),
-           "no record is not a detection");
+        ok(!reputationHasDetections(miss), "no record is not a detection");
 
         ReputationResult clean;
         clean.state = ReputationState::Known;
@@ -579,8 +581,8 @@ int main() {
            "a zero-detection record is not a detection");
     }
 
-    std::cout << "\nreputation checks=" << checks
-              << " failures=" << failures << '\n';
+    std::cout << "\nreputation checks=" << checks << " failures=" << failures
+              << '\n';
 
     std::error_code ec;
     std::filesystem::remove_all(scratchDir(), ec);

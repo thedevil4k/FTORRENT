@@ -29,7 +29,8 @@ size_t utf8Clip(const std::string& text, size_t pos) {
 // every backend we build (Windows x86/ARM64, Linux 32/64, Arch, Flatpak).
 std::string SearchResultsWidget::elideToWidth(const std::string& text,
                                               int maxPixels) {
-    if (text.empty() || maxPixels <= 0) return text.empty() ? text : std::string();
+    if (text.empty() || maxPixels <= 0)
+        return text.empty() ? text : std::string();
     if (fl_width(text.c_str()) <= maxPixels) return text;
     const char* ellipsis = "...";
     const int ellipsisW = static_cast<int>(fl_width(ellipsis));
@@ -73,7 +74,7 @@ bool SearchResultsWidget::isExpanded(const std::string& key) const {
 
 void SearchResultsWidget::setExpanded(const std::string& key, bool on) {
     if (!on) m_expanded.erase(key);
-    else     m_expanded[key] = true;
+    else m_expanded[key] = true;
 }
 
 bool SearchResultsWidget::isRowExpanded(int row) const {
@@ -81,7 +82,8 @@ bool SearchResultsWidget::isRowExpanded(int row) const {
     return r && isExpanded(cacheKey(*r));
 }
 
-void SearchResultsWidget::forEachRow(const std::function<void(int, const SearchResult&)>& fn) {
+void SearchResultsWidget::forEachRow(
+    const std::function<void(int, const SearchResult&)>& fn) {
     for (int row = 0; row < rows(); ++row) {
         const SearchResult* r = getResultAt(row);
         if (r) fn(row, *r);
@@ -91,11 +93,13 @@ void SearchResultsWidget::forEachRow(const std::function<void(int, const SearchR
 void SearchResultsWidget::requestFiles(int row) {
     const SearchResult* r = getResultAt(row);
     if (!r) return;
-    SearchResult copy = *r;                 // the fetch must not read the table
+    SearchResult copy = *r; // the fetch must not read the table
     std::string key = cacheKey(copy);
 
     if (m_files.request(key, copy.magnet, copy.torrentUrl,
-                        [this, key](const FileListService::Entry&) { filesArrived(key); })) {
+                        [this, key](const FileListService::Entry&) {
+                            filesArrived(key);
+                        })) {
         // The row now has a "reading it" line under the name; make room for it.
         updateRowHeight(row);
         redraw();
@@ -160,15 +164,17 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
     const Fl_Color sepColor =
         darkBg ? fl_rgb_color(70, 70, 70) : fl_rgb_color(210, 210, 210);
 
-    if (rf.state == FileListState::Loading || rf.state == FileListState::Queued) {
+    if (rf.state == FileListState::Loading ||
+        rf.state == FileListState::Queued) {
         fl_color(fl_rgb_color(140, 140, 140));
         fl_draw("Reading the file list...", x + 24, ly, avail, FILE_LINE_HEIGHT,
                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
         return;
     }
     if (rf.state == FileListState::Failed) {
-        std::string msg = rf.error.empty() ? "The file list could not be obtained"
-                                           : ("File list unavailable: " + rf.error);
+        std::string msg = rf.error.empty()
+                              ? "The file list could not be obtained"
+                              : ("File list unavailable: " + rf.error);
         msg = elideToWidth(msg, avail);
         fl_color(FL_FOREGROUND_COLOR);
         fl_draw(msg.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
@@ -182,8 +188,8 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
     {
         auto asked = m_reputation.find(cacheKey(*r));
         if (asked != m_reputation.end()) {
-            const std::string line = elideToWidth(
-                reputationLine(asked->second), avail);
+            const std::string line =
+                elideToWidth(reputationLine(asked->second), avail);
             fl_color(reputationHasDetections(asked->second)
                          ? SecurityBadge::riskColor(RiskLevel::Critical)
                          : FL_FOREGROUND_COLOR);
@@ -213,7 +219,8 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         fl_color(sepColor);
         int x2 = x + w - 6;
         if (x2 < x + 24) x2 = x + 24;
-        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2, ly + FILE_LINE_HEIGHT - 1);
+        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2,
+                ly + FILE_LINE_HEIGHT - 1);
         ly += FILE_LINE_HEIGHT;
     }
 
@@ -230,7 +237,8 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         fl_color(sepColor);
         int x2 = x + w - 6;
         if (x2 < x + 24) x2 = x + 24;
-        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2, ly + FILE_LINE_HEIGHT - 1);
+        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2,
+                ly + FILE_LINE_HEIGHT - 1);
         ly += FILE_LINE_HEIGHT;
         fl_font(FL_HELVETICA, 11);
     }
@@ -271,14 +279,17 @@ void SearchResultsWidget::drawFileList(int row, int x, int y, int w, int h) {
         int x2 = x + w - 6;
         if (x2 < x + 24) x2 = x + 24;
         fl_color(sepColor);
-        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2, ly + FILE_LINE_HEIGHT - 1);
+        fl_line(x + 24, ly + FILE_LINE_HEIGHT - 1, x2,
+                ly + FILE_LINE_HEIGHT - 1);
         ly += FILE_LINE_HEIGHT;
     }
     if (static_cast<int>(rf.files.size()) > MAX_SHOWN_FILES && ly < limit) {
         fl_color(fl_rgb_color(140, 140, 140));
         fl_font(FL_HELVETICA, 11);
         std::string more = "... and " +
-            std::to_string(static_cast<int>(rf.files.size()) - MAX_SHOWN_FILES) + " more";
+                           std::to_string(static_cast<int>(rf.files.size()) -
+                                          MAX_SHOWN_FILES) +
+                           " more";
         more = elideToWidth(more, avail);
         fl_draw(more.c_str(), x + 24, ly, avail, FILE_LINE_HEIGHT,
                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);

@@ -1,6 +1,6 @@
 #include "SecurityBadge.h"
 #include "SecurityAnalyzer.h"
-#include "Format.h"   // so an entry reads like the size column
+#include "Format.h" // so an entry reads like the size column
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -28,8 +28,7 @@ bool bidiSequenceAt(const std::string& text, std::size_t pos,
         {0xE2, 0x80, 0xAB}, {0xE2, 0x80, 0xAC}, {0xE2, 0x80, 0xAD},
         {0xE2, 0x80, 0xAE}, {0xE2, 0x80, 0xA8}, {0xE2, 0x80, 0xA9},
         {0xE2, 0x81, 0xA6}, {0xE2, 0x81, 0xA7}, {0xE2, 0x81, 0xA8},
-        {0xE2, 0x81, 0xA9}
-    };
+        {0xE2, 0x81, 0xA9}};
     if (pos + 3 > text.size()) return false;
     for (const auto& sequence : sequences) {
         if (static_cast<unsigned char>(text[pos]) == sequence[0] &&
@@ -76,18 +75,22 @@ Fl_Color SecurityBadge::riskColor(RiskLevel level, bool darkMode) {
 }
 
 Fl_Color SecurityBadge::outlineColor(bool darkMode) {
-    return darkMode ? fl_rgb_color(245, 245, 245)
-                    : fl_rgb_color(35, 35, 35);
+    return darkMode ? fl_rgb_color(245, 245, 245) : fl_rgb_color(35, 35, 35);
 }
 
 std::string SecurityBadge::riskLabel(RiskLevel level) {
     switch (level) {
-        case RiskLevel::Low:      return "Low risk";
-        case RiskLevel::Medium:   return "Medium risk";
-        case RiskLevel::High:     return "High risk";
-        case RiskLevel::Critical: return "Critical risk";
+        case RiskLevel::Low:
+            return "Low risk";
+        case RiskLevel::Medium:
+            return "Medium risk";
+        case RiskLevel::High:
+            return "High risk";
+        case RiskLevel::Critical:
+            return "Critical risk";
         case RiskLevel::Unknown:
-        default:                  return "Unknown";
+        default:
+            return "Unknown";
     }
 }
 
@@ -119,8 +122,8 @@ std::string SecurityBadge::displayText(const std::string& text) {
 }
 
 std::string SecurityBadge::archiveEntryLine(const SecurityFile& file) {
-    std::string line = "- " + displayText(file.path) +
-                       "  (" + Format::bytes(file.size) + ")";
+    std::string line =
+        "- " + displayText(file.path) + "  (" + Format::bytes(file.size) + ")";
 
     // The same tags the torrent tables show, capped at two so a hostile name
     // carrying every marker cannot push the size off the row.

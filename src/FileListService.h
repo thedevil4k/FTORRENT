@@ -67,10 +67,8 @@ public:
     // Returns whether the request was accepted: when every slot is busy it is
     // queued and started as soon as one frees up, rather than dropped, which
     // is what used to lose a click made while other rows were still loading.
-    bool request(const std::string& key,
-                 const std::string& magnet,
-                 const std::string& torrentUrl,
-                 const Completion& done);
+    bool request(const std::string& key, const std::string& magnet,
+                 const std::string& torrentUrl, const Completion& done);
 
     // Fetches currently running (queued requests are not counted).
     int pending() const;
@@ -92,12 +90,12 @@ private:
             Completion done;
         };
 
-        int maxCached = 0;             // set once, at construction
+        int maxCached = 0; // set once, at construction
         int maxInFlight = 0;
         std::mutex mutex;
         std::unordered_map<std::string, Entry> entries;
-        std::deque<std::string> order;       // insertion order, for the cap
-        std::deque<Pending> queue;           // asked for, not started yet
+        std::deque<std::string> order; // insertion order, for the cap
+        std::deque<Pending> queue;     // asked for, not started yet
         std::atomic<int> inFlight{0};
         std::atomic<bool> alive{true};
     };
@@ -116,8 +114,7 @@ private:
 
     // Spawns the worker for one request. The slot must already be counted.
     static void startWorker(std::shared_ptr<Shared> shared,
-                            const std::string& key,
-                            const std::string& magnet,
+                            const std::string& key, const std::string& magnet,
                             const std::string& torrentUrl,
                             const Completion& done);
 

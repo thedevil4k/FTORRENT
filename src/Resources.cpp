@@ -29,11 +29,13 @@ namespace {
 // compiled into the binary: whoever owns the glyphs owns how they are drawn.
 Fl_RGB_Image* rescaleGlyph(const char* const* xpm, int size) {
     int w = 0, h = 0, colours = 0, chars = 0;
-    if (std::sscanf(xpm[0], "%d %d %d %d", &w, &h, &colours, &chars) != 4) return nullptr;
+    if (std::sscanf(xpm[0], "%d %d %d %d", &w, &h, &colours, &chars) != 4)
+        return nullptr;
     // One character per pixel and #RRGGBB colours is the shape every glyph in
     // Icons.h has. Anything else is refused here rather than mis-drawn: the
     // caller already handles a null icon, and a wrong picture would not.
-    if (w <= 0 || h <= 0 || colours <= 0 || chars != 1 || size <= 0) return nullptr;
+    if (w <= 0 || h <= 0 || colours <= 0 || chars != 1 || size <= 0)
+        return nullptr;
 
     // Which characters paint, and in what colour. "None" is the absence of
     // paint; a named FLTK colour is not something this parser can reproduce, so
@@ -86,7 +88,8 @@ Fl_RGB_Image* rescaleGlyph(const char* const* xpm, int size) {
     // a buffer on this function's stack would leave the image pointing at freed
     // memory. Hence new[] plus the documented ownership flag rather than a
     // local array.
-    unsigned char* out = new unsigned char[static_cast<size_t>(size) * size * 4]();
+    unsigned char* out =
+        new unsigned char[static_cast<size_t>(size) * size * 4]();
     const double stepX = static_cast<double>(w) / size;
     const double stepY = static_cast<double>(h) / size;
     for (int dy = 0; dy < size; dy++) {
@@ -94,13 +97,18 @@ Fl_RGB_Image* rescaleGlyph(const char* const* xpm, int size) {
         for (int dx = 0; dx < size; dx++) {
             const double left = dx * stepX, right = (dx + 1) * stepX;
             double total = 0.0, ink = 0.0, r = 0.0, g = 0.0, b = 0.0;
-            for (int sy = static_cast<int>(top); sy <= static_cast<int>(std::ceil(bottom)) && sy < h; sy++) {
+            for (int sy = static_cast<int>(top);
+                 sy <= static_cast<int>(std::ceil(bottom)) && sy < h; sy++) {
                 if (sy < 0) continue;
-                const double sliceY = std::min(bottom, sy + 1.0) - std::max(top, static_cast<double>(sy));
+                const double sliceY = std::min(bottom, sy + 1.0) -
+                                      std::max(top, static_cast<double>(sy));
                 if (sliceY <= 0.0) continue;
-                for (int sx = static_cast<int>(left); sx <= static_cast<int>(std::ceil(right)) && sx < w; sx++) {
+                for (int sx = static_cast<int>(left);
+                     sx <= static_cast<int>(std::ceil(right)) && sx < w; sx++) {
                     if (sx < 0) continue;
-                    const double sliceX = std::min(right, sx + 1.0) - std::max(left, static_cast<double>(sx));
+                    const double sliceX =
+                        std::min(right, sx + 1.0) -
+                        std::max(left, static_cast<double>(sx));
                     if (sliceX <= 0.0) continue;
                     const double share = sliceX * sliceY;
                     const int cell = sy * w + sx;
@@ -113,7 +121,8 @@ Fl_RGB_Image* rescaleGlyph(const char* const* xpm, int size) {
             }
             if (total <= 0.0) continue;
             unsigned char* px = &out[(static_cast<size_t>(dy) * size + dx) * 4];
-            px[3] = static_cast<unsigned char>(std::lround(255.0 * ink / total));
+            px[3] =
+                static_cast<unsigned char>(std::lround(255.0 * ink / total));
             // Undo the premultiplication: a partly covered pixel keeps the
             // glyph's own colour and shows it through its alpha, which is what
             // an anti-aliased edge is.
@@ -129,11 +138,11 @@ Fl_RGB_Image* rescaleGlyph(const char* const* xpm, int size) {
     // surface underneath, which is what makes a soft edge read as an edge
     // rather than as a staircase.
     Fl_RGB_Image* image = new Fl_RGB_Image(out, size, size, 4);
-    image->alloc_array = 1;   // the image now owns `out` and frees it
+    image->alloc_array = 1; // the image now owns `out` and frees it
     return image;
 }
 
-}  // namespace
+} // namespace
 
 // Static member initialization
 Fl_RGB_Image* Resources::s_logo = nullptr;
@@ -149,7 +158,8 @@ Fl_Image* Resources::s_iconNetwork = nullptr;
 
 void Resources::initialize() {
     // Create logo from PNG memory buffer
-    s_logo = new Fl_PNG_Image("logo.png", ftorrent_logo_png, ftorrent_logo_png_size);
+    s_logo =
+        new Fl_PNG_Image("logo.png", ftorrent_logo_png, ftorrent_logo_png_size);
     s_iconAdd = new Fl_Pixmap(icon_add_xpm);
     // These are the glyphs a button carries on its own, so they are the ones
     // resampled to the icon size. Search earns its place here despite normally
@@ -178,7 +188,7 @@ void Resources::cleanup() {
     delete s_iconUpload;
     delete s_iconSearch;
     delete s_iconNetwork;
-    
+
     s_logo = nullptr;
     s_iconAdd = nullptr;
     s_iconPause = nullptr;

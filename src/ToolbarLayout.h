@@ -24,10 +24,10 @@
 //
 // A spacer with no width still has to stay VISIBLE. Fl_Pack skips a hidden
 // child together with the gap on either side of it, so hiding a collapsed
-// spacer quietly takes 2 * kSpacing out of the row: the pack comes up short, the
-// two margins cannot be equal, and at the narrowest width the window allows the
-// block ends up against the left edge. requiredWidth() counts that gap, so a
-// collapsed spacer stays in the pack and simply draws nothing.
+// spacer quietly takes 2 * kSpacing out of the row: the pack comes up short,
+// the two margins cannot be equal, and at the narrowest width the window allows
+// the block ends up against the left edge. requiredWidth() counts that gap, so
+// a collapsed spacer stays in the pack and simply draws nothing.
 //
 // That leaves the spare width to spend, and it has to be spent exactly:
 // kGrowableCount grown buttons plus two equal margins, with no pixel left over
@@ -37,9 +37,9 @@
 struct ToolbarLayout {
 
     enum Level {
-        ICONS = 0,   // no room for any text
-        SHORT = 1,   // shortened labels
-        FULL = 2,    // everything spelled out
+        ICONS = 0, // no room for any text
+        SHORT = 1, // shortened labels
+        FULL = 2,  // everything spelled out
     };
 
     // The buttons whose width and label change with the level, plus the gap
@@ -52,7 +52,7 @@ struct ToolbarLayout {
         int createWidth;
         const char* prefsLabel;
         int prefsWidth;
-        int spacerWidth;   // 0 means the spacer is hidden
+        int spacerWidth; // 0 means the spacer is hidden
     };
 
     // The buttons that carry text and may widen to use spare room. Icon-only
@@ -67,23 +67,27 @@ struct ToolbarLayout {
     // Widths of the widgets that never change with the level. The limit button
     // is here, not in the table: it carries an icon only, so it is the same
     // icon-sized button at every level.
-    static constexpr int kIconButton = 46;    // pause, remove, search, limit, network
+    static constexpr int kIconButton =
+        46; // pause, remove, search, limit, network
     static constexpr int kThemeButton = 34;
     // RAM mode button: icon plus mode text, always fully visible. Wide enough
     // for the longest label (" NORMAL") next to a toolbar icon.
     static constexpr int kRamButton = 110;
 
     // The bar and the button inside it are two different numbers, on purpose:
-    // the bar is the strip, the buttons sit inside it with room above and below.
+    // the bar is the strip, the buttons sit inside it with room above and
+    // below.
     //
-    // Fl_Pack stretches every child to the height of the PACK, so the thing that
-    // has to be kButtonHeight is the pack itself; kBarHeight is the strip it
-    // sits in. Conflating the two is what made the buttons touch the bar's edge.
+    // Fl_Pack stretches every child to the height of the PACK, so the thing
+    // that has to be kButtonHeight is the pack itself; kBarHeight is the strip
+    // it sits in. Conflating the two is what made the buttons touch the bar's
+    // edge.
     static constexpr int kBarHeight = 44;
     static constexpr int kButtonHeight = 34;
 
-    // Room above and below a button inside the bar. Derived from the two heights
-    // rather than written down, so the gap cannot drift out of step with either.
+    // Room above and below a button inside the bar. Derived from the two
+    // heights rather than written down, so the gap cannot drift out of step
+    // with either.
     static constexpr int kBarPadding = (kBarHeight - kButtonHeight) / 2;
 
     // Edge length of a square toolbar icon. The PNGs are loaded at this size by
@@ -112,9 +116,9 @@ struct ToolbarLayout {
     static constexpr int kGroupSpacers = 2;
     static constexpr int kOtherFixedWidgets = 2;
     static constexpr int kElasticSpacers = 2;
-    static constexpr int kChildCount = kLabelledButtons + kIconButtons
-                                     + kGroupSpacers + kOtherFixedWidgets
-                                     + kElasticSpacers;
+    static constexpr int kChildCount = kLabelledButtons + kIconButtons +
+                                       kGroupSpacers + kOtherFixedWidgets +
+                                       kElasticSpacers;
 
     // True when a spacer of this width must stay in the pack.
     //
@@ -152,4 +156,4 @@ struct ToolbarLayout {
     static int margin(int slack);
 };
 
-#endif  // FTORRENT_TOOLBARLAYOUT_H
+#endif // FTORRENT_TOOLBARLAYOUT_H

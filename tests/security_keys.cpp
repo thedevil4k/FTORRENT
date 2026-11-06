@@ -15,7 +15,7 @@
 #include <vector>
 
 #ifndef _WIN32
-    #include <sys/stat.h>
+#include <sys/stat.h>
 #endif
 
 namespace {
@@ -66,7 +66,8 @@ std::string readAllBytes(const std::string& path) {
 int main() {
     useScratchConfig();
 
-    const std::string key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const std::string key =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     const SecurityKeys::Provider vt = SecurityKeys::Provider::VirusTotal;
 
     section("normalizing a pasted key");
@@ -168,7 +169,8 @@ int main() {
     section("two providers, two files");
     {
         const SecurityKeys::Provider mb = SecurityKeys::Provider::MalwareBazaar;
-        const std::string bazaarKey = "0123456789abcdef0123456789abcdef";  // 32 hex
+        const std::string bazaarKey =
+            "0123456789abcdef0123456789abcdef"; // 32 hex
 
         std::string error;
         ok(SecurityKeys::save(vt, key, error), "the VirusTotal key is saved");
@@ -204,8 +206,8 @@ int main() {
         std::filesystem::remove(path, ec);
     }
 
-    std::cout << "\nsecurity_keys checks=" << checks
-              << " failures=" << failures << '\n';
+    std::cout << "\nsecurity_keys checks=" << checks << " failures=" << failures
+              << '\n';
 
     std::error_code ec;
     std::filesystem::remove_all(scratchDir(), ec);

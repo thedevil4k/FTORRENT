@@ -25,7 +25,8 @@ std::string joinSummaries(const std::vector<ProviderVerdict>& verdicts) {
     return answered + " " + failed;
 }
 
-std::vector<std::string> answeredNames(const std::vector<ProviderVerdict>& verdicts) {
+std::vector<std::string>
+answeredNames(const std::vector<ProviderVerdict>& verdicts) {
     std::vector<std::string> names;
     for (const ProviderVerdict& verdict : verdicts) {
         if (verdict.answered) names.push_back(verdict.provider);
@@ -57,7 +58,8 @@ ReputationResult aggregate(const std::string& sha256,
     for (const ProviderVerdict& verdict : verdicts) {
         if (verdict.answered) anyAnswered = true;
         if (verdict.known) anyKnown = true;
-        if (verdict.malicious > 0 || verdict.suspicious > 0) anyMalicious = true;
+        if (verdict.malicious > 0 || verdict.suspicious > 0)
+            anyMalicious = true;
         if (verdict.needsKey) anyWaitedOnKey = true;
     }
 
@@ -75,8 +77,8 @@ ReputationResult aggregate(const std::string& sha256,
 
     if (!anyAnswered) {
         result.message = joinSummaries(verdicts);
-        result.state = anyWaitedOnKey ? ReputationState::NoKey
-                                      : ReputationState::Error;
+        result.state =
+            anyWaitedOnKey ? ReputationState::NoKey : ReputationState::Error;
         if (result.message.empty()) {
             result.message = "No reputation provider could be asked.";
         }
@@ -212,8 +214,9 @@ ReputationService::Start ReputationService::request(const std::string& sha256,
                 if (provider->requiresKey() && apiKey.empty()) {
                     verdict.provider = provider->name();
                     verdict.needsKey = true;
-                    verdict.summary = provider->name() +
-                                      " needs an API key (Preferences, Security).";
+                    verdict.summary =
+                        provider->name() +
+                        " needs an API key (Preferences, Security).";
                 } else {
                     verdict = provider->query(key, apiKey, shared->cancel);
                 }
@@ -221,8 +224,7 @@ ReputationService::Start ReputationService::request(const std::string& sha256,
             }
         } catch (const std::exception&) {
             ProviderVerdict verdict;
-            verdict.summary =
-                "A reputation provider failed unexpectedly.";
+            verdict.summary = "A reputation provider failed unexpectedly.";
             verdicts.push_back(std::move(verdict));
         } catch (...) {
             ProviderVerdict verdict;
@@ -240,7 +242,7 @@ ReputationService::Start ReputationService::request(const std::string& sha256,
 void ReputationService::deliver(void* data) {
     std::unique_ptr<Delivery> delivery(static_cast<Delivery*>(data));
     const std::shared_ptr<Shared>& shared = delivery->shared;
-    if (!shared->alive.load()) return;      // the owner is gone; drop it
+    if (!shared->alive.load()) return; // the owner is gone; drop it
 
     shared->inFlight.fetch_sub(1);
 

@@ -77,7 +77,8 @@ int main() {
         for (const auto& def : all) {
             if (def.name == "Disabled One") sawDisabled = true;
         }
-        ok(!sawDisabled, "a disabled engine is never asked, not even by the mode");
+        ok(!sawDisabled,
+           "a disabled engine is never asked, not even by the mode");
     }
 
     section("rows that mean nothing");
@@ -86,13 +87,12 @@ int main() {
            "a row past the last engine asks nothing");
         ok(searchScopeForRow(catalogue, -1).empty(),
            "a negative row asks nothing");
-        ok(searchScopeForRow({}, 0).empty(),
-           "an empty catalogue asks nothing");
+        ok(searchScopeForRow({}, 0).empty(), "an empty catalogue asks nothing");
         ok(searchScopeForRow({engine("Off", false)}, 0).empty(),
            "a catalogue with only disabled engines asks nothing");
     }
 
-    std::cout << "\nsearch_scope checks=" << checks
-              << " failures=" << failures << '\n';
+    std::cout << "\nsearch_scope checks=" << checks << " failures=" << failures
+              << '\n';
     return failures ? 1 : 0;
 }

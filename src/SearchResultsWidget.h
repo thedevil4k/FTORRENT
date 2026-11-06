@@ -25,7 +25,7 @@ class ArchiveCheckTask;
 class SearchResultsWidget : public Fl_Table_Row {
 public:
     enum Column {
-        COL_EXPAND = 0,   // narrow, no header text: the file-list toggle
+        COL_EXPAND = 0, // narrow, no header text: the file-list toggle
         COL_NAME,
         COL_SIZE,
         COL_SEEDERS,
@@ -34,12 +34,14 @@ public:
         COL_COUNT
     };
 
-    SearchResultsWidget(int x, int y, int w, int h, const char* label = nullptr);
+    SearchResultsWidget(int x, int y, int w, int h,
+                        const char* label = nullptr);
     ~SearchResultsWidget() override;
 
     void setResults(const std::vector<SearchResult>& results);
 
-    // Adds rows without re-sorting the whole table: used while results stream in
+    // Adds rows without re-sorting the whole table: used while results stream
+    // in
     void appendResults(const std::vector<SearchResult>& results);
     void clear();
 
@@ -68,20 +70,21 @@ public:
     // The file list is whatever the row has loaded (empty when the row was
     // never expanded or the fetch failed), in torrent order, so the Add
     // dialog can offer one checkbox per file.
-    using DownloadCallback =
-        std::function<void(const SearchResult&, const std::vector<TorrentFileEntry>&,
-                           const std::string& torrentBody)>;
+    using DownloadCallback = std::function<void(
+        const SearchResult&, const std::vector<TorrentFileEntry>&,
+        const std::string& torrentBody)>;
     void setOnDownloadCallback(DownloadCallback cb) { m_onDownload = cb; }
 
 protected:
-    void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override;
+    void draw_cell(TableContext context, int row, int col, int x, int y, int w,
+                   int h) override;
     int handle(int event) override;
     void draw() override;
 
 public:
     // Public because MainWindow drives the layout from outside
     void resize(int X, int Y, int W, int H) override;
-    
+
     // Colors the rows, the header and the scrollbars for the active theme
     void applyTheme(bool darkMode);
 
@@ -97,7 +100,7 @@ private:
     // The numbers that decide how a row is drawn. They live in the class so
     // that the drawing code can live in more than one file without repeating
     // them: one place owns the answer.
-    static constexpr int BASE_ROW_HEIGHT = 25;   // matches initializeColumns()
+    static constexpr int BASE_ROW_HEIGHT = 25; // matches initializeColumns()
     static constexpr int FILE_LINE_HEIGHT = 16;
     // Enough to see what is inside without turning a row into a wall of text.
     static constexpr int MAX_SHOWN_FILES = 12;
@@ -209,7 +212,7 @@ private:
         std::string path;
         std::string magnet;
         std::string torrentUrl;
-        std::string line;      // result, empty until asked
+        std::string line; // result, empty until asked
         bool running = false;
         bool visible = false;
         // How many entries the last successful walk found password-protected.

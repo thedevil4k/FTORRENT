@@ -9,7 +9,7 @@
 
 /**
  * @brief Resource manager for FTorrent
- * 
+ *
  * Provides easy access to application icons and resources.
  * Uses XPM format for embedded icons.
  */
@@ -17,10 +17,10 @@ class Resources {
 public:
     // Initialize all resources (call once at startup)
     static void initialize();
-    
+
     // Cleanup resources
     static void cleanup();
-    
+
     // Get icons
     static Fl_RGB_Image* getLogoImage();
     static Fl_Pixmap* getAddIcon();
@@ -40,7 +40,7 @@ public:
     static Fl_Image* getSearchIcon();
     // Globe for the network monitor button.
     static Fl_Image* getNetworkIcon();
-    
+
 private:
     static Fl_RGB_Image* s_logo;
     static Fl_Pixmap* s_iconAdd;

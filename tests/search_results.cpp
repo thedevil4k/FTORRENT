@@ -88,7 +88,7 @@ int main() {
         ok(table.rowCount() == 1, "a new search starts from one row, not two");
     }
 
-    std::printf("\nsearch_results checks=%d failures=%d\n",
-                testsupport::checks, testsupport::failures);
+    std::printf("\nsearch_results checks=%d failures=%d\n", testsupport::checks,
+                testsupport::failures);
     return testsupport::failures ? 1 : 0;
 }

@@ -17,13 +17,14 @@ std::string urlDecode(const std::string& in) {
     out.reserve(in.size());
     for (size_t i = 0; i < in.size(); ++i) {
         if (in[i] == '%' && i + 2 < in.size() &&
-            std::isxdigit((unsigned char)in[i+1]) && std::isxdigit((unsigned char)in[i+2])) {
+            std::isxdigit((unsigned char)in[i + 1]) &&
+            std::isxdigit((unsigned char)in[i + 2])) {
             auto hex = [](char c) -> int {
                 if (c >= '0' && c <= '9') return c - '0';
                 if (c >= 'a' && c <= 'f') return c - 'a' + 10;
                 return c - 'A' + 10;
             };
-            out += static_cast<char>(hex(in[i+1]) * 16 + hex(in[i+2]));
+            out += static_cast<char>(hex(in[i + 1]) * 16 + hex(in[i + 2]));
             i += 2;
         } else if (in[i] == '+') {
             out += ' ';
@@ -35,7 +36,8 @@ std::string urlDecode(const std::string& in) {
 }
 
 // True for a bare BitTorrent info hash: 40 hex characters (SHA-1) or 32 for the
-// older SHA-256 truncated form. APIs return these where a magnet link is expected.
+// older SHA-256 truncated form. APIs return these where a magnet link is
+// expected.
 bool isInfoHash(const std::string& value) {
     if (value.size() != 40 && value.size() != 32) return false;
     for (char c : value) {
@@ -51,13 +53,13 @@ bool isInfoHash(const std::string& value) {
 std::string decodeHtmlEntities(const std::string& in) {
     std::string out;
     out.reserve(in.size());
-    
+
     for (size_t i = 0; i < in.size(); ++i) {
         if (in[i] != '&') {
             out += in[i];
             continue;
         }
-        
+
         // &#x3D; / &#61; / &#58; : numeric, hexadecimal or decimal
         if (in.compare(i, 3, "&#x") == 0 || in.compare(i, 3, "&#X") == 0) {
             size_t end = in.find(';', i + 3);
@@ -65,10 +67,14 @@ std::string decodeHtmlEntities(const std::string& in) {
                 std::string digits = in.substr(i + 3, end - i - 3);
                 bool hex = true;
                 for (char c : digits) {
-                    if (!std::isxdigit((unsigned char)c)) { hex = false; break; }
+                    if (!std::isxdigit((unsigned char)c)) {
+                        hex = false;
+                        break;
+                    }
                 }
                 if (hex && !digits.empty()) {
-                    out += static_cast<char>(std::strtol(digits.c_str(), nullptr, 16));
+                    out += static_cast<char>(
+                        std::strtol(digits.c_str(), nullptr, 16));
                     i = end;
                     continue;
                 }
@@ -80,7 +86,10 @@ std::string decodeHtmlEntities(const std::string& in) {
                 std::string digits = in.substr(i + 2, end - i - 2);
                 bool digitsOnly = !digits.empty();
                 for (char c : digits) {
-                    if (!std::isdigit((unsigned char)c)) { digitsOnly = false; break; }
+                    if (!std::isdigit((unsigned char)c)) {
+                        digitsOnly = false;
+                        break;
+                    }
                 }
                 if (digitsOnly) {
                     long value = std::strtol(digits.c_str(), nullptr, 10);
@@ -95,10 +104,13 @@ std::string decodeHtmlEntities(const std::string& in) {
                 }
             }
         }
-        
-        static const struct { const char* entity; char ch; } named[] = {
-            { "&amp;", '&' }, { "&quot;", '"' }, { "&apos;", '\'' },
-            { "&lt;", '<' }, { "&gt;", '>' }, { "&colon;", ':' }, { "&equals;", '=' },
+
+        static const struct {
+            const char* entity;
+            char ch;
+        } named[] = {
+            {"&amp;", '&'}, {"&quot;", '"'},  {"&apos;", '\''},  {"&lt;", '<'},
+            {"&gt;", '>'},  {"&colon;", ':'}, {"&equals;", '='},
         };
         bool replaced = false;
         for (const auto& n : named) {
@@ -132,7 +144,8 @@ std::string originOf(const std::string& urlTemplate) {
 // file, and guessing would point the fetch at the wrong place.
 std::string absoluteUrl(const std::string& origin, const std::string& link) {
     if (link.empty()) return std::string();
-    if (link.rfind("https://", 0) == 0 || link.rfind("http://", 0) == 0) return link;
+    if (link.rfind("https://", 0) == 0 || link.rfind("http://", 0) == 0)
+        return link;
     if (!origin.empty() && link[0] == '/') return origin + link;
     return std::string();
 }
@@ -160,37 +173,41 @@ bool matchSelector(const std::string& chunk, const std::string& selector,
 int64_t parseSizeText(const std::string& text) {
     // e.g. "1.5 GB", "700MB", "1,2 GiB", "1024". Some pages separate the
     // number from the unit with &nbsp; instead of a plain space.
-    std::regex re(R"(([0-9]+(?:[.,][0-9]+)?)(?:\s|&nbsp;)*([KMGTP]?)(i?B)?)", std::regex::icase);
+    std::regex re(R"(([0-9]+(?:[.,][0-9]+)?)(?:\s|&nbsp;)*([KMGTP]?)(i?B)?)",
+                  std::regex::icase);
     std::smatch m;
     if (!std::regex_search(text, m, re)) return 0;
-    
+
     std::string num = m[1].str();
-    for (auto& c : num) if (c == ',') c = '.';
+    for (auto& c : num)
+        if (c == ',') c = '.';
     double value = std::strtod(num.c_str(), nullptr);
-    
+
     std::string unit = m[2].str();
     for (auto& c : unit) c = static_cast<char>(std::toupper((unsigned char)c));
-    
+
     int64_t mult = 1;
     if (unit == "K") mult = 1024LL;
     else if (unit == "M") mult = 1024LL * 1024;
     else if (unit == "G") mult = 1024LL * 1024 * 1024;
     else if (unit == "T") mult = 1024LL * 1024 * 1024 * 1024;
     else if (unit == "P") mult = 1024LL * 1024 * 1024 * 1024 * 1024;
-    
+
     return static_cast<int64_t>(value * mult);
 }
 
-// Reads a peer count, keeping every digit of a grouped number ("1,234" -> 1234).
+// Reads a peer count, keeping every digit of a grouped number ("1,234" ->
+// 1234).
 int parseCountText(const std::string& text) {
     // Sites write big numbers with separators ("1,234"), and taking the leading
     // digits of that would give 1 instead of 1234. So grab the whole numeric
     // run and keep only the digits. The trailing group is optional so that a
     // single digit ("0 seeders") still counts.
-    static const std::regex re(R"([0-9](?:[0-9.,' ]*[0-9])?)", std::regex::ECMAScript);
+    static const std::regex re(R"([0-9](?:[0-9.,' ]*[0-9])?)",
+                               std::regex::ECMAScript);
     std::smatch m;
     if (!std::regex_search(text, m, re)) return -1;
-    
+
     std::string digits;
     for (char c : m[0].str()) {
         if (std::isdigit((unsigned char)c)) digits += c;
@@ -205,62 +222,67 @@ int parseCountText(const std::string& text) {
 // time, the trackers (tr=), so it is kept exactly as published: rebuilding it
 // from the hash alone dropped the trackers and made a live swarm look dead.
 bool harvestMagnets(const std::string& body, std::vector<SearchResult>& out,
-                           const std::string& torrentSelector,
-                           const std::string& origin) {
-    // The link is looked for with a permissive pattern and validated afterwards.
-    // Sites disagree on how much of a magnet they escape: some write
-    // "magnet:?xt=urn:btih:...", others "magnet:?xt&#x3D;urn:btih:...", so a
-    // single strict pattern misses half of them.
-    static const std::regex magnetRe(R"(magnet:[^"'<>\s]*)", std::regex::ECMAScript);
+                    const std::string& torrentSelector,
+                    const std::string& origin) {
+    // The link is looked for with a permissive pattern and validated
+    // afterwards. Sites disagree on how much of a magnet they escape: some
+    // write "magnet:?xt=urn:btih:...", others "magnet:?xt&#x3D;urn:btih:...",
+    // so a single strict pattern misses half of them.
+    static const std::regex magnetRe(R"(magnet:[^"'<>\s]*)",
+                                     std::regex::ECMAScript);
     static const std::regex strictRe(
         R"(^magnet:\?xt=urn:btih:([0-9a-fA-F]{40}|[0-9a-fA-F]{32}))",
         std::regex::ECMAScript);
-    
+
     std::set<std::string> seen;
     auto begin = std::sregex_iterator(body.begin(), body.end(), magnetRe);
     auto end = std::sregex_iterator();
-    
+
     // End of the previous match, carried along because a regex iterator is only
     // a forward iterator.
     size_t prevMatchEnd = 0;
-    
+
     for (auto it = begin; it != end; ++it) {
         if (out.size() >= 200) break;
-        
+
         // Undo the HTML escaping before the link can be understood.
         std::string link = decodeHtmlEntities(it->str());
-        
+
         std::smatch sm;
         if (!std::regex_search(link, sm, strictRe)) continue;
-        
+
         std::string hash = sm[1].str();
-        std::transform(hash.begin(), hash.end(), hash.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (!seen.insert(hash).second) continue;   // same file listed twice
-        
+        std::transform(
+            hash.begin(), hash.end(), hash.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (!seen.insert(hash).second) continue; // same file listed twice
+
         SearchResult r;
         r.source = "";
         // The whole link, not a rebuilt one: the tr= entries are what tell the
         // probe where the peers are.
         r.magnet = link;
-        
-        // The name is normally in the magnet itself as dn=, already URL-encoded.
+
+        // The name is normally in the magnet itself as dn=, already
+        // URL-encoded.
         size_t dn = link.find("&dn=");
         if (dn != std::string::npos) {
             size_t endName = link.find('&', dn + 4);
             if (endName == std::string::npos) endName = link.size();
             r.name = urlDecode(link.substr(dn + 4, endName - (dn + 4)));
         }
-        
+
         // Context: only the text around this magnet, bounded by the previous
         // and next match. A fixed window would pick up the size and peer counts
         // belonging to the neighbouring result.
         size_t pos = static_cast<size_t>(it->position(0));
         auto next = std::next(it);
         size_t prevEnd = prevMatchEnd;
-        size_t nextPos = (next == end) ? body.size() : static_cast<size_t>(next->position(0));
+        size_t nextPos = (next == end) ? body.size()
+                                       : static_cast<size_t>(next->position(0));
         if (pos > prevEnd + 900) prevEnd = pos > 900 ? pos - 900 : 0;
-        if (nextPos > pos + it->length(0) + 900) nextPos = pos + it->length(0) + 900;
+        if (nextPos > pos + it->length(0) + 900)
+            nextPos = pos + it->length(0) + 900;
         std::string ctx = body.substr(prevEnd, nextPos - prevEnd);
 
         // The .torrent button belongs to this row when it sits between the
@@ -269,33 +291,41 @@ bool harvestMagnets(const std::string& body, std::vector<SearchResult>& out,
         // borrowing its neighbour's link.
         if (!torrentSelector.empty() && pos > prevEnd) {
             std::string href;
-            if (matchSelector(ctx.substr(0, pos - prevEnd), torrentSelector, href)) {
+            if (matchSelector(ctx.substr(0, pos - prevEnd), torrentSelector,
+                              href)) {
                 r.torrentUrl = absoluteUrl(origin, href);
             }
         }
-        
+
         if (r.name.empty()) {
             // Fall back to the visible text of the nearest link or heading
-            static const std::regex textRe(R"(<a[^>]*>([^<]{4,160})</a>)", std::regex::ECMAScript);
+            static const std::regex textRe(R"(<a[^>]*>([^<]{4,160})</a>)",
+                                           std::regex::ECMAScript);
             std::smatch tm;
             if (std::regex_search(ctx, tm, textRe)) {
                 r.name = urlDecode(decodeHtmlEntities(tm[1].str()));
             }
         }
         if (r.name.empty()) r.name = hash;
-        
-        static const std::regex sizeRe(R"(([0-9][0-9.,]*\s?[KMGTP]i?B))", std::regex::icase);
-        std::smatch sized;
-        if (std::regex_search(ctx, sized, sizeRe)) r.size = parseSizeText(sized[1].str());
-        
-        static const std::regex seedRe(R"(([0-9][0-9.,]*)\s*(?:seeders?|seeds|seeding|completos|sembradores))",
+
+        static const std::regex sizeRe(R"(([0-9][0-9.,]*\s?[KMGTP]i?B))",
                                        std::regex::icase);
-        if (std::regex_search(ctx, sized, seedRe)) r.seeders = parseCountText(sized[1].str());
-        
-        static const std::regex leecherRe(R"(([0-9][0-9.,]*)\s*(?:leechers?|peers|descargas|incompletos))",
-                                          std::regex::icase);
-        if (std::regex_search(ctx, sized, leecherRe)) r.leechers = parseCountText(sized[1].str());
-        
+        std::smatch sized;
+        if (std::regex_search(ctx, sized, sizeRe))
+            r.size = parseSizeText(sized[1].str());
+
+        static const std::regex seedRe(
+            R"(([0-9][0-9.,]*)\s*(?:seeders?|seeds|seeding|completos|sembradores))",
+            std::regex::icase);
+        if (std::regex_search(ctx, sized, seedRe))
+            r.seeders = parseCountText(sized[1].str());
+
+        static const std::regex leecherRe(
+            R"(([0-9][0-9.,]*)\s*(?:leechers?|peers|descargas|incompletos))",
+            std::regex::icase);
+        if (std::regex_search(ctx, sized, leecherRe))
+            r.leechers = parseCountText(sized[1].str());
+
         prevMatchEnd = pos + it->length(0);
         out.push_back(r);
     }
@@ -306,17 +336,19 @@ bool harvestMagnets(const std::string& body, std::vector<SearchResult>& out,
 
 // Very small helper: minimal JSON string/number extraction by dotted path.
 // Deliberately not a full JSON parser: the engines only need flat fields.
-bool SearchEngine::jsonField(const std::string& json, const std::string& path, std::string& out) {
+bool SearchEngine::jsonField(const std::string& json, const std::string& path,
+                             std::string& out) {
     std::string key = path;
     size_t start = 0;
     std::string value;
     bool found = false;
-    
+
     while (!key.empty()) {
         size_t dot = key.find('.');
-        std::string part = (dot == std::string::npos) ? key : key.substr(0, dot);
+        std::string part =
+            (dot == std::string::npos) ? key : key.substr(0, dot);
         key = (dot == std::string::npos) ? "" : key.substr(dot + 1);
-        
+
         std::string needle = "\"" + part + "\"";
         size_t p = json.find(needle, start);
         if (p == std::string::npos) return false;
@@ -324,7 +356,7 @@ bool SearchEngine::jsonField(const std::string& json, const std::string& path, s
         if (p == std::string::npos) return false;
         ++p;
         while (p < json.size() && std::isspace((unsigned char)json[p])) ++p;
-        
+
         std::string val;
         if (p < json.size() && json[p] == '"') {
             size_t e = json.find('"', p + 1);
@@ -339,7 +371,10 @@ bool SearchEngine::jsonField(const std::string& json, const std::string& path, s
             size_t q = p;
             for (; q < json.size(); ++q) {
                 if (json[q] == open) ++depth;
-                else if (json[q] == close) { --depth; if (depth == 0) break; }
+                else if (json[q] == close) {
+                    --depth;
+                    if (depth == 0) break;
+                }
             }
             if (q >= json.size()) return false;
             val = json.substr(p, q - p + 1);
@@ -353,7 +388,7 @@ bool SearchEngine::jsonField(const std::string& json, const std::string& path, s
         value = val;
         found = true;
     }
-    
+
     if (found) out = value;
     return found;
 }
@@ -380,7 +415,7 @@ void SearchEngine::normalizeResult(SearchResult& r) {
     for (const char* ent : {"&amp;", "&quot;", "&#39;", "&lt;", "&gt;"}) {
         size_t pos;
         while ((pos = r.magnet.find(ent)) != std::string::npos) {
-            r.magnet.replace(pos, std::string(ent).size(), 
+            r.magnet.replace(pos, std::string(ent).size(),
                              ent[1] == 'a' ? "&" : "");
         }
     }
@@ -391,28 +426,40 @@ void SearchEngine::normalizeResult(SearchResult& r) {
     // probe asked for it.
     if (!r.torrentUrl.empty()) {
         r.torrentUrl = decodeHtmlEntities(r.torrentUrl);
-        while (!r.torrentUrl.empty() &&
-               (r.torrentUrl.back() == '"' || r.torrentUrl.back() == '\'' ||
-                std::isspace(static_cast<unsigned char>(r.torrentUrl.back())))) {
+        while (
+            !r.torrentUrl.empty() &&
+            (r.torrentUrl.back() == '"' || r.torrentUrl.back() == '\'' ||
+             std::isspace(static_cast<unsigned char>(r.torrentUrl.back())))) {
             r.torrentUrl.pop_back();
         }
     }
-    
+
     // Quitar el HTML del titulo y descomprimir las entidades basicas
     std::string clean;
     bool inTag = false;
     for (char c : r.name) {
-        if (c == '<') { inTag = true; continue; }
-        if (c == '>') { inTag = false; continue; }
+        if (c == '<') {
+            inTag = true;
+            continue;
+        }
+        if (c == '>') {
+            inTag = false;
+            continue;
+        }
         if (!inTag) clean += c;
     }
     size_t pos;
-    while ((pos = clean.find("&amp;")) != std::string::npos) clean.replace(pos, 5, "&");
-    while ((pos = clean.find("&quot;")) != std::string::npos) clean.replace(pos, 6, "\"");
-    while ((pos = clean.find("&#39;")) != std::string::npos) clean.replace(pos, 5, "'");
-    while ((pos = clean.find("&lt;")) != std::string::npos) clean.replace(pos, 4, "<");
-    while ((pos = clean.find("&gt;")) != std::string::npos) clean.replace(pos, 4, ">");
-    
+    while ((pos = clean.find("&amp;")) != std::string::npos)
+        clean.replace(pos, 5, "&");
+    while ((pos = clean.find("&quot;")) != std::string::npos)
+        clean.replace(pos, 6, "\"");
+    while ((pos = clean.find("&#39;")) != std::string::npos)
+        clean.replace(pos, 5, "'");
+    while ((pos = clean.find("&lt;")) != std::string::npos)
+        clean.replace(pos, 4, "<");
+    while ((pos = clean.find("&gt;")) != std::string::npos)
+        clean.replace(pos, 4, ">");
+
     // Colapsar espacios y quitar los que quedaron en los bordes
     std::string tidy;
     bool prevSpace = false;
@@ -429,14 +476,16 @@ void SearchEngine::normalizeResult(SearchResult& r) {
     r.name = tidy;
 }
 
-bool SearchEngine::applySelector(const std::string& chunk, const std::string& selector,
+bool SearchEngine::applySelector(const std::string& chunk,
+                                 const std::string& selector,
                                  std::string& out) const {
     return matchSelector(chunk, selector, out);
 }
 
-bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out) const {
+bool SearchEngine::parse(const std::string& body,
+                         std::vector<SearchResult>& out) const {
     if (body.empty()) return false;
-    
+
     // Plain-text endpoints: one result per line. No engine in the catalogue
     // uses this today, but the parser stays because it needs no HTML at all
     // and is the cheapest way to bring a new text endpoint back.
@@ -453,14 +502,14 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
                 std::smatch m;
                 if (!std::regex_match(text, m, lineRe)) continue;
                 if (m.size() < 5) continue;
-                
+
                 SearchResult r;
                 r.source = m_def.name;
                 r.name = m[1].str();
                 r.magnet = m[4].str();
                 r.size = parseSizeText(m[2].str());
                 r.seeders = parseCountText(m[3].str());
-                
+
                 normalizeResult(r);
                 if (r.magnet.empty() || r.name.empty()) continue;
                 out.push_back(r);
@@ -471,7 +520,7 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
         }
         return !out.empty();
     }
-    
+
     // No site-specific rules: harvest whatever magnets the page exposes.
     if (m_def.rowSelector.empty() && m_def.magnetSelector.empty()) {
         bool found = harvestMagnets(body, out, m_def.torrentSelector,
@@ -487,10 +536,11 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
         }
         return found;
     }
-    
+
     if (m_def.type == "json") {
         // Split into repeated objects on the row selector's key, or on "name"
-        std::string marker = m_def.rowSelector.empty() ? "name" : m_def.rowSelector;
+        std::string marker =
+            m_def.rowSelector.empty() ? "name" : m_def.rowSelector;
         size_t start = 0;
         int count = 0;
         while (true) {
@@ -502,7 +552,7 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
             size_t objEnd = body.find('}', p);
             if (objEnd == std::string::npos) break;
             std::string obj = body.substr(objStart, objEnd - objStart + 1);
-            
+
             SearchResult r;
             r.source = m_def.name;
             std::string v;
@@ -514,9 +564,11 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
                 r.detailId = v;
             }
             if (jsonField(obj, m_def.sizeSelector, v)) r.size = parseSize(v);
-            if (jsonField(obj, m_def.seedersSelector, v)) r.seeders = parseCount(v);
-            if (jsonField(obj, m_def.leechersSelector, v)) r.leechers = parseCount(v);
-            
+            if (jsonField(obj, m_def.seedersSelector, v))
+                r.seeders = parseCount(v);
+            if (jsonField(obj, m_def.leechersSelector, v))
+                r.leechers = parseCount(v);
+
             r.magnet = rawLink;
             // Some APIs answer with a bare info hash instead of a full magnet
             // link, so the link is put together from it.
@@ -526,7 +578,7 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
                     r.magnet += "&dn=" + urlEncode(r.name);
                 }
             }
-            
+
             normalizeResult(r);
             // A row is worth keeping when it already carries a magnet, or when
             // this engine says the magnet can be asked for separately.
@@ -541,7 +593,7 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
         }
         if (!out.empty()) return true;
     }
-    
+
     // HTML: iterate over the rows found by the row selector
     if (m_def.rowSelector.empty()) return false;
     // The .torrent links a listing prints are relative to the site it came
@@ -561,10 +613,13 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
             if (applySelector(chunk, m_def.torrentSelector, v)) {
                 r.torrentUrl = absoluteUrl(origin, v);
             }
-            if (applySelector(chunk, m_def.sizeSelector, v)) r.size = parseSize(v);
-            if (applySelector(chunk, m_def.seedersSelector, v)) r.seeders = parseCount(v);
-            if (applySelector(chunk, m_def.leechersSelector, v)) r.leechers = parseCount(v);
-            
+            if (applySelector(chunk, m_def.sizeSelector, v))
+                r.size = parseSize(v);
+            if (applySelector(chunk, m_def.seedersSelector, v))
+                r.seeders = parseCount(v);
+            if (applySelector(chunk, m_def.leechersSelector, v))
+                r.leechers = parseCount(v);
+
             normalizeResult(r);
             if (!r.magnet.empty() && !r.name.empty()) {
                 out.push_back(r);
@@ -572,7 +627,7 @@ bool SearchEngine::parse(const std::string& body, std::vector<SearchResult>& out
             }
         }
     } catch (const std::regex_error&) {
-        return false;   // A malformed plugin file should not crash the app
+        return false; // A malformed plugin file should not crash the app
     }
     return !out.empty();
 }

@@ -28,36 +28,41 @@ void MainWindow::createSearchView() {
     int viewH = h() - y - STATUS_HEIGHT;
     int barY = y + 4;
     int barH = SEARCH_BAR_HEIGHT - 10;
-    
+
     m_searchView = new Fl_Group(0, y, w(), viewH);
     m_searchView->box(FL_FLAT_BOX);
     m_searchView->begin();
-    
+
     // --- Bar: engine chooser, category, query, buttons ---
     m_choiceSearchEngine = new Fl_Choice(10, barY, 150, barH);
     m_choiceSearchEngine->box(FL_FLAT_BOX);
-    m_choiceSearchEngine->tooltip("Search engine (green = reachable, red = unreachable, gray = not checked yet)");
-    m_choiceSearchEngine->callback([](Fl_Widget*, void* data) {
-        MainWindow* win = (MainWindow*)data;
-        if (win) win->updateCategoryChoice();
-    }, this);
-    
+    m_choiceSearchEngine->tooltip("Search engine (green = reachable, red = "
+                                  "unreachable, gray = not checked yet)");
+    m_choiceSearchEngine->callback(
+        [](Fl_Widget*, void* data) {
+            MainWindow* win = (MainWindow*)data;
+            if (win) win->updateCategoryChoice();
+        },
+        this);
+
     m_choiceSearchCategory = new Fl_Choice(165, barY, 95, barH);
     m_choiceSearchCategory->box(FL_FLAT_BOX);
     m_choiceSearchCategory->tooltip("Category (depends on the engine)");
-    m_choiceSearchCategory->hide();   // only engines with categories show it
-    
+    m_choiceSearchCategory->hide(); // only engines with categories show it
+
     m_searchInput = new Fl_Input(170, barY, 300, barH);
     m_searchInput->tooltip("Type what to look for and press Enter");
     m_searchInput->when(FL_WHEN_ENTER_KEY);
-    m_searchInput->callback([](Fl_Widget*, void* data) {
-        MainWindow* win = (MainWindow*)data;
-        if (win) win->startSearch();
-    }, this);
-    
+    m_searchInput->callback(
+        [](Fl_Widget*, void* data) {
+            MainWindow* win = (MainWindow*)data;
+            if (win) win->startSearch();
+        },
+        this);
+
     m_btnSearchGo = new Fl_Button(480, barY, 80, barH, "Search");
     m_btnSearchGo->callback(onSearchGo, this);
-    
+
     // Cancel, in red because it aborts the running search
     m_btnSearchCancel = new Fl_Button(795, barY, 100, barH, "Cancel");
     m_btnSearchCancel->box(FL_DOWN_BOX);
@@ -67,8 +72,8 @@ void MainWindow::createSearchView() {
     m_btnSearchCancel->color(fl_rgb_color(64, 20, 20));
     m_btnSearchCancel->tooltip("Stop the search in progress");
     m_btnSearchCancel->callback(onSearchCancelClick, this);
-    m_btnSearchCancel->hide();   // only while searching
-    
+    m_btnSearchCancel->hide(); // only while searching
+
     // --- Status line, under the bar and above the results ---
     int stY = y + SEARCH_BAR_HEIGHT;
     m_searchStatus = new Fl_Box(10, stY, w() - 20, SEARCH_STATUS_HEIGHT,
@@ -76,36 +81,37 @@ void MainWindow::createSearchView() {
     m_searchStatus->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     m_searchStatus->labelsize(11);
     m_searchStatus->labelcolor(fl_rgb_color(120, 120, 120));
-    
+
     // --- Results fill the rest ---
     int resY = stY + SEARCH_STATUS_HEIGHT;
     int resH = h() - resY - STATUS_HEIGHT;
     m_searchResults = new SearchResultsWidget(0, resY, w(), resH);
     // (SearchResultsWidget's constructor already restores the current group)
-    
+
     m_searchView->end();
-    
+
     // Results go straight to the add dialog, same as a dropped .torrent file.
     // Only leaves the search view when something was actually added, so a
     // cancelled dialog does not throw the results away (notably on Windows,
     // where the dialog is the whole download affordance). The row's file list
     // travels along so a multi-file magnet offers one checkbox per file.
     m_searchResults->setOnDownloadCallback(
-        [this](const SearchResult& r, const std::vector<TorrentFileEntry>& files,
+        [this](const SearchResult& r,
+               const std::vector<TorrentFileEntry>& files,
                const std::string& body) {
             if (showAddTorrentDialog("", r.magnet, files, r.torrentUrl, body)) {
                 switchView(false);
             }
         });
-    
-    m_searchView->hide();   // Torrent list is what you see first
-    
-    layoutSearchViewContents(w());   // replace the hardcoded bar widths
+
+    m_searchView->hide(); // Torrent list is what you see first
+
+    layoutSearchViewContents(w()); // replace the hardcoded bar widths
 }
 
 void MainWindow::switchView(bool showSearch) {
     m_showSearchView = showSearch;
-    
+
     if (m_searchView) {
         if (showSearch) m_searchView->show();
         else m_searchView->hide();
@@ -115,7 +121,8 @@ void MainWindow::switchView(bool showSearch) {
         else m_torrentList->show();
     }
     if (m_btnSearch) {
-        m_btnSearch->tooltip(showSearch ? "Back to my torrents" : "Search torrents");
+        m_btnSearch->tooltip(showSearch ? "Back to my torrents"
+                                        : "Search torrents");
     }
 
     // First visit to the search view: probe every engine once, in the
@@ -134,7 +141,7 @@ void MainWindow::layoutSearchView() {
     int listH = h() - y - STATUS_HEIGHT;
     if (listH < 40) listH = 40;
     int viewW = w();
-    
+
     if (m_showSearchView) {
         if (m_searchView) m_searchView->resize(0, y, viewW, listH);
         layoutSearchViewContents(viewW);
@@ -147,20 +154,20 @@ void MainWindow::layoutSearchViewContents(int available) {
     int y = MENU_HEIGHT + TOOLBAR_HEIGHT;
     int barY = y + 4;
     int barH = SEARCH_BAR_HEIGHT - 10;
-    
+
     // The query field takes whatever the fixed-width widgets leave, so the
     // bar adapts to the window instead of clipping the buttons.
     // Positions: 10 | engine | 5 | category? | 5 | input | 5 | Search
     const int wGo = 80, wCancel = 100;
     const int MARGIN_L = 10, MARGIN_R = 10, GAP = 5;
     int wEngine = (available < 820) ? 120 : 150;
-    int wCat = (m_choiceSearchCategory && m_choiceSearchCategory->visible()) ? 95 : 0;
-    int fixed = MARGIN_L + wEngine + GAP + wCat + (wCat > 0 ? GAP : 0)
-              + GAP + wGo
-              + GAP + wCancel + MARGIN_R;
+    int wCat =
+        (m_choiceSearchCategory && m_choiceSearchCategory->visible()) ? 95 : 0;
+    int fixed = MARGIN_L + wEngine + GAP + wCat + (wCat > 0 ? GAP : 0) + GAP +
+                wGo + GAP + wCancel + MARGIN_R;
     int wInput = available - fixed;
     if (wInput < 120) wInput = 120;
-    
+
     m_choiceSearchEngine->resize(MARGIN_L, barY, wEngine, barH);
     int cx = MARGIN_L + wEngine + GAP;
     if (wCat > 0 && m_choiceSearchCategory) {
@@ -168,20 +175,21 @@ void MainWindow::layoutSearchViewContents(int available) {
         cx += wCat + GAP;
     }
     m_searchInput->resize(cx, barY, wInput, barH);
-    
+
     int bx = cx + wInput + GAP;
     m_btnSearchGo->resize(bx, barY, wGo, barH);
     bx += wGo + GAP;
     if (m_btnSearchCancel) m_btnSearchCancel->resize(bx, barY, wCancel, barH);
-    
+
     // Status line spans the panel so long messages are not cut off
     int stY = y + SEARCH_BAR_HEIGHT;
-    m_searchStatus->resize(MARGIN_L, stY, available - MARGIN_L - MARGIN_R, SEARCH_STATUS_HEIGHT);
-    
+    m_searchStatus->resize(MARGIN_L, stY, available - MARGIN_L - MARGIN_R,
+                           SEARCH_STATUS_HEIGHT);
+
     int resY = stY + SEARCH_STATUS_HEIGHT;
     int resH = h() - resY - STATUS_HEIGHT;
     if (resH < 40) resH = 40;
-    
+
     if (m_searchResults) {
         m_searchResults->resize(0, resY, available, resH);
     }
@@ -256,8 +264,8 @@ int MainWindow::engineMenuIndex(const std::string& name) const {
     return -1;
 }
 
-MainWindow::EngineStatus MainWindow::engineStatusOf(
-    const std::string& name) const {
+MainWindow::EngineStatus
+MainWindow::engineStatusOf(const std::string& name) const {
     auto it = m_engineStatus.find(name);
     if (it == m_engineStatus.end()) return EngineStatus::Unknown;
     return it->second;
@@ -266,9 +274,12 @@ MainWindow::EngineStatus MainWindow::engineStatusOf(
 Fl_Color MainWindow::engineColor(EngineStatus status) {
     // Gray reads on both themes; green/red carry the verdict.
     switch (status) {
-        case EngineStatus::Up:   return fl_rgb_color(70, 190, 80);
-        case EngineStatus::Down: return fl_rgb_color(220, 70, 70);
-        default:                 return fl_rgb_color(150, 150, 150);
+        case EngineStatus::Up:
+            return fl_rgb_color(70, 190, 80);
+        case EngineStatus::Down:
+            return fl_rgb_color(220, 70, 70);
+        default:
+            return fl_rgb_color(150, 150, 150);
     }
 }
 
@@ -285,24 +296,22 @@ std::string MainWindow::engineLabel(const std::string& name) {
 // toolbar_clicks suite caught. See shutdownEngineProbes().
 
 void MainWindow::startEngineStatusCheck() {
-    if (m_engineStatusChecked) return;   // once per session; also post-shutdown
+    if (m_engineStatusChecked) return; // once per session; also post-shutdown
     m_engineStatusChecked = true;
     for (const auto& d : SearchManager::instance().engines()) {
         if (!d.enabled) continue;
-        SearchEngine::Definition def = d;   // the worker must not read the UI
+        SearchEngine::Definition def = d; // the worker must not read the UI
         m_engineProbes.emplace_back([this, def] {
             if (!isAlive() || m_probesStop.load()) return;
             SearchEngine engine(def);
             HttpClient::Response resp = HttpClient::get(
-                engine.buildUrl("test"), std::string("FTORRENT ") + VERSION,
-                10,
+                engine.buildUrl("test"), std::string("FTORRENT ") + VERSION, 10,
                 [this] {
                     return !MainWindow::isAlive() || m_probesStop.load();
                 },
                 nullptr, 6);
             if (!isAlive()) return;
-            auto* delivery =
-                new EngineStatusDelivery{this, def.name, resp.ok};
+            auto* delivery = new EngineStatusDelivery{this, def.name, resp.ok};
             Fl::awake(handleEngineStatus, delivery);
         });
     }
@@ -345,7 +354,7 @@ void MainWindow::applyEngineStatus(const std::string& name, bool up) {
 
 void MainWindow::updateCategoryChoice() {
     if (!m_choiceSearchCategory) return;
-    
+
     // Row 0 is "All engines", which has no categories of its own: searching
     // everything means "all" for each site.
     const SearchEngine::Definition* def = nullptr;
@@ -359,7 +368,7 @@ void MainWindow::updateCategoryChoice() {
             }
         }
     }
-    
+
     m_choiceSearchCategory->clear();
     if (!def || def->categories.size() < 2) {
         m_choiceSearchCategory->hide();
@@ -398,24 +407,25 @@ void MainWindow::loadSearchEngines() {
 void MainWindow::startSearch() {
     if (m_searching) {
         // A new search replaces the previous one instead of piling up: the old
-        // thread sees the flag and stops at its next checkpoint, and the new one
-        // takes over the flag below. Rows already shown are cleared once the
-        // previous thread hands the state back, so the two never interleave.
+        // thread sees the flag and stops at its next checkpoint, and the new
+        // one takes over the flag below. Rows already shown are cleared once
+        // the previous thread hands the state back, so the two never
+        // interleave.
         m_searchCancelled = true;
         if (m_btnSearchCancel) m_btnSearchCancel->deactivate();
     }
-    
+
     if (!m_choiceSearchEngine || m_choiceSearchEngine->value() < 0) {
         setSearchStatus("No search engine available");
         return;
     }
-    
+
     std::string query = m_searchInput ? m_searchInput->value() : "";
     if (query.empty()) {
         setSearchStatus("Type something and press Enter");
         return;
     }
-    
+
     // Row 0 is the explicit "All engines" mode; every other row picks exactly
     // one engine, and the requests go to that engine only. The mapping lives in
     // SearchScope so it can be tested.
@@ -426,16 +436,18 @@ void MainWindow::startSearch() {
         setSearchStatus("No search engine available");
         return;
     }
-    
+
     // Category of the selected engine, or "all" when it declares none. A
     // search across every engine has no single category to offer.
     std::string category = "all";
     if (!isAllEnginesRow(selection) && m_choiceSearchCategory &&
-        m_choiceSearchCategory->visible() && m_choiceSearchCategory->value() >= 0) {
-        const char* picked = m_choiceSearchCategory->text(m_choiceSearchCategory->value());
+        m_choiceSearchCategory->visible() &&
+        m_choiceSearchCategory->value() >= 0) {
+        const char* picked =
+            m_choiceSearchCategory->text(m_choiceSearchCategory->value());
         if (picked && picked[0] != '\0') category = picked;
     }
-    
+
     // Each search gets a number, so a thread that was superseded can tell that
     // it no longer owns the state and hand it back untouched.
     const unsigned long generation = ++m_searchGeneration;
@@ -471,15 +483,16 @@ void MainWindow::startSearch() {
             };
 
             // Rows are delivered as they are parsed rather than all at the end,
-            // so a slow site fills the table progressively. Fl::awake only takes
-            // a plain function, so each message is parked under the mutex and
-            // picked up there.
+            // so a slow site fills the table progressively. Fl::awake only
+            // takes a plain function, so each message is parked under the mutex
+            // and picked up there.
             std::string error;
             bool ok = false;
             try {
-                ok = engine.searchStreaming(query,
-                    [this, def, generation, isCurrent](
-                        const std::vector<SearchResult>& batch) {
+                ok = engine.searchStreaming(
+                    query,
+                    [this, def, generation,
+                     isCurrent](const std::vector<SearchResult>& batch) {
                         if (batch.empty() || !isCurrent()) return;
                         SearchEvent event;
                         event.kind = SearchEvent::Kind::Batch;
@@ -490,9 +503,9 @@ void MainWindow::startSearch() {
                     [this, isCurrent]() {
                         return !isCurrent() || m_searchCancelled.load();
                     },
-                    error,
-                    category,
-                    [this, def, generation, isCurrent](const std::string& stage) {
+                    error, category,
+                    [this, def, generation,
+                     isCurrent](const std::string& stage) {
                         if (stage.empty() || !isCurrent()) return;
                         SearchEvent event;
                         event.kind = SearchEvent::Kind::Stage;
@@ -593,7 +606,7 @@ void MainWindow::handleSearchEvents(void* data) {
         win->m_searchResults->appendResults(rows);
     }
 
-    if (!win->m_searching) return;   // cancelled while this was in flight
+    if (!win->m_searching) return; // cancelled while this was in flight
 
     if (win->m_engineStates.size() <= 1) {
         // One engine: its own stage line is the most useful thing to show.
@@ -685,14 +698,14 @@ void MainWindow::finishSearch() {
 void MainWindow::onSearchCancelClick(Fl_Widget*, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (!win || !win->m_searching) return;
-    
+
     // The flag alone is enough to stop an in-flight request: it is checked
     // several times per second by the transfer, so the worker unwinds on its
     // own and the UI is put back in order right away instead of after it.
     win->m_searchCancelled = true;
     win->m_searching = false;
     win->setSearchStatus("Search cancelled");
-    
+
     if (win->m_btnSearchCancel) win->m_btnSearchCancel->hide();
     if (win->m_btnSearchGo) win->m_btnSearchGo->activate();
     if (win->m_searchResults) {
@@ -702,7 +715,7 @@ void MainWindow::onSearchCancelClick(Fl_Widget*, void* data) {
                                  " results so far");
         }
     }
-    
+
     // Bumping the generation tells every worker that its results no longer
     // belong on screen, so nothing lands in the table after the cancel. The
     // queue is emptied too: whatever was already parked belongs to the search

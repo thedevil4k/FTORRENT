@@ -25,8 +25,8 @@ bool allZero(const lt::sha256_hash& hash) {
 } // namespace
 
 void SecurityHashes::fillWholeFileHash(const lt::torrent_info& info,
-                                       const lt::file_storage& fs, int fileIndex,
-                                       SecurityFile& file) {
+                                       const lt::file_storage& fs,
+                                       int fileIndex, SecurityFile& file) {
     file.sha256.clear();
     file.sha256Complete = false;
 

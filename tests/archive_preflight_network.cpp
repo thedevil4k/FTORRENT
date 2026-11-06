@@ -90,7 +90,7 @@ int childExitCode(int status) {
     return status;
 #else
     if (WIFEXITED(status)) return WEXITSTATUS(status);
-    return -2;   // killed by a signal
+    return -2; // killed by a signal
 #endif
 }
 
@@ -158,7 +158,6 @@ public:
     }
 
 private:
-
     void build(const fs::path& fixture, int pieceLength) {
         std::error_code ec;
         m_dir = fs::temp_directory_path() / "ftorrent-archive-network";
@@ -166,7 +165,8 @@ private:
         fs::create_directories(m_dir, ec);
 
         m_file = m_dir / fixture.filename();
-        fs::copy_file(fixture, m_file, fs::copy_options::overwrite_existing, ec);
+        fs::copy_file(fixture, m_file, fs::copy_options::overwrite_existing,
+                      ec);
         if (ec) {
             m_error = "could not copy the fixture: " + ec.message();
             return;
@@ -201,7 +201,8 @@ private:
         settings.set_bool(lt::settings_pack::enable_upnp, false);
         settings.set_bool(lt::settings_pack::enable_natpmp, false);
         settings.set_int(lt::settings_pack::alert_mask,
-                         lt::alert_category::status | lt::alert_category::error);
+                         lt::alert_category::status |
+                             lt::alert_category::error);
         lt::session_params sessionParams(settings);
         // The seeder only reads the file it serves, so the simple portable
         // disk I/O is enough for it.
@@ -264,7 +265,8 @@ bool createLargeZip(const fs::path& path, std::size_t payloadBytes) {
               archive_write_set_options(writer, "zip:compression=store") ==
                   ARCHIVE_OK;
 #ifdef _WIN32
-    ok = ok && archive_write_open_filename_w(writer, path.c_str()) == ARCHIVE_OK;
+    ok =
+        ok && archive_write_open_filename_w(writer, path.c_str()) == ARCHIVE_OK;
 #else
     ok = ok && archive_write_open_filename(writer, path.c_str()) == ARCHIVE_OK;
 #endif
@@ -308,8 +310,7 @@ bool createLargeZip(const fs::path& path, std::size_t payloadBytes) {
 // the file instead of one at each end.
 void scenarioRarWalk(const fs::path& fixtures) {
     section("a RAR 1.5-4.x lists its entries from a swarm");
-    const fs::path fixture =
-        fixtures / "test_read_format_rar_binary_data.rar";
+    const fs::path fixture = fixtures / "test_read_format_rar_binary_data.rar";
     const int pieceLength = 16384;
 
     std::cout << "    seeding " << fixture.filename().string() << '\n';
@@ -329,9 +330,9 @@ void scenarioRarWalk(const fs::path& fixtures) {
     bool encryptedHeaders = false;
 
     std::cout << "    checking the archive\n";
-    const bool listed = ArchivePreflight::inspect(
-        seeder.clientParams(), 0, entries, error, nullptr, 90, &note,
-        &encryptedHeaders);
+    const bool listed =
+        ArchivePreflight::inspect(seeder.clientParams(), 0, entries, error,
+                                  nullptr, 90, &note, &encryptedHeaders);
 
     if (!note.empty()) std::cout << "        note: " << note << '\n';
     if (!error.empty()) std::cout << "        error: " << error << '\n';
@@ -377,9 +378,9 @@ void scenarioEncryptedHeaders(const fs::path& fixtures) {
     bool encryptedHeaders = false;
 
     std::cout << "    checking the archive\n";
-    const bool listed = ArchivePreflight::inspect(
-        seeder.clientParams(), 0, entries, error, nullptr, 90, &note,
-        &encryptedHeaders);
+    const bool listed =
+        ArchivePreflight::inspect(seeder.clientParams(), 0, entries, error,
+                                  nullptr, 90, &note, &encryptedHeaders);
 
     ok(!listed, "nothing can be listed");
     ok(encryptedHeaders, "the archive is reported as password-protected");
@@ -422,9 +423,9 @@ void scenarioZipTwoEnds(const fs::path&) {
     bool encryptedHeaders = false;
 
     std::cout << "    checking the archive\n";
-    const bool listed = ArchivePreflight::inspect(
-        seeder.clientParams(), 0, entries, error, nullptr, 90, &note,
-        &encryptedHeaders);
+    const bool listed =
+        ArchivePreflight::inspect(seeder.clientParams(), 0, entries, error,
+                                  nullptr, 90, &note, &encryptedHeaders);
 
     if (!error.empty()) std::cout << "        error: " << error << '\n';
 
@@ -434,7 +435,8 @@ void scenarioZipTwoEnds(const fs::path&) {
     // first and the last piece are all the check needs.
     ok(seeder.uploaded() <= 2 * pieceLength,
        "the seeder sent at most the two end pieces");
-    ok(seeder.uploaded() < seeder.size(), "and far less than the whole archive");
+    ok(seeder.uploaded() < seeder.size(),
+       "and far less than the whole archive");
 
     fs::remove(source, ec);
 }
@@ -457,9 +459,9 @@ void scenarioHostileNames(const fs::path& fixtures) {
     bool encryptedHeaders = false;
 
     std::cout << "    checking the archive\n";
-    const bool listed = ArchivePreflight::inspect(
-        seeder.clientParams(), 0, entries, error, nullptr, 90, &note,
-        &encryptedHeaders);
+    const bool listed =
+        ArchivePreflight::inspect(seeder.clientParams(), 0, entries, error,
+                                  nullptr, 90, &note, &encryptedHeaders);
 
     ok(listed, "the ZIP is listed without downloading it");
     ok(findEntry(entries, "setup.exe") != nullptr, "the plain .exe is found");

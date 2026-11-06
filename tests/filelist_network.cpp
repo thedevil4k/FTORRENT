@@ -56,7 +56,8 @@ int main() {
     {
         files.clear();
         error.clear();
-        const bool loaded = TorrentFileList::resolve("", NYAA_TORRENT, files, error, 20);
+        const bool loaded =
+            TorrentFileList::resolve("", NYAA_TORRENT, files, error, 20);
         ok(loaded, "the Nyaa .torrent file downloads and parses");
         ok(!files.empty(), "and lists files");
         if (!loaded) std::cout << "        error: " << error << '\n';
@@ -68,7 +69,8 @@ int main() {
         error.clear();
         const std::string magnet =
             std::string("magnet:?xt=urn:btih:") + NYAA_HASH + "&dn=One+Piece";
-        const bool loaded = TorrentFileList::resolve(magnet, NYAA_TORRENT, files, error, 20);
+        const bool loaded =
+            TorrentFileList::resolve(magnet, NYAA_TORRENT, files, error, 20);
         ok(loaded, "the hash matches, so the file is used");
         ok(!files.empty(), "with the file list");
         if (!loaded) std::cout << "        error: " << error << '\n';
@@ -81,8 +83,10 @@ int main() {
         // A well-formed hash that is not the one the file carries. The swarm
         // probe is given two seconds so this stays a quick check.
         const std::string other =
-            "magnet:?xt=urn:btih:0000000000000000000000000000000000000001&dn=other";
-        const bool loaded = TorrentFileList::resolve(other, NYAA_TORRENT, files, error, 2);
+            "magnet:?xt=urn:btih:0000000000000000000000000000000000000001&dn="
+            "other";
+        const bool loaded =
+            TorrentFileList::resolve(other, NYAA_TORRENT, files, error, 2);
         ok(!loaded, "the mismatch is refused");
         ok(error.find("different torrent") != std::string::npos,
            "and the message says so");
@@ -93,7 +97,8 @@ int main() {
     {
         files.clear();
         error.clear();
-        const bool loaded = TorrentFileList::resolve(TPB_MAGNET, "", files, error, 60);
+        const bool loaded =
+            TorrentFileList::resolve(TPB_MAGNET, "", files, error, 60);
         ok(loaded, "the default trackers find peers for a TPB magnet");
         ok(!files.empty(), "and the metadata arrives with a file list");
         if (!loaded) std::cout << "        error: " << error << '\n';
@@ -104,7 +109,8 @@ int main() {
         files.clear();
         error.clear();
         const std::string dead =
-            "magnet:?xt=urn:btih:0000000000000000000000000000000000000001&dn=dead";
+            "magnet:?xt=urn:btih:0000000000000000000000000000000000000001&dn="
+            "dead";
         const bool loaded = TorrentFileList::resolve(dead, "", files, error, 4);
         ok(!loaded, "nothing is invented for a dead hash");
         ok(error.find("No peer sent the metadata") != std::string::npos,
@@ -123,9 +129,10 @@ int main() {
         // One listing per site the fix touches, written out so a wrong URL is
         // obvious rather than computed.
         const Live live[] = {
-            { "Nyaa.si", "https://nyaa.si/?f=0&c=0_0&q=one+piece&p=1" },
-            { "BitSearch", "https://bitsearch.eu/search?q=one+piece&page=1" },
-            { "SolidTorrents", "https://solidtorrents.eu/search?q=one+piece&page=1" },
+            {"Nyaa.si", "https://nyaa.si/?f=0&c=0_0&q=one+piece&p=1"},
+            {"BitSearch", "https://bitsearch.eu/search?q=one+piece&page=1"},
+            {"SolidTorrents",
+             "https://solidtorrents.eu/search?q=one+piece&page=1"},
         };
 
         // Nyaa is the engine the failure was reproduced on and the one whose
@@ -151,11 +158,13 @@ int main() {
             int withTrackers = 0;
             int withTorrent = 0;
             for (const SearchResult& row : rows) {
-                if (row.magnet.find("&tr=") != std::string::npos) ++withTrackers;
+                if (row.magnet.find("&tr=") != std::string::npos)
+                    ++withTrackers;
                 if (!row.torrentUrl.empty()) ++withTorrent;
             }
-            std::cout << "        " << site.engine << " http=" << page.httpStatus
-                      << " rows=" << rows.size() << " trackers=" << withTrackers
+            std::cout << "        " << site.engine
+                      << " http=" << page.httpStatus << " rows=" << rows.size()
+                      << " trackers=" << withTrackers
                       << " torrent-links=" << withTorrent << '\n';
             if (!rows.empty()) {
                 std::cout << "          sample: "

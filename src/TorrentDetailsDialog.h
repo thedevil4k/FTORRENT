@@ -19,7 +19,7 @@ class ArchiveCheckTask;
 
 /**
  * @brief Diálogo de detalles de un torrent específico
- * 
+ *
  * Muestra información detallada en pestañas:
  * - General: Información básica del torrent
  * - Trackers: Lista de trackers
@@ -35,20 +35,20 @@ class TorrentDetailsDialog : public Fl_Window {
 public:
     TorrentDetailsDialog(TorrentItem* torrent);
     ~TorrentDetailsDialog();
-    
+
     void show_modal();
     void updateInfo();
 
     // Opens on the Security tab and asks about the torrent's hash, for the
     // shield click in the torrent list.
     void showSecurityAndCheck();
-    
+
 private:
     TorrentItem* m_torrent;
-    
+
     // Tabs
     Fl_Tabs* m_tabs;
-    
+
     // General tab
     Fl_Group* m_generalTab;
     SecurityShieldBox* m_generalShield;
@@ -66,17 +66,17 @@ private:
     Fl_Box* m_etaLabel;
     Fl_Box* m_savePathLabel;
     Fl_Box* m_generalSecuritySummary;
-    
+
     // Trackers tab
     Fl_Group* m_trackersTab;
     Fl_Text_Display* m_trackersDisplay;
     Fl_Text_Buffer* m_trackersBuffer = nullptr;
-    
+
     // Peers tab
     Fl_Group* m_peersTab;
     Fl_Text_Display* m_peersDisplay;
     Fl_Text_Buffer* m_peersBuffer = nullptr;
-    
+
     // Security tab
     Fl_Group* m_securityTab;
     SecurityShieldBox* m_securityShield;
@@ -117,7 +117,7 @@ private:
     // Buttons
     Fl_Button* m_refreshButton;
     Fl_Button* m_closeButton;
-    
+
     // UI Creation
     void createGeneralTab();
     void createTrackersTab();
@@ -125,7 +125,7 @@ private:
     void createSecurityTab();
     void createFilesTab();
     void createButtons();
-    
+
     // Update methods
     void updateGeneralInfo();
     void updateTrackers();
@@ -139,12 +139,12 @@ private:
                          const std::string& digestOrError);
     static void onCheckArchiveClicked(Fl_Widget* w, void* data);
     void updateFiles();
-    
+
     // Callbacks
     static void onRefresh(Fl_Widget* w, void* data);
     static void onClose(Fl_Widget* w, void* data);
     static void updateTimerCallback(void* data);
-    
+
     // Helper
     std::string formatLabel(const std::string& label, const std::string& value);
 };

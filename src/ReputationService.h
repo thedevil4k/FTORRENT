@@ -39,10 +39,10 @@ public:
 
     // What a request() call actually did.
     enum class Start {
-        Started,         // This call started the lookup; done will be called.
-        AlreadyRunning,  // A lookup was in flight; done joins its waiters.
-        Cached,          // The answer is already here; use find().
-        Rejected         // Not a SHA-256, or too many lookups are running.
+        Started,        // This call started the lookup; done will be called.
+        AlreadyRunning, // A lookup was in flight; done joins its waiters.
+        Cached,         // The answer is already here; use find().
+        Rejected        // Not a SHA-256, or too many lookups are running.
     };
 
     // What is known right now. Starts nothing.

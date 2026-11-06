@@ -29,6 +29,6 @@ const std::string& dir();
 // it were the icon.
 Fl_Image* load(const std::string& file, int size);
 
-}  // namespace AssetLoader
+} // namespace AssetLoader
 
-#endif  // FTORRENT_ASSETLOADER_H
+#endif // FTORRENT_ASSETLOADER_H

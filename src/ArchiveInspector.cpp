@@ -21,33 +21,29 @@ namespace {
 // installers; they exist to stop a hostile archive, not to judge a big game.
 constexpr int MAX_ENTRIES = 100000;
 
-std::filesystem::path pathFromUtf8(const std::string& text)
-{
+std::filesystem::path pathFromUtf8(const std::string& text) {
 #if defined(__cpp_char8_t)
-    return std::filesystem::path(
-        std::u8string(reinterpret_cast<const char8_t*>(text.data()), text.size()));
+    return std::filesystem::path(std::u8string(
+        reinterpret_cast<const char8_t*>(text.data()), text.size()));
 #else
     return std::filesystem::u8path(text);
 #endif
 }
 
 struct ArchiveCloser {
-    void operator()(archive* value) const
-    {
+    void operator()(archive* value) const {
         if (value) archive_read_free(value);
     }
 };
 
 using ArchivePtr = std::unique_ptr<archive, ArchiveCloser>;
 
-std::string archiveError(archive* value, const char* fallback)
-{
+std::string archiveError(archive* value, const char* fallback) {
     const char* message = value ? archive_error_string(value) : nullptr;
     return message ? std::string(message) : std::string(fallback);
 }
 
-bool openArchive(archive* value, const std::string& path, std::string& error)
-{
+bool openArchive(archive* value, const std::string& path, std::string& error) {
     // Only the uncompressed stream is needed: ZIP and RAR do their compression
     // inside the format reader. Registering every filter would also make
     // libarchive consider external helper programs for no benefit.
@@ -62,7 +58,8 @@ bool openArchive(archive* value, const std::string& path, std::string& error)
     const int status = archive_read_open_filename_w(
         value, pathFromUtf8(path).c_str(), 64 * 1024);
 #else
-    const int status = archive_read_open_filename(value, path.c_str(), 64 * 1024);
+    const int status =
+        archive_read_open_filename(value, path.c_str(), 64 * 1024);
 #endif
     if (status != ARCHIVE_OK) {
         error = archiveError(value, "could not open archive");
@@ -79,8 +76,8 @@ bool openArchive(archive* value, const std::string& path, std::string& error)
 // gap, so listing a 21 GB RAR meant writing 21 GB first.
 struct WindowStream {
     std::int64_t size = 0;
-    std::string head;   // At offset 0
-    std::string tail;   // At offset size - tail.size()
+    std::string head; // At offset 0
+    std::string tail; // At offset size - tail.size()
     std::int64_t pos = 0;
     char zeros[64 * 1024] = {};
     // When set, bytes outside the two windows are fetched on demand instead of
@@ -91,13 +88,13 @@ struct WindowStream {
     std::string error;
 };
 
-la_ssize_t windowRead(archive*, void* client, const void** buffer)
-{
+la_ssize_t windowRead(archive*, void* client, const void** buffer) {
     WindowStream* stream = static_cast<WindowStream*>(client);
     if (stream->size <= 0 || stream->pos >= stream->size) return 0;
 
     const std::int64_t remaining = stream->size - stream->pos;
-    const std::int64_t headSize = static_cast<std::int64_t>(stream->head.size());
+    const std::int64_t headSize =
+        static_cast<std::int64_t>(stream->head.size());
     if (stream->pos < headSize) {
         const std::int64_t available = headSize - stream->pos;
         const la_ssize_t take = static_cast<la_ssize_t>(
@@ -107,7 +104,8 @@ la_ssize_t windowRead(archive*, void* client, const void** buffer)
         return take;
     }
 
-    const std::int64_t tailSize = static_cast<std::int64_t>(stream->tail.size());
+    const std::int64_t tailSize =
+        static_cast<std::int64_t>(stream->tail.size());
     const std::int64_t tailStart = stream->size - tailSize;
     if (stream->pos >= tailStart) {
         const std::int64_t available = stream->size - stream->pos;
@@ -154,8 +152,7 @@ la_ssize_t windowRead(archive*, void* client, const void** buffer)
     return take;
 }
 
-la_int64_t windowSkip(archive*, void* client, la_int64_t request)
-{
+la_int64_t windowSkip(archive*, void* client, la_int64_t request) {
     WindowStream* stream = static_cast<WindowStream*>(client);
     if (request <= 0) return 0;
     const std::int64_t remaining = stream->size - stream->pos;
@@ -164,8 +161,7 @@ la_int64_t windowSkip(archive*, void* client, la_int64_t request)
     return take;
 }
 
-la_int64_t windowSeek(archive*, void* client, la_int64_t offset, int whence)
-{
+la_int64_t windowSeek(archive*, void* client, la_int64_t offset, int whence) {
     WindowStream* stream = static_cast<WindowStream*>(client);
     std::int64_t target = offset;
     if (whence == SEEK_CUR) target = stream->pos + offset;
@@ -176,9 +172,7 @@ la_int64_t windowSeek(archive*, void* client, la_int64_t offset, int whence)
     return stream->pos;
 }
 
-
-std::string entryName(archive_entry* entry)
-{
+std::string entryName(archive_entry* entry) {
     const char* name = archive_entry_pathname_utf8(entry);
     if (!name) name = archive_entry_pathname(entry);
     return name ? std::string(name) : std::string();
@@ -187,14 +181,12 @@ std::string entryName(archive_entry* entry)
 // A hardlink entry carries no data of its own. Hashing it would produce the
 // digest of an empty stream, which is not the file the user thinks they picked,
 // so links are never offered as executables.
-bool isRegularFileEntry(archive_entry* entry)
-{
+bool isRegularFileEntry(archive_entry* entry) {
     return archive_entry_filetype(entry) == AE_IFREG &&
            archive_entry_hardlink(entry) == nullptr;
 }
 
-bool isEncrypted(archive_entry* entry)
-{
+bool isEncrypted(archive_entry* entry) {
 #if ARCHIVE_VERSION_NUMBER >= 3004000
     return archive_entry_is_encrypted(entry) != 0;
 #else
@@ -207,11 +199,11 @@ bool isEncrypted(archive_entry* entry)
 // encryption support unavailable", ZIP says "Passphrase required". Only used
 // when nothing at all could be listed, so it can never turn a readable archive
 // into an encrypted one.
-bool looksEncrypted(const std::string& message)
-{
+bool looksEncrypted(const std::string& message) {
     std::string lower = message;
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::transform(
+        lower.begin(), lower.end(), lower.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lower.find("encrypt") != std::string::npos ||
            lower.find("passphrase") != std::string::npos ||
            lower.find("password") != std::string::npos;
@@ -223,10 +215,8 @@ bool looksEncrypted(const std::string& message)
 
 // The header walk, shared by a file on disk and by the two-window stream. The
 // reader must already be open.
-bool readOpenArchive(archive* reader,
-                     std::vector<ArchiveInspector::Entry>& out,
-                     std::string& error, const std::atomic<bool>* cancelled)
-{
+bool readOpenArchive(archive* reader, std::vector<ArchiveInspector::Entry>& out,
+                     std::string& error, const std::atomic<bool>* cancelled) {
     archive_entry* entry = nullptr;
     int entryIndex = 0;
     int status = ARCHIVE_OK;
@@ -276,8 +266,7 @@ bool readOpenArchive(archive* reader,
 
 } // namespace
 
-bool ArchiveInspector::isAvailable()
-{
+bool ArchiveInspector::isAvailable() {
 #ifdef FTORRENT_HAVE_LIBARCHIVE
     return true;
 #else
@@ -285,8 +274,7 @@ bool ArchiveInspector::isAvailable()
 #endif
 }
 
-std::string ArchiveInspector::extensionLower(const std::string& path)
-{
+std::string ArchiveInspector::extensionLower(const std::string& path) {
     const size_t separator = path.find_last_of("/\\");
     const size_t dot = path.find_last_of('.');
     if (dot == std::string::npos ||
@@ -295,13 +283,13 @@ std::string ArchiveInspector::extensionLower(const std::string& path)
     }
 
     std::string extension = path.substr(dot);
-    std::transform(extension.begin(), extension.end(), extension.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::transform(
+        extension.begin(), extension.end(), extension.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return extension;
 }
 
-bool ArchiveInspector::canListBeforeDownload(const std::string& path)
-{
+bool ArchiveInspector::canListBeforeDownload(const std::string& path) {
     const std::string extension = extensionLower(path);
     return extension == ".rar" || extension == ".zip";
 }
@@ -309,8 +297,7 @@ bool ArchiveInspector::canListBeforeDownload(const std::string& path)
 // Shared by both listings: a file on disk and the two-window stream.
 bool ArchiveInspector::readEntries(const std::string& archivePath,
                                    std::vector<Entry>& out, std::string& error,
-                                   const std::atomic<bool>* cancelled)
-{
+                                   const std::atomic<bool>* cancelled) {
 #ifndef FTORRENT_HAVE_LIBARCHIVE
     (void)archivePath;
     (void)out;
@@ -342,8 +329,7 @@ bool ArchiveInspector::readEntries(const std::string& archivePath,
 
 ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
     std::int64_t fileSize, const std::string& head, const std::string& tail,
-    const std::atomic<bool>* cancelled, RangeFetcher fetch)
-{
+    const std::atomic<bool>* cancelled, RangeFetcher fetch) {
     ListingAll result;
 #ifndef FTORRENT_HAVE_LIBARCHIVE
     (void)fileSize;
@@ -388,9 +374,10 @@ ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
     archive_read_set_seek_callback(archive.get(), &windowSeek);
     if (archive_read_open2(archive.get(), &stream, nullptr, &windowRead,
                            &windowSkip, nullptr) != ARCHIVE_OK) {
-        result.error = stream.error.empty()
-                           ? archiveError(archive.get(), "could not open archive")
-                           : stream.error;
+        result.error =
+            stream.error.empty()
+                ? archiveError(archive.get(), "could not open archive")
+                : stream.error;
         return result;
     }
     if (!readOpenArchive(archive.get(), result.entries, result.error,
@@ -427,13 +414,11 @@ ArchiveInspector::ListingAll ArchiveInspector::listEntriesFromWindows(
 #endif
 }
 
-ArchiveInspector::ListingAll ArchiveInspector::listEntries(
-    const std::string& archivePath,
-    const std::atomic<bool>* cancelled)
-{
+ArchiveInspector::ListingAll
+ArchiveInspector::listEntries(const std::string& archivePath,
+                              const std::atomic<bool>* cancelled) {
     ListingAll result;
-    if (!readEntries(archivePath, result.entries, result.error,
-                     cancelled)) {
+    if (!readEntries(archivePath, result.entries, result.error, cancelled)) {
         return result;
     }
     result.ok = true;

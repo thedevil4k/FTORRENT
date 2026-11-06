@@ -18,8 +18,9 @@
  * catalogue, so a test can hold it down instead of it being a few lines buried
  * in MainWindow::startSearch().
  */
-std::vector<SearchEngine::Definition> searchScopeForRow(
-    const std::vector<SearchEngine::Definition>& catalogue, int row);
+std::vector<SearchEngine::Definition>
+searchScopeForRow(const std::vector<SearchEngine::Definition>& catalogue,
+                  int row);
 
 /** True for the row that asks every enabled engine at once. */
 bool isAllEnginesRow(int row);

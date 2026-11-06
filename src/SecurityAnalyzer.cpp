@@ -31,14 +31,12 @@ bool isAbsoluteLike(const std::string& path) {
     if (path[0] == '/' || path[0] == '\\') return true;
     // A Windows drive letter, absolute or drive-relative (C:foo).
     return path.size() >= 2 &&
-           std::isalpha(static_cast<unsigned char>(path[0])) &&
-           path[1] == ':';
+           std::isalpha(static_cast<unsigned char>(path[0])) && path[1] == ':';
 }
 
 bool isUncLike(const std::string& path) {
-    return path.size() >= 2 &&
-           ((path[0] == '\\' && path[1] == '\\') ||
-            (path[0] == '/' && path[1] == '/'));
+    return path.size() >= 2 && ((path[0] == '\\' && path[1] == '\\') ||
+                                (path[0] == '/' && path[1] == '/'));
 }
 
 bool hasTraversal(const std::string& path) {
@@ -83,8 +81,7 @@ bool containsBidiControl(const std::string& text) {
         {0xE2, 0x80, 0xAA}, {0xE2, 0x80, 0xAB}, {0xE2, 0x80, 0xAC},
         {0xE2, 0x80, 0xAD}, {0xE2, 0x80, 0xAE}, {0xE2, 0x80, 0x8E},
         {0xE2, 0x80, 0x8F}, {0xE2, 0x81, 0xA6}, {0xE2, 0x81, 0xA7},
-        {0xE2, 0x81, 0xA8}, {0xE2, 0x81, 0xA9}
-    };
+        {0xE2, 0x81, 0xA8}, {0xE2, 0x81, 0xA9}};
     for (const auto& sequence : sequences) {
         if (text.find(reinterpret_cast<const char*>(sequence), 0, 3) !=
             std::string::npos) {
@@ -145,19 +142,20 @@ std::string previousExtension(const std::string& path) {
 }
 
 bool containsSuspiciousKeyword(const std::string& base) {
-    static const char* const keywords[] = {
-        "crack", "keygen", "patch", "activator", "serial",
-        "nulled", "warez", "hacktool"
-    };
+    static const char* const keywords[] = {"crack",     "keygen",  "patch",
+                                           "activator", "serial",  "nulled",
+                                           "warez",     "hacktool"};
     const std::string lower = lowerAscii(base);
     for (const char* keyword : keywords) {
         const std::string word(keyword);
         std::size_t pos = lower.find(word);
         while (pos != std::string::npos) {
-            const bool leftOk = pos == 0 ||
+            const bool leftOk =
+                pos == 0 ||
                 !std::isalnum(static_cast<unsigned char>(lower[pos - 1]));
             const std::size_t after = pos + word.size();
-            const bool rightOk = after >= lower.size() ||
+            const bool rightOk =
+                after >= lower.size() ||
                 !std::isalnum(static_cast<unsigned char>(lower[after]));
             if (leftOk && rightOk) return true;
             pos = lower.find(word, pos + 1);
@@ -182,12 +180,17 @@ bool isLongPath(const std::string& path) {
 
 RiskLevel riskForSeverity(Severity severity) {
     switch (severity) {
-        case Severity::Low:      return RiskLevel::Low;
-        case Severity::Medium:   return RiskLevel::Medium;
-        case Severity::High:     return RiskLevel::High;
-        case Severity::Critical: return RiskLevel::Critical;
+        case Severity::Low:
+            return RiskLevel::Low;
+        case Severity::Medium:
+            return RiskLevel::Medium;
+        case Severity::High:
+            return RiskLevel::High;
+        case Severity::Critical:
+            return RiskLevel::Critical;
         case Severity::Info:
-        default:                 return RiskLevel::Unknown;
+        default:
+            return RiskLevel::Unknown;
     }
 }
 
@@ -234,14 +237,15 @@ void addTag(std::vector<std::string>& tags, const char* tag) {
 }
 
 // The end of a title, ignoring the padding publishers add after the file name
-// (apibay pads with spaces) and a closing bracket that wraps it ("[repack.zip]").
-// Returns the offset just past the last character that can belong to a name.
+// (apibay pads with spaces) and a closing bracket that wraps it
+// ("[repack.zip]"). Returns the offset just past the last character that can
+// belong to a name.
 std::size_t titlePathEnd(const std::string& title) {
     std::size_t end = title.size();
     while (end > 0) {
         const char last = title[end - 1];
-        if (std::isspace(static_cast<unsigned char>(last)) ||
-            last == ']' || last == ')') {
+        if (std::isspace(static_cast<unsigned char>(last)) || last == ']' ||
+            last == ')') {
             --end;
         } else {
             break;
@@ -254,27 +258,25 @@ std::size_t titlePathEnd(const std::string& title) {
 
 bool SecurityAnalyzer::isExecutablePath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".exe", ".com", ".scr", ".pif", ".cpl", ".dll", ".sys",
-        ".appimage", ".run", ".jar", ".class", ".elf", ".bin"
-    });
+    return extensionIn(extension,
+                       {".exe", ".com", ".scr", ".pif", ".cpl", ".dll", ".sys",
+                        ".appimage", ".run", ".jar", ".class", ".elf", ".bin"});
 }
 
 bool SecurityAnalyzer::isInstallerPath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".msi", ".msix", ".appx", ".msu", ".pkg", ".deb", ".rpm", ".apk"
-    });
+    return extensionIn(extension, {".msi", ".msix", ".appx", ".msu", ".pkg",
+                                   ".deb", ".rpm", ".apk"});
 }
 
 bool SecurityAnalyzer::isScriptPath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse",
-        ".wsf", ".wsh", ".hta", ".reg", ".sh", ".bash", ".zsh", ".py",
-        ".pyw", ".pl", ".rb", ".php", ".lua", ".scpt", ".applescript",
-        ".command"
-    });
+    return extensionIn(extension,
+                       {".bat", ".cmd",  ".ps1",         ".psm1",   ".vbs",
+                        ".vbe", ".js",   ".jse",         ".wsf",    ".wsh",
+                        ".hta", ".reg",  ".sh",          ".bash",   ".zsh",
+                        ".py",  ".pyw",  ".pl",          ".rb",     ".php",
+                        ".lua", ".scpt", ".applescript", ".command"});
 }
 
 bool SecurityAnalyzer::isShortcutPath(const std::string& path) {
@@ -284,25 +286,21 @@ bool SecurityAnalyzer::isShortcutPath(const std::string& path) {
 
 bool SecurityAnalyzer::isMacroDocumentPath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".pptm", ".potm",
-        ".ppsm"
-    });
+    return extensionIn(extension, {".docm", ".dotm", ".xlsm", ".xltm", ".xlam",
+                                   ".pptm", ".potm", ".ppsm"});
 }
 
 bool SecurityAnalyzer::isArchivePath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".zst",
-        ".cab", ".arj", ".lzh", ".lha"
-    });
+    return extensionIn(extension,
+                       {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
+                        ".zst", ".cab", ".arj", ".lzh", ".lha"});
 }
 
 bool SecurityAnalyzer::isDiskImagePath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".iso", ".img", ".vhd", ".vhdx", ".vmdk", ".dmg", ".wim", ".esd"
-    });
+    return extensionIn(extension, {".iso", ".img", ".vhd", ".vhdx", ".vmdk",
+                                   ".dmg", ".wim", ".esd"});
 }
 
 bool SecurityAnalyzer::isDiscImagePath(const std::string& path) {
@@ -312,19 +310,17 @@ bool SecurityAnalyzer::isDiscImagePath(const std::string& path) {
 
 bool SecurityAnalyzer::isVideoPath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".mp4", ".m4v", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm",
-        ".mpg", ".mpeg", ".m2ts", ".mts", ".vob", ".ogv", ".3gp", ".3g2",
-        ".divx", ".rm", ".rmvb", ".asf", ".f4v", ".mxf"
-    });
+    return extensionIn(extension,
+                       {".mp4",  ".m4v",  ".mkv", ".avi",  ".mov",  ".wmv",
+                        ".flv",  ".webm", ".mpg", ".mpeg", ".m2ts", ".mts",
+                        ".vob",  ".ogv",  ".3gp", ".3g2",  ".divx", ".rm",
+                        ".rmvb", ".asf",  ".f4v", ".mxf"});
 }
 
 bool SecurityAnalyzer::isNativeExecutablePath(const std::string& path) {
     const std::string extension = extensionLower(path);
-    return extensionIn(extension, {
-        ".exe", ".com", ".scr", ".pif", ".cpl",
-        ".appimage", ".run", ".elf"
-    });
+    return extensionIn(extension, {".exe", ".com", ".scr", ".pif", ".cpl",
+                                   ".appimage", ".run", ".elf"});
 }
 
 bool SecurityAnalyzer::titleSuggestsArchive(const std::string& title) {
@@ -380,8 +376,8 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
     const bool executable = isExecutablePath(file.path) || file.executable;
     const bool archive = isArchivePath(file.path);
     const bool disk = isDiskImagePath(file.path);
-    const bool runnable = script || shortcut || macro || installer ||
-                          executable;
+    const bool runnable =
+        script || shortcut || macro || installer || executable;
     assessment.runnable = runnable;
 
     std::vector<Finding>& findings = assessment.findings;
@@ -434,7 +430,7 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
     if (hasDoubleExtension(file.path)) {
         add(FindingCode::DoubleExtension, Severity::Critical,
             base + " (looks like " + previousExtension(file.path) +
-            ", runs as " + extension + ")");
+                ", runs as " + extension + ")");
     }
     if (containsBidiControl(file.path)) {
         add(FindingCode::RtlOverride, Severity::Critical, base);
@@ -446,16 +442,14 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
         add(FindingCode::NonAsciiExtension, Severity::High, base);
     }
 
-    const bool hidden = file.hidden ||
-        (!base.empty() && base[0] == '.');
+    const bool hidden = file.hidden || (!base.empty() && base[0] == '.');
     if (hidden) {
         add(FindingCode::HiddenFile, Severity::Low, base);
     }
     if (lowerAscii(base) == "autorun.inf") {
         add(FindingCode::AutorunFile, Severity::High, base);
     }
-    if (lowerAscii(base) == "desktop.ini" ||
-        lowerAscii(base) == "thumbs.db") {
+    if (lowerAscii(base) == "desktop.ini" || lowerAscii(base) == "thumbs.db") {
         add(FindingCode::SystemMetadataFile, Severity::Low, base);
     }
     if (containsSuspiciousKeyword(base)) {
@@ -463,7 +457,8 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
     }
 
     if (file.symlink || !file.symlinkPath.empty()) {
-        std::string detail = base + " -> " +
+        std::string detail =
+            base + " -> " +
             (file.symlinkPath.empty() ? "unknown target" : file.symlinkPath);
         if (isAbsoluteLike(file.symlinkPath) ||
             hasTraversal(file.symlinkPath)) {
@@ -497,7 +492,8 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
         const RiskLevel risk = riskForSeverity(finding.severity);
         if (risk > assessment.level) assessment.level = risk;
     }
-    if (assessment.level == RiskLevel::Unknown) assessment.level = RiskLevel::Low;
+    if (assessment.level == RiskLevel::Unknown)
+        assessment.level = RiskLevel::Low;
 
     std::vector<std::string>& tags = assessment.tags;
     if (script) addTag(tags, "SCRIPT");
@@ -511,32 +507,58 @@ FileAssessment SecurityAnalyzer::assessFile(const SecurityFile& file) {
 
     for (const Finding& finding : findings) {
         switch (finding.code) {
-            case FindingCode::DoubleExtension: addTag(tags, "DOUBLE EXT"); break;
-            case FindingCode::RtlOverride:     addTag(tags, "RTL"); break;
-            case FindingCode::ControlCharacter:addTag(tags, "CONTROL"); break;
-            case FindingCode::NonAsciiExtension:addTag(tags, "NON-ASCII"); break;
+            case FindingCode::DoubleExtension:
+                addTag(tags, "DOUBLE EXT");
+                break;
+            case FindingCode::RtlOverride:
+                addTag(tags, "RTL");
+                break;
+            case FindingCode::ControlCharacter:
+                addTag(tags, "CONTROL");
+                break;
+            case FindingCode::NonAsciiExtension:
+                addTag(tags, "NON-ASCII");
+                break;
             case FindingCode::PathTraversal:
             case FindingCode::AbsolutePath:
             case FindingCode::UncPath:
             case FindingCode::ReservedName:
             case FindingCode::TrailingDotOrSpace:
-            case FindingCode::LongPath:        addTag(tags, "PATH"); break;
-            case FindingCode::HiddenFile:      addTag(tags, "HIDDEN"); break;
-            case FindingCode::AutorunFile:     addTag(tags, "AUTORUN"); break;
-            case FindingCode::SystemMetadataFile: addTag(tags, "SYSTEM"); break;
-            case FindingCode::SuspiciousKeyword: addTag(tags, "SUSPICIOUS"); break;
-            case FindingCode::Symlink:         addTag(tags, "SYMLINK"); break;
-            case FindingCode::RootExecutable:  addTag(tags, "ROOT"); break;
+            case FindingCode::LongPath:
+                addTag(tags, "PATH");
+                break;
+            case FindingCode::HiddenFile:
+                addTag(tags, "HIDDEN");
+                break;
+            case FindingCode::AutorunFile:
+                addTag(tags, "AUTORUN");
+                break;
+            case FindingCode::SystemMetadataFile:
+                addTag(tags, "SYSTEM");
+                break;
+            case FindingCode::SuspiciousKeyword:
+                addTag(tags, "SUSPICIOUS");
+                break;
+            case FindingCode::Symlink:
+                addTag(tags, "SYMLINK");
+                break;
+            case FindingCode::RootExecutable:
+                addTag(tags, "ROOT");
+                break;
             case FindingCode::ZeroByteExecutable:
-            case FindingCode::SizeTypeMismatch:addTag(tags, "SIZE"); break;
-            default: break;
+            case FindingCode::SizeTypeMismatch:
+                addTag(tags, "SIZE");
+                break;
+            default:
+                break;
         }
     }
 
     return assessment;
 }
 
-SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files) {
+SecurityReport
+SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files) {
     SecurityReport report;
     bool shaIsRunnable = false;
     if (files.empty()) {
@@ -598,8 +620,8 @@ SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files)
     if (report.executables >= 3) {
         Finding finding;
         finding.code = FindingCode::ManyExecutables;
-        finding.severity = report.executables >= 6 ? Severity::High
-                                                   : Severity::Medium;
+        finding.severity =
+            report.executables >= 6 ? Severity::High : Severity::Medium;
         finding.fileIndex = -1;
         finding.detail = countLabel(report.executables, "executable file",
                                     "executable files");
@@ -616,8 +638,8 @@ SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files)
 
     std::vector<std::string> parts;
     if (report.executables > 0) {
-        parts.push_back(countLabel(report.executables, "executable",
-                                   "executables"));
+        parts.push_back(
+            countLabel(report.executables, "executable", "executables"));
     }
     if (report.scripts > 0) {
         parts.push_back(countLabel(report.scripts, "script", "scripts"));
@@ -653,52 +675,85 @@ SecurityReport SecurityAnalyzer::analyze(const std::vector<SecurityFile>& files)
     return report;
 }
 
-std::vector<std::string> SecurityAnalyzer::tagsForFile(
-    const SecurityFile& file) {
+std::vector<std::string>
+SecurityAnalyzer::tagsForFile(const SecurityFile& file) {
     return assessFile(file).tags;
 }
 
 std::string SecurityAnalyzer::findingTitle(FindingCode code) {
     switch (code) {
-        case FindingCode::Executable:         return "Executable file";
-        case FindingCode::Installer:          return "Installer";
-        case FindingCode::Script:             return "Script";
-        case FindingCode::Shortcut:           return "Shortcut";
-        case FindingCode::MacroDocument:      return "Macro-enabled document";
-        case FindingCode::Archive:            return "Archive";
-        case FindingCode::DiskImage:          return "Disk image";
-        case FindingCode::DoubleExtension:    return "Double extension";
-        case FindingCode::RtlOverride:        return "Right-to-left override";
-        case FindingCode::ControlCharacter:   return "Control character";
-        case FindingCode::NonAsciiExtension:  return "Non-ASCII extension";
-        case FindingCode::PathTraversal:      return "Path traversal";
-        case FindingCode::AbsolutePath:       return "Absolute path";
-        case FindingCode::UncPath:            return "UNC path";
-        case FindingCode::ReservedName:       return "Windows reserved name";
-        case FindingCode::TrailingDotOrSpace: return "Trailing dot or space";
-        case FindingCode::HiddenFile:         return "Hidden file";
-        case FindingCode::AutorunFile:        return "Autorun file";
-        case FindingCode::SystemMetadataFile: return "System metadata file";
-        case FindingCode::SuspiciousKeyword:  return "Suspicious name";
-        case FindingCode::Symlink:            return "Symlink";
-        case FindingCode::RootExecutable:     return "Executable at torrent root";
-        case FindingCode::ManyExecutables:    return "Many executables";
-        case FindingCode::ZeroByteExecutable: return "Zero-byte executable";
-        case FindingCode::SizeTypeMismatch:   return "Suspiciously small executable";
-        case FindingCode::LongPath:           return "Long path";
+        case FindingCode::Executable:
+            return "Executable file";
+        case FindingCode::Installer:
+            return "Installer";
+        case FindingCode::Script:
+            return "Script";
+        case FindingCode::Shortcut:
+            return "Shortcut";
+        case FindingCode::MacroDocument:
+            return "Macro-enabled document";
+        case FindingCode::Archive:
+            return "Archive";
+        case FindingCode::DiskImage:
+            return "Disk image";
+        case FindingCode::DoubleExtension:
+            return "Double extension";
+        case FindingCode::RtlOverride:
+            return "Right-to-left override";
+        case FindingCode::ControlCharacter:
+            return "Control character";
+        case FindingCode::NonAsciiExtension:
+            return "Non-ASCII extension";
+        case FindingCode::PathTraversal:
+            return "Path traversal";
+        case FindingCode::AbsolutePath:
+            return "Absolute path";
+        case FindingCode::UncPath:
+            return "UNC path";
+        case FindingCode::ReservedName:
+            return "Windows reserved name";
+        case FindingCode::TrailingDotOrSpace:
+            return "Trailing dot or space";
+        case FindingCode::HiddenFile:
+            return "Hidden file";
+        case FindingCode::AutorunFile:
+            return "Autorun file";
+        case FindingCode::SystemMetadataFile:
+            return "System metadata file";
+        case FindingCode::SuspiciousKeyword:
+            return "Suspicious name";
+        case FindingCode::Symlink:
+            return "Symlink";
+        case FindingCode::RootExecutable:
+            return "Executable at torrent root";
+        case FindingCode::ManyExecutables:
+            return "Many executables";
+        case FindingCode::ZeroByteExecutable:
+            return "Zero-byte executable";
+        case FindingCode::SizeTypeMismatch:
+            return "Suspiciously small executable";
+        case FindingCode::LongPath:
+            return "Long path";
         case FindingCode::Unknown:
-        default:                              return "Metadata finding";
+        default:
+            return "Metadata finding";
     }
 }
 
 std::string SecurityAnalyzer::severityLabel(Severity severity) {
     switch (severity) {
-        case Severity::Info:     return "Info";
-        case Severity::Low:      return "Low";
-        case Severity::Medium:   return "Medium";
-        case Severity::High:     return "High";
-        case Severity::Critical: return "Critical";
-        default:                 return "Info";
+        case Severity::Info:
+            return "Info";
+        case Severity::Low:
+            return "Low";
+        case Severity::Medium:
+            return "Medium";
+        case Severity::High:
+            return "High";
+        case Severity::Critical:
+            return "Critical";
+        default:
+            return "Info";
     }
 }
 

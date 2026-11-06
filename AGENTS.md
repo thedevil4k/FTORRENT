@@ -143,8 +143,9 @@ The owner of each rule:
 - **Names:** `PascalCase` types, `camelCase` functions and locals, `m_` members,
   `SCREAMING_SNAKE` constants. Files are named after their primary type.
 - **Formatting:** 4 spaces, 80 columns, one statement per line. `.clang-format`
-  describes the current style; do not reformat a whole file in a behaviour
-  commit.
+  describes the current style, and the tree is formatted with it: a
+  `clang-format --dry-run` over `src/` and `tests/` reports nothing. Do not
+  reformat a whole file in a behaviour commit.
 - **Errors:** a library function returns `false` and fills a human-readable
   reason; UI code prefixes it with what was being attempted. Do not swallow an
   exception without a comment saying why the failure is irrelevant.

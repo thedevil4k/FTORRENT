@@ -19,7 +19,8 @@ public:
      * @brief Async fetch public IP and country code.
      * @param callback Called with (ip, countryCode). E.g. ("x.y.z.w", "ES")
      */
-    static void fetchPublicIpAndCountry(std::function<void(std::string, std::string)> callback);
+    static void fetchPublicIpAndCountry(
+        std::function<void(std::string, std::string)> callback);
 
     /**
      * @brief Get the standard configuration directory for the current OS

@@ -43,9 +43,11 @@ std::string readFile(const fs::path& path) {
                        std::istreambuf_iterator<char>());
 }
 
-std::vector<std::string> namesOf(const std::vector<ArchiveInspector::Entry>& entries) {
+std::vector<std::string>
+namesOf(const std::vector<ArchiveInspector::Entry>& entries) {
     std::vector<std::string> names;
-    for (const ArchiveInspector::Entry& entry : entries) names.push_back(entry.path);
+    for (const ArchiveInspector::Entry& entry : entries)
+        names.push_back(entry.path);
     return names;
 }
 
@@ -63,9 +65,12 @@ int main() {
     }
     {
         // A file aligned to a piece boundary and spanning three pieces.
-        const auto r = ArchivePreflight::computeRange(16384, 40000, 16384, 200000);
-        ok(r.firstPiece == 1, "the first piece is the one holding the first byte");
-        ok(r.firstOffset == 0, "an aligned file starts at offset 0 in its piece");
+        const auto r =
+            ArchivePreflight::computeRange(16384, 40000, 16384, 200000);
+        ok(r.firstPiece == 1,
+           "the first piece is the one holding the first byte");
+        ok(r.firstOffset == 0,
+           "an aligned file starts at offset 0 in its piece");
         ok(r.firstLength == 16384, "the first piece is read whole");
         ok(r.lastPiece == 3, "the last piece is the one holding the last byte");
         ok(r.lastOffset == 0, "the last piece starts with file bytes here");
@@ -74,7 +79,8 @@ int main() {
     }
     {
         // A file that starts in the middle of a piece.
-        const auto r = ArchivePreflight::computeRange(20000, 1000, 16384, 100000);
+        const auto r =
+            ArchivePreflight::computeRange(20000, 1000, 16384, 100000);
         ok(r.firstPiece == 1 && r.firstOffset == 20000 - 16384,
            "a file that starts mid-piece is sliced at its own offset");
         ok(r.firstLength == 1000, "the whole file fits in that piece");
@@ -114,7 +120,7 @@ int main() {
                     static_cast<std::int64_t>(bytes.size()),
                     bytes.substr(0, std::min(window, bytes.size())),
                     bytes.substr(bytes.size() > window ? bytes.size() - window
-                                                      : 0));
+                                                       : 0));
             ok(fromFull.ok, std::string("the whole file lists: ") + name);
             ok(fromWindows.ok == fromFull.ok,
                std::string("the two windows list it too: ") + name);
@@ -128,11 +134,12 @@ int main() {
 
         ok(!ArchiveInspector::listEntriesFromWindows(0, "", "").ok,
            "an empty file is refused");
-        ok(!ArchiveInspector::listEntriesFromWindows(
-                   100, std::string(200, 'x'), std::string()).ok,
+        ok(!ArchiveInspector::listEntriesFromWindows(100, std::string(200, 'x'),
+                                                     std::string())
+                .ok,
            "windows larger than the file are refused");
-        ok(!ArchiveInspector::listEntriesFromWindows(16, "not an archive",
-                                                     "").ok,
+        ok(!ArchiveInspector::listEntriesFromWindows(16, "not an archive", "")
+                .ok,
            "bytes that are not an archive are refused");
     }
 
@@ -166,7 +173,8 @@ int main() {
                         if (offset < 0 ||
                             static_cast<std::size_t>(offset) + length >
                                 bytes.size()) {
-                            error = "the test fetcher was asked outside the file";
+                            error =
+                                "the test fetcher was asked outside the file";
                             return false;
                         }
                         out.assign(bytes, static_cast<std::size_t>(offset),
@@ -187,9 +195,8 @@ int main() {
                    std::string("the lazy listing is not empty: ") + name);
             }
 
-            const std::size_t unique =
-                static_cast<std::size_t>(std::count(touched.begin(),
-                                                    touched.end(), 1));
+            const std::size_t unique = static_cast<std::size_t>(
+                std::count(touched.begin(), touched.end(), 1));
             ok(fetched > 0 && unique > 0,
                std::string("the walk asked for header bytes: ") + name);
             if (std::string(name) == "test_read_format_rar_filter.rar") {
@@ -197,8 +204,8 @@ int main() {
                    "the walk does not need every byte of the RAR4");
             }
             if (std::string(name) == "test_read_format_rar_binary_data.rar") {
-                // The 1 MB payload is skipped; only the headers and libarchive's
-                // read-ahead are touched.
+                // The 1 MB payload is skipped; only the headers and
+                // libarchive's read-ahead are touched.
                 ok(unique < bytes.size() / 2,
                    "the walk skips most of the compressed data");
             }
@@ -219,8 +226,7 @@ int main() {
                         std::string& out, std::string& error) {
                         if (firstCall) {
                             firstCall = false;
-                            out.assign(bytes,
-                                       static_cast<std::size_t>(offset),
+                            out.assign(bytes, static_cast<std::size_t>(offset),
                                        length);
                             return true;
                         }
@@ -234,9 +240,8 @@ int main() {
 
         // Encrypted headers: nothing can be listed, and the reader must say so
         // in a way the lock badge can use instead of reporting a broken file.
-        const fs::path encrypted =
-            fs::path(FTORRENT_ARCHIVE_FIXTURES) /
-            "test_read_format_rar_encryption_header.rar";
+        const fs::path encrypted = fs::path(FTORRENT_ARCHIVE_FIXTURES) /
+                                   "test_read_format_rar_encryption_header.rar";
         const std::string encryptedBytes = readFile(encrypted);
         ok(!encryptedBytes.empty(), "the encrypted-header fixture is present");
         if (!encryptedBytes.empty()) {
@@ -278,8 +283,7 @@ int main() {
         // never makes things worse; the tail is what recovers the entries the
         // local headers cannot describe. Asserting "at least as many" is the
         // property the preflight actually depends on.
-        const fs::path full =
-            fs::path(FTORRENT_ARCHIVE_FIXTURES) / "setup.zip";
+        const fs::path full = fs::path(FTORRENT_ARCHIVE_FIXTURES) / "setup.zip";
         const std::string bytes = readFile(full);
         if (!bytes.empty()) {
             const std::size_t window = 65536;
@@ -293,7 +297,7 @@ int main() {
                     static_cast<std::int64_t>(bytes.size()),
                     bytes.substr(0, std::min(window, bytes.size())),
                     bytes.substr(bytes.size() > window ? bytes.size() - window
-                                                      : 0));
+                                                       : 0));
             ok(!bothListing.ok || !headListing.ok ||
                    bothListing.entries.size() >= headListing.entries.size(),
                "adding the tail never hides entries the head already showed");

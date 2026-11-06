@@ -12,16 +12,14 @@
 #include <string>
 #include <vector>
 
-const SearchResultsWidget::ColumnInfo SearchResultsWidget::COLUMN_INFO[COL_COUNT] = {
-    {"",         24, FL_ALIGN_CENTER},
-    {"Name",     400, FL_ALIGN_LEFT},
-    {"Size",     110, FL_ALIGN_RIGHT},
-    {"Seeders",   90, FL_ALIGN_RIGHT},
-    {"Leechers",  90, FL_ALIGN_RIGHT},
-    {"Source",   120, FL_ALIGN_LEFT}
-};
+const SearchResultsWidget::ColumnInfo
+    SearchResultsWidget::COLUMN_INFO[COL_COUNT] = {
+        {"", 24, FL_ALIGN_CENTER},        {"Name", 400, FL_ALIGN_LEFT},
+        {"Size", 110, FL_ALIGN_RIGHT},    {"Seeders", 90, FL_ALIGN_RIGHT},
+        {"Leechers", 90, FL_ALIGN_RIGHT}, {"Source", 120, FL_ALIGN_LEFT}};
 
-SearchResultsWidget::SearchResultsWidget(int x, int y, int w, int h, const char* label)
+SearchResultsWidget::SearchResultsWidget(int x, int y, int w, int h,
+                                         const char* label)
     : Fl_Table_Row(x, y, w, h, label)
     , m_sortColumn(COL_SEEDERS)
     // Descending: the most seeded (usable) torrents come first. Zero-seeder
@@ -30,13 +28,12 @@ SearchResultsWidget::SearchResultsWidget(int x, int y, int w, int h, const char*
     // descending, and the header indicator shows its ▼ from the start.
     , m_sortAscending(false)
     , m_headerBg(FL_LIGHT2)
-    , m_oddRowColor(fl_rgb_color(248, 248, 248))
-{
+    , m_oddRowColor(fl_rgb_color(248, 248, 248)) {
     initializeColumns();
-    
+
     type(SELECT_SINGLE);
     when(FL_WHEN_RELEASE);
-    
+
     // See TorrentListWidget: the per-widget scrollbar_size() needs the
     // extended FLTK 1.3 ABI, so fall back to the global setter there.
 #if defined(FLTK_ABI_VERSION) && FLTK_ABI_VERSION >= 10301
@@ -46,7 +43,7 @@ SearchResultsWidget::SearchResultsWidget(int x, int y, int w, int h, const char*
 #endif
     vscrollbar->box(FL_FLAT_BOX);
     hscrollbar->box(FL_FLAT_BOX);
-    
+
     end();
 }
 
@@ -66,14 +63,14 @@ void SearchResultsWidget::initializeColumns() {
     cols(COL_COUNT);
     col_header(1);
     col_resize(1);
-    
+
     for (int i = 0; i < COL_COUNT; i++) {
         col_width(i, COLUMN_INFO[i].width);
     }
-    
+
     row_height_all(BASE_ROW_HEIGHT);
     row_header(0);
-    
+
     layoutColumns();
 }
 
@@ -105,9 +102,10 @@ void SearchResultsWidget::setResults(const std::vector<SearchResult>& results) {
     redraw();
 }
 
-void SearchResultsWidget::appendResults(const std::vector<SearchResult>& results) {
+void SearchResultsWidget::appendResults(
+    const std::vector<SearchResult>& results) {
     if (results.empty()) return;
-    
+
     m_results.insert(m_results.end(), results.begin(), results.end());
     updateSortedIndices();
     rows(m_results.size());
@@ -158,9 +156,11 @@ void SearchResultsWidget::applyTheme(bool darkMode) {
         m_headerBg = FL_LIGHT2;
         m_oddRowColor = fl_rgb_color(248, 248, 248);
     }
-    
-    Fl_Color trough = darkMode ? fl_rgb_color(45, 45, 45) : fl_rgb_color(232, 232, 232);
-    Fl_Color knob = darkMode ? fl_rgb_color(120, 120, 120) : fl_rgb_color(150, 150, 150);
+
+    Fl_Color trough =
+        darkMode ? fl_rgb_color(45, 45, 45) : fl_rgb_color(232, 232, 232);
+    Fl_Color knob =
+        darkMode ? fl_rgb_color(120, 120, 120) : fl_rgb_color(150, 150, 150);
     if (vscrollbar) {
         vscrollbar->color(trough);
         vscrollbar->selection_color(knob);
@@ -180,11 +180,11 @@ void SearchResultsWidget::draw() {
 
 void SearchResultsWidget::drawHeader(int col, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
-    
+
     fl_color(FL_BACKGROUND_COLOR);
     fl_rectf(x, y, w, h);
     fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, m_headerBg);
-    
+
     if (col >= 0 && col < COL_COUNT) {
         fl_color(FL_FOREGROUND_COLOR);
         fl_font(FL_HELVETICA_BOLD, 12);
@@ -192,7 +192,7 @@ void SearchResultsWidget::drawHeader(int col, int x, int y, int w, int h) {
         if (col == m_sortColumn) label += m_sortAscending ? " ▲" : " ▼";
         fl_draw(label.c_str(), x + 5, y, w - 10, h, COLUMN_INFO[col].alignment);
     }
-    
+
     fl_pop_clip();
 }
 
@@ -253,7 +253,8 @@ void SearchResultsWidget::drawExpandCell(int row, int x, int y, int w, int) {
     FileListService::Entry rf = filesForRow(row);
 
     Fl_Color fg = FL_FOREGROUND_COLOR;
-    if (rf.state == FileListState::Loading || rf.state == FileListState::Queued) {
+    if (rf.state == FileListState::Loading ||
+        rf.state == FileListState::Queued) {
         fg = fl_rgb_color(140, 140, 140);
     }
 
@@ -266,43 +267,55 @@ void SearchResultsWidget::drawExpandCell(int row, int x, int y, int w, int) {
     // Three lines rather than fl_polygon(): the shape stays the same on every
     // FLTK backend, including the ones that rasterise fills differently.
     fl_color(fg);
-    if (expanded) {           // pointing down
+    if (expanded) { // pointing down
         fl_line(cx - s, cy - s / 2, cx + s, cy - s / 2);
         fl_line(cx + s, cy - s / 2, cx, cy + s);
         fl_line(cx, cy + s, cx - s, cy - s / 2);
-    } else {                  // pointing right
+    } else { // pointing right
         fl_line(cx - s / 2, cy - s, cx - s / 2, cy + s);
         fl_line(cx - s / 2, cy + s, cx + s, cy);
         fl_line(cx + s, cy, cx - s / 2, cy - s);
     }
 }
 
-void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h) {
+void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w,
+                                   int h) {
     const SearchResult* r = getResultAt(row);
     if (!r) return;
-    
+
     fl_push_clip(x, y, w, h);
-    
+
     fl_color(row % 2 ? m_oddRowColor : FL_BACKGROUND2_COLOR);
     fl_rectf(x, y, w, h);
-    
+
     fl_color(FL_FOREGROUND_COLOR);
     fl_font(FL_HELVETICA, 12);
-    
+
     if (col == COL_EXPAND) {
         drawExpandCell(row, x, y, w, h);
         fl_pop_clip();
         return;
     }
-    
+
     std::string text;
     switch (col) {
-        case COL_NAME:     text = r->name; break;
-        case COL_SIZE:     text = r->size > 0 ? Format::bytes(r->size) : "?"; break;
-        case COL_SEEDERS:  text = r->seeders >= 0 ? std::to_string(r->seeders) : "?"; break;
-        case COL_LEECHERS: text = r->leechers >= 0 ? std::to_string(r->leechers) : "?"; break;
-        case COL_SOURCE:   text = r->source; break;
-        default: break;
+        case COL_NAME:
+            text = r->name;
+            break;
+        case COL_SIZE:
+            text = r->size > 0 ? Format::bytes(r->size) : "?";
+            break;
+        case COL_SEEDERS:
+            text = r->seeders >= 0 ? std::to_string(r->seeders) : "?";
+            break;
+        case COL_LEECHERS:
+            text = r->leechers >= 0 ? std::to_string(r->leechers) : "?";
+            break;
+        case COL_SOURCE:
+            text = r->source;
+            break;
+        default:
+            break;
     }
 
     // Pixel-measured ellipsis: full absolute name when the maximised Name
@@ -342,8 +355,7 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
         };
         const BadgePlan plan[] = {
             {ContentBadge::Archive, report.archives > 0,
-             !fileListKnown &&
-                 SecurityAnalyzer::titleSuggestsArchive(r->name)},
+             !fileListKnown && SecurityAnalyzer::titleSuggestsArchive(r->name)},
             // The lock never comes from the title or from the torrent's file
             // list: only a completed archive check that found entries asking
             // for a password can raise it.
@@ -356,8 +368,7 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
             {ContentBadge::Video, report.videos > 0, false},
             {ContentBadge::NativeExecutable, report.nativeExecutables > 0,
              !fileListKnown &&
-                 SecurityAnalyzer::titleSuggestsNativeExecutable(r->name)}
-        };
+                 SecurityAnalyzer::titleSuggestsNativeExecutable(r->name)}};
         for (const BadgePlan& item : plan) {
             if (!item.confirmed && !item.hinted) continue;
             Fl_Image* badge = badgeIcon(item.badge, item.hinted);
@@ -382,14 +393,14 @@ void SearchResultsWidget::drawCell(int row, int col, int x, int y, int w, int h)
     fl_draw(text.c_str(), textX, y, textW, topH, align);
 
     if (col == COL_NAME) drawFileList(row, x, y, w, h);
-    
+
     fl_pop_clip();
 }
 
 bool SearchResultsWidget::compareResults(int idx1, int idx2) const {
     const SearchResult& a = m_results[idx1];
     const SearchResult& b = m_results[idx2];
-    
+
     int result = 0;
     switch (m_sortColumn) {
         case COL_NAME:
@@ -399,10 +410,13 @@ bool SearchResultsWidget::compareResults(int idx1, int idx2) const {
             result = (a.size < b.size) ? -1 : (a.size > b.size ? 1 : 0);
             break;
         case COL_SEEDERS:
-            result = (a.seeders < b.seeders) ? -1 : (a.seeders > b.seeders ? 1 : 0);
+            result =
+                (a.seeders < b.seeders) ? -1 : (a.seeders > b.seeders ? 1 : 0);
             break;
         case COL_LEECHERS:
-            result = (a.leechers < b.leechers) ? -1 : (a.leechers > b.leechers ? 1 : 0);
+            result = (a.leechers < b.leechers)
+                         ? -1
+                         : (a.leechers > b.leechers ? 1 : 0);
             break;
         case COL_SOURCE:
             result = a.source.compare(b.source);
@@ -481,9 +495,9 @@ int SearchResultsWidget::handle(int event) {
         redraw();
         return 1;
     }
-    
+
     int result = Fl_Table_Row::handle(event);
-    
+
     // Click on a column header: sort by it
     if (event == FL_RELEASE && callback_context() == CONTEXT_COL_HEADER) {
         if (Fl::event_is_click()) {
@@ -499,13 +513,15 @@ int SearchResultsWidget::handle(int event) {
                 updateSortedIndices();
                 // Expansion follows the torrent, not the row, but the heights
                 // are stored per row and the rows have just been permuted.
-                forEachRow([this](int row, const SearchResult&) { updateRowHeight(row); });
+                forEachRow([this](int row, const SearchResult&) {
+                    updateRowHeight(row);
+                });
                 redraw();
                 return 1;
             }
         }
     }
-    
+
     // Click on the toggle: open or close the file list. Handled before the
     // download shortcut so a double click on the arrow never starts a
     // download the user did not ask for.
@@ -516,7 +532,7 @@ int SearchResultsWidget::handle(int event) {
         }
         return 1;
     }
-    
+
     // Double-click: download the clicked result.
     // Uses callback_row(), not selectedRow(): on Windows the second PUSH of a
     // double-click can arrive before Fl_Table_Row moves the selection, so
@@ -530,7 +546,7 @@ int SearchResultsWidget::handle(int event) {
             const SearchResult* r = getResultAt(clicked);
             if (r && m_onDownload) {
                 select_row(clicked, 1);
-                SearchResult copy = *r;  // modal dialog spins Fl::wait()
+                SearchResult copy = *r; // modal dialog spins Fl::wait()
                 // Whatever this row already resolved (empty if never expanded
                 // or failed): same order the dialog and libtorrent use.
                 FileListService::Entry rf = filesForRow(clicked);

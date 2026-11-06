@@ -107,9 +107,9 @@ int main() {
     ok(SecurityBadge::riskLabel(RiskLevel::High) == "High risk", "high label");
     ok(SecurityBadge::riskLabel(RiskLevel::Critical) == "Critical risk",
        "critical label");
-    for (RiskLevel level : {RiskLevel::Unknown, RiskLevel::Low,
-                            RiskLevel::Medium, RiskLevel::High,
-                            RiskLevel::Critical}) {
+    for (RiskLevel level :
+         {RiskLevel::Unknown, RiskLevel::Low, RiskLevel::Medium,
+          RiskLevel::High, RiskLevel::Critical}) {
         ok(SecurityBadge::riskLabel(level) != "Safe",
            "no risk level is ever labelled safe");
     }
@@ -140,15 +140,20 @@ int main() {
     section("display text");
     ok(SecurityBadge::displayText("readme.txt") == "readme.txt",
        "ordinary text is untouched");
-    ok(SecurityBadge::displayText(std::string("a\x01" "b")) == "a?b",
+    ok(SecurityBadge::displayText(std::string("a\x01"
+                                              "b")) == "a?b",
        "an ASCII control character is replaced");
-    ok(SecurityBadge::displayText(std::string("a\x7f" "b")) == "a?b",
+    ok(SecurityBadge::displayText(std::string("a\x7f"
+                                              "b")) == "a?b",
        "DEL is replaced");
-    ok(SecurityBadge::displayText(std::string("a\xE2\x80\xAE" "b")) == "a?b",
+    ok(SecurityBadge::displayText(std::string("a\xE2\x80\xAE"
+                                              "b")) == "a?b",
        "a right-to-left override is replaced");
-    ok(SecurityBadge::displayText(std::string("a\xE2\x81\xA6" "b")) == "a?b",
+    ok(SecurityBadge::displayText(std::string("a\xE2\x81\xA6"
+                                              "b")) == "a?b",
        "an isolate control is replaced");
-    ok(SecurityBadge::displayText(std::string("a\xD8\x9C" "b")) == "a?b",
+    ok(SecurityBadge::displayText(std::string("a\xD8\x9C"
+                                              "b")) == "a?b",
        "the Arabic letter mark is replaced");
     ok(SecurityBadge::displayText(std::string("caf\xC3\xA9")) ==
            std::string("caf\xC3\xA9"),
@@ -197,9 +202,9 @@ int main() {
     }
 
     section("drawing");
-    for (RiskLevel level : {RiskLevel::Unknown, RiskLevel::Low,
-                            RiskLevel::Medium, RiskLevel::High,
-                            RiskLevel::Critical}) {
+    for (RiskLevel level :
+         {RiskLevel::Unknown, RiskLevel::Low, RiskLevel::Medium,
+          RiskLevel::High, RiskLevel::Critical}) {
         const int painted = paintedPixels(level);
         ok(painted > 100, "the shield paints a visible shape");
     }

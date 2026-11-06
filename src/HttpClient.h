@@ -24,7 +24,7 @@ public:
     struct Response {
         bool ok = false;
         std::string body;
-        std::string error;     // Human readable reason when ok == false
+        std::string error; // Human readable reason when ok == false
         long httpStatus = 0;
     };
 
@@ -40,9 +40,10 @@ public:
     // after the current request finishes.
     using StopCheck = std::function<bool()>;
 
-    // Reports download progress as (bytesSoFar, totalOrMinusOne). Called at most
-    // a few times per second; total is -1 when the server did not announce it.
-    // This is what drives progress bars while a plugin or torrent is fetched.
+    // Reports download progress as (bytesSoFar, totalOrMinusOne). Called at
+    // most a few times per second; total is -1 when the server did not announce
+    // it. This is what drives progress bars while a plugin or torrent is
+    // fetched.
     using ProgressCallback = std::function<void(int64_t, int64_t)>;
 
     // Performs a GET. Redirects are followed unless the caller says otherwise.
@@ -57,8 +58,7 @@ public:
     // whatever header the caller sent (an API key, for instance) to a host the
     // caller never chose, so a provider request passes false and treats a 3xx
     // answer as a failure.
-    static Response get(const std::string& url,
-                        const std::string& userAgent,
+    static Response get(const std::string& url, const std::string& userAgent,
                         int timeoutSeconds = 15,
                         const StopCheck& shouldStop = nullptr,
                         const ProgressCallback& onProgress = nullptr,
@@ -71,8 +71,7 @@ public:
     // for the reason above.
     static Response postForm(const std::string& url,
                              const std::string& userAgent,
-                             const std::string& body,
-                             int timeoutSeconds = 15,
+                             const std::string& body, int timeoutSeconds = 15,
                              const StopCheck& shouldStop = nullptr,
                              int connectTimeoutSeconds = 10,
                              const std::vector<Header>& headers = {},

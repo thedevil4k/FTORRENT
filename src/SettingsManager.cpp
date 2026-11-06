@@ -9,7 +9,8 @@
 
 // User agent reported to trackers. The version comes from the build, so it is
 // bumped by project(FTorrent VERSION ...) and nowhere else.
-static const std::string DEFAULT_USER_AGENT = Version::defaultTrackerUserAgent();
+static const std::string DEFAULT_USER_AGENT =
+    Version::defaultTrackerUserAgent();
 
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;
@@ -38,7 +39,7 @@ bool SettingsManager::load() {
     }
 
     file.close();
-    
+
     // The theme is not a setting any more, but parseLine() keeps every key it
     // reads, so a DarkMode left by an older build would be written back on
     // every save and the file would keep advertising something the app ignores.
@@ -47,9 +48,10 @@ bool SettingsManager::load() {
     for (auto it = m_settings.begin(); it != m_settings.end();) {
         std::string key = it->first;
         for (char& c : key) c = (char)std::tolower((unsigned char)c);
-        if (key == "darkmode") it = m_settings.erase(it); else ++it;
+        if (key == "darkmode") it = m_settings.erase(it);
+        else ++it;
     }
-    
+
     migrateUserAgent();
     return true;
 }
@@ -60,11 +62,10 @@ bool SettingsManager::load() {
 // old naming scheme for the current one on load.
 void SettingsManager::migrateUserAgent() {
     std::string agent = getUserAgent();
-    
+
     // Old scheme looked like "FTorrent/0.1.0"
-    bool isLegacy = agent.empty()
-                 || agent.compare(0, 8, "FTorrent") == 0;
-    
+    bool isLegacy = agent.empty() || agent.compare(0, 8, "FTorrent") == 0;
+
     if (isLegacy) {
         setUserAgent(DEFAULT_USER_AGENT);
         save();
@@ -78,7 +79,7 @@ bool SettingsManager::save() {
     }
 
     file << "# FTorrent Settings\n\n";
-    
+
     for (const auto& pair : m_settings) {
         file << pair.first << "=" << pair.second << "\n";
     }
@@ -92,19 +93,19 @@ void SettingsManager::setDefaults() {
     setDefaultSavePath(SystemUtils::getDefaultDownloadsDir());
     setStartWithSystem(false);
     setMinimizeToTray(false);
-    
+
     // Network
     setMaxDownloadRate(0); // Unlimited
-    setMaxUploadRate(0); // Unlimited
+    setMaxUploadRate(0);   // Unlimited
     setMaxConnections(200);
     setListenPort(6881);
-    
+
     // BitTorrent
     setDHTEnabled(true);
     setPEXEnabled(true);
     setLSDEnabled(true);
     setUPnPEnabled(true);
-    
+
     // UI
     setWindowWidth(1024);
     setWindowHeight(768);
@@ -118,20 +119,21 @@ void SettingsManager::setDefaults() {
     // not contact anything until the user asks for it. The checkbox in
     // Preferences turns it on.
     setShowPublicIp(false);
-    
+
     // Advanced
     setUserAgent(DEFAULT_USER_AGENT);
 }
 
 std::string SettingsManager::getConfigPath() const {
     std::string dir = SystemUtils::getConfigDir();
-    std::string filename = SystemUtils::isWindows() ? "\\settings.ini" : "/settings.ini";
+    std::string filename =
+        SystemUtils::isWindows() ? "\\settings.ini" : "/settings.ini";
     return dir + filename;
 }
 
 void SettingsManager::parseLine(const std::string& line) {
     std::string trimmed = trim(line);
-    
+
     // Skip empty lines and comments
     if (trimmed.empty() || trimmed[0] == '#') {
         return;
@@ -145,7 +147,7 @@ void SettingsManager::parseLine(const std::string& line) {
 
     std::string key = trim(trimmed.substr(0, pos));
     std::string value = trim(trimmed.substr(pos + 1));
-    
+
     m_settings[key] = value;
 }
 
@@ -154,18 +156,20 @@ std::string SettingsManager::trim(const std::string& str) const {
     if (first == std::string::npos) {
         return "";
     }
-    
+
     size_t last = str.find_last_not_of(" \t\r\n");
     return str.substr(first, last - first + 1);
 }
 
 // Generic getters/setters
-std::string SettingsManager::getString(const std::string& key, const std::string& defaultValue) const {
+std::string SettingsManager::getString(const std::string& key,
+                                       const std::string& defaultValue) const {
     auto it = m_settings.find(key);
     return (it != m_settings.end()) ? it->second : defaultValue;
 }
 
-void SettingsManager::setString(const std::string& key, const std::string& value) {
+void SettingsManager::setString(const std::string& key,
+                                const std::string& value) {
     m_settings[key] = value;
 }
 

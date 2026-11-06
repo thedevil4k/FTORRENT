@@ -75,7 +75,8 @@ int main() {
     ok(SecurityAnalyzer::isInstallerPath("a.apk"), "apk is an installer");
     ok(SecurityAnalyzer::isScriptPath("a.PS1"), "ps1 is a script");
     ok(SecurityAnalyzer::isShortcutPath("a.lnk"), "lnk is a shortcut");
-    ok(SecurityAnalyzer::isMacroDocumentPath("a.docm"), "docm is a macro document");
+    ok(SecurityAnalyzer::isMacroDocumentPath("a.docm"),
+       "docm is a macro document");
     ok(SecurityAnalyzer::isArchivePath("a.RAR"), "rar is an archive");
     ok(SecurityAnalyzer::isDiskImagePath("a.iso"), "iso is a disk image");
     ok(SecurityAnalyzer::isDiscImagePath("a.ISO"),
@@ -118,14 +119,16 @@ int main() {
 
     section("ordinary files");
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file("photo.jpg"));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file("photo.jpg"));
         ok(a.level == RiskLevel::Low, "a plain picture is low risk");
         ok(a.findings.empty(), "a plain picture has no findings");
         ok(a.tags.empty(), "a plain picture has no tags");
         ok(!a.runnable, "a plain picture does not run");
     }
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file("setup.exe"));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file("setup.exe"));
         ok(a.level == RiskLevel::Medium, "an exe alone is medium risk");
         ok(hasCode(a, FindingCode::Executable), "the exe is reported");
         ok(hasCode(a, FindingCode::RootExecutable),
@@ -134,7 +137,8 @@ int main() {
         ok(a.runnable, "the exe is runnable");
     }
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file("install.bat"));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file("install.bat"));
         ok(a.level == RiskLevel::High, "a script is high risk");
         ok(hasCode(a, FindingCode::Script), "the script is reported");
         ok(hasTag(a, "SCRIPT"), "the script gets a SCRIPT tag");
@@ -145,13 +149,15 @@ int main() {
         ok(hasCode(a, FindingCode::Installer), "the installer is reported");
     }
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file("album.zip"));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file("album.zip"));
         ok(a.level == RiskLevel::Medium, "an archive is medium risk");
         ok(hasCode(a, FindingCode::Archive), "the archive is reported");
         ok(hasTag(a, "ARCHIVE"), "the archive gets an ARCHIVE tag");
     }
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file("movie.iso"));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file("movie.iso"));
         ok(a.level == RiskLevel::Medium, "a disk image is medium risk");
         ok(hasCode(a, FindingCode::DiskImage), "the disk image is reported");
     }
@@ -175,7 +181,8 @@ int main() {
         const FileAssessment a =
             SecurityAnalyzer::assessFile(file("C:\\Windows\\evil.exe"));
         ok(a.level == RiskLevel::Critical, "an absolute path is critical");
-        ok(hasCode(a, FindingCode::AbsolutePath), "the absolute path is reported");
+        ok(hasCode(a, FindingCode::AbsolutePath),
+           "the absolute path is reported");
     }
     {
         const FileAssessment a =
@@ -186,7 +193,8 @@ int main() {
     }
     {
         const FileAssessment a =
-            SecurityAnalyzer::assessFile(file("evil.\xE2\x80\xAE" "exe.txt"));
+            SecurityAnalyzer::assessFile(file("evil.\xE2\x80\xAE"
+                                              "exe.txt"));
         ok(a.level == RiskLevel::Critical, "a bidi override is critical");
         ok(hasCode(a, FindingCode::RtlOverride), "the override is reported");
     }
@@ -200,16 +208,19 @@ int main() {
     {
         const FileAssessment a = SecurityAnalyzer::assessFile(file("con.txt"));
         ok(a.level == RiskLevel::High, "a reserved device name is high risk");
-        ok(hasCode(a, FindingCode::ReservedName), "the reserved name is reported");
+        ok(hasCode(a, FindingCode::ReservedName),
+           "the reserved name is reported");
     }
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file("evil.exe."));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file("evil.exe."));
         ok(hasCode(a, FindingCode::TrailingDotOrSpace),
            "a trailing dot is reported");
         ok(a.level == RiskLevel::Medium, "a trailing dot alone is medium risk");
     }
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file(".hidden.exe"));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file(".hidden.exe"));
         ok(a.level == RiskLevel::High,
            "hidden plus runnable is high risk, not low");
         ok(hasTag(a, "HIDDEN"), "the hidden marker gets a tag");
@@ -239,7 +250,8 @@ int main() {
            "an escaping symlink says its target is outside the torrent");
     }
     {
-        const FileAssessment a = SecurityAnalyzer::assessFile(file("tool.exe", 0));
+        const FileAssessment a =
+            SecurityAnalyzer::assessFile(file("tool.exe", 0));
         ok(a.level == RiskLevel::High, "a zero-byte executable is high risk");
         ok(hasCode(a, FindingCode::ZeroByteExecutable),
            "the zero-byte executable is reported");
@@ -254,8 +266,7 @@ int main() {
     }
     {
         std::vector<SecurityFile> files = {
-            file("readme.txt"), file("photo.jpg"), file("music.mp3")
-        };
+            file("readme.txt"), file("photo.jpg"), file("music.mp3")};
         const SecurityReport r = SecurityAnalyzer::analyze(files);
         ok(r.files == 3, "all three files are counted");
         ok(r.level == RiskLevel::Low, "a clean list is low risk");
@@ -265,9 +276,8 @@ int main() {
         ok(!contains(r.summary, "safe"), "a clean list never says safe");
     }
     {
-        std::vector<SecurityFile> files = {
-            file("setup.exe"), file("crack.exe"), file("tool.exe")
-        };
+        std::vector<SecurityFile> files = {file("setup.exe"), file("crack.exe"),
+                                           file("tool.exe")};
         const SecurityReport r = SecurityAnalyzer::analyze(files);
         ok(r.executables == 3, "three executables are counted");
         bool many = false;
@@ -275,7 +285,8 @@ int main() {
             if (f.code == FindingCode::ManyExecutables) many = true;
         }
         ok(many, "three executables add the torrent-level finding");
-        ok(r.level >= RiskLevel::Medium, "three executables are at least medium");
+        ok(r.level >= RiskLevel::Medium,
+           "three executables are at least medium");
         ok(contains(r.summary, "3 executables"), "the summary counts them");
     }
     {
@@ -290,14 +301,14 @@ int main() {
     }
     {
         std::vector<SecurityFile> files = {
-            file("install.bat"), file("album.zip"), file("notes.txt")
-        };
+            file("install.bat"), file("album.zip"), file("notes.txt")};
         const SecurityReport r = SecurityAnalyzer::analyze(files);
         ok(r.scripts == 1, "scripts are counted");
         ok(r.archives == 1, "archives are counted");
         ok(r.level == RiskLevel::High, "a script raises the torrent to high");
         ok(contains(r.summary, "1 script"), "the summary mentions the script");
-        ok(contains(r.summary, "1 archive"), "the summary mentions the archive");
+        ok(contains(r.summary, "1 archive"),
+           "the summary mentions the archive");
         ok(contains(r.summary, "Review before downloading"),
            "a high-risk list asks for review before downloading");
     }
@@ -305,9 +316,8 @@ int main() {
         // The search row draws its "compressed package" badge from this count,
         // so the count has to cover the containers a user calls an archive and
         // not only the two the preflight can index.
-        std::vector<SecurityFile> files = {
-            file("pack.7z"), file("pack.tar.gz"), file("disc.iso")
-        };
+        std::vector<SecurityFile> files = {file("pack.7z"), file("pack.tar.gz"),
+                                           file("disc.iso")};
         const SecurityReport r = SecurityAnalyzer::analyze(files);
         ok(r.archives == 2, "7z and tar.gz count as archives, an ISO does not");
     }
@@ -316,10 +326,9 @@ int main() {
         // ones: a dll or a script is still an executable for risk purposes, but
         // only a native binary may draw the executable badge.
         std::vector<SecurityFile> files = {
-            file("movie.mkv"), file("disc.iso"), file("setup.exe"),
-            file("bundle.rar"), file("lib.dll"), file("tool.py"),
-            file("notes.txt")
-        };
+            file("movie.mkv"),  file("disc.iso"), file("setup.exe"),
+            file("bundle.rar"), file("lib.dll"),  file("tool.py"),
+            file("notes.txt")};
         const SecurityReport r = SecurityAnalyzer::analyze(files);
         ok(r.videos == 1, "one video is counted");
         ok(r.discImages == 1, "one disc image is counted");
@@ -347,7 +356,8 @@ int main() {
                    "ENCRYPTED"),
            "a plain entry is not marked as encrypted");
 
-        const SecurityReport plain = SecurityAnalyzer::analyze({file("readme.txt")});
+        const SecurityReport plain =
+            SecurityAnalyzer::analyze({file("readme.txt")});
         ok(plain.encrypted == 0,
            "a file list with no archive headers reports nothing encrypted");
     }
@@ -380,7 +390,8 @@ int main() {
     }
     {
         // The badge shown before the file list is known comes from the title.
-        // It is a hint, so the rule is deliberately narrow: the end of the name.
+        // It is a hint, so the rule is deliberately narrow: the end of the
+        // name.
         ok(SecurityAnalyzer::titleSuggestsArchive(
                "Adobe Premiere Pro CC 2018 15.3.1.72 + Optimized.zip"),
            "a title ending in .zip is a hint");

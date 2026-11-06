@@ -54,7 +54,7 @@ Fl_Image* variantCopy(Fl_Image* source, bool invert, double alphaScale) {
     if (!rgb || !rgb->array || rgb->w() <= 0 || rgb->h() <= 0) return nullptr;
     const int d = rgb->d();
     if (d != 3 && d != 4) return nullptr;
-    if (alphaScale < 1.0 && d != 4) return nullptr;   // no alpha to fade
+    if (alphaScale < 1.0 && d != 4) return nullptr; // no alpha to fade
 
     const int w = rgb->w();
     const int h = rgb->h();
@@ -65,18 +65,18 @@ Fl_Image* variantCopy(Fl_Image* source, bool invert, double alphaScale) {
         for (int channel = 0; channel < 3; ++channel) {
             const unsigned char value =
                 static_cast<unsigned char>(rgb->array[i + channel]);
-            pixels[i + channel] = invert
-                ? static_cast<unsigned char>(255 - value)
-                : value;
+            pixels[i + channel] =
+                invert ? static_cast<unsigned char>(255 - value) : value;
         }
         if (d == 4) {
             const double alpha = static_cast<unsigned char>(rgb->array[i + 3]);
-            pixels[i + 3] = static_cast<unsigned char>(alpha * alphaScale + 0.5);
+            pixels[i + 3] =
+                static_cast<unsigned char>(alpha * alphaScale + 0.5);
         }
     }
 
     Fl_RGB_Image* image = new Fl_RGB_Image(pixels, w, h, d);
-    image->alloc_array = 1;   // the image frees the buffer it was given
+    image->alloc_array = 1; // the image frees the buffer it was given
     return image;
 }
 
@@ -100,12 +100,23 @@ Fl_Image* SearchResultsWidget::badgeIcon(ContentBadge badge, bool hinted) {
 
     const char* asset = nullptr;
     switch (badge) {
-        case ContentBadge::Archive:          asset = "compressed.png"; break;
-        case ContentBadge::Encrypted:        asset = "encrypted.png"; break;
-        case ContentBadge::DiscImage:        asset = "iso.png"; break;
-        case ContentBadge::Video:            asset = "video.png"; break;
-        case ContentBadge::NativeExecutable: asset = "executable.png"; break;
-        case ContentBadge::Count:            break;
+        case ContentBadge::Archive:
+            asset = "compressed.png";
+            break;
+        case ContentBadge::Encrypted:
+            asset = "encrypted.png";
+            break;
+        case ContentBadge::DiscImage:
+            asset = "iso.png";
+            break;
+        case ContentBadge::Video:
+            asset = "video.png";
+            break;
+        case ContentBadge::NativeExecutable:
+            asset = "executable.png";
+            break;
+        case ContentBadge::Count:
+            break;
     }
     if (!asset) return nullptr;
 
@@ -113,9 +124,8 @@ Fl_Image* SearchResultsWidget::badgeIcon(ContentBadge badge, bool hinted) {
     // box, whatever the asset's aspect ratio. load() copies the PNG into
     // exactly BADGE_BOX x BADGE_BOX, so a landscape film strip and a square
     // disc end up the same size as the risk shield beside them.
-    std::unique_ptr<Fl_Image> loaded(
-        AssetLoader::load(asset, BADGE_BOX));
-    if (!loaded) return nullptr;   // no asset: no badge, never a blank square
+    std::unique_ptr<Fl_Image> loaded(AssetLoader::load(asset, BADGE_BOX));
+    if (!loaded) return nullptr; // no asset: no badge, never a blank square
 
     // Ink art needs its strokes flipped on a light row; a coloured icon is
     // drawn as designed on both. See isInkArt() and variantCopy().
@@ -222,8 +232,8 @@ void SearchResultsWidget::startReputationLookup(
             ReputationResult rejected;
             rejected.state = ReputationState::Error;
             rejected.sha256 = target.sha256;
-            rejected.message =
-                "Too many reputation checks are running. Try again in a moment.";
+            rejected.message = "Too many reputation checks are running. Try "
+                               "again in a moment.";
             m_reputation[key] = rejected;
             break;
         }

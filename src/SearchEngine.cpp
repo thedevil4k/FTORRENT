@@ -26,8 +26,8 @@ std::string SearchEngine::urlEncode(const std::string& in) {
 }
 
 std::string SearchEngine::buildUrl(const std::string& query,
-                                    const std::string& category,
-                                    int page) const {
+                                   const std::string& category,
+                                   int page) const {
     std::string url = m_def.urlTemplate;
     size_t pos = url.find("%s");
     if (pos != std::string::npos) {
@@ -80,15 +80,14 @@ std::string SearchEngine::categoryCode(const std::string& category) const {
 // Fetches through the direct address, and retries through the proxy/mirror
 // when the direct one is blocked or returns nothing usable. That retry is what
 // keeps a site working after it rotates its domain, without any code change.
-static bool fetchWithFallback(const std::string& url,
-                              const std::string& proxyUrl,
-                              HttpClient::Response& resp,
-                              std::string& error,
-                              std::string& usedVia,
-                              const std::function<bool(const std::string&)>& usable,
-                              const SearchEngine::StopCheck& shouldStop) {
+static bool
+fetchWithFallback(const std::string& url, const std::string& proxyUrl,
+                  HttpClient::Response& resp, std::string& error,
+                  std::string& usedVia,
+                  const std::function<bool(const std::string&)>& usable,
+                  const SearchEngine::StopCheck& shouldStop) {
     std::string ua = "FTORRENT " FTP_VERSION;
-    
+
     // A site often answers with a challenge page or an empty listing instead of
     // refusing outright, so a body is only accepted once the parser finds
     // something in it. Otherwise the mirror below gets its turn.
@@ -98,17 +97,19 @@ static bool fetchWithFallback(const std::string& url,
             usedVia = "direct";
             return true;
         }
-        error = resp.ok ? std::string("The site returned no usable results") : resp.error;
+        error = resp.ok ? std::string("The site returned no usable results")
+                        : resp.error;
     }
-    
+
     // Cancelling must not silently turn into a second request to the mirror.
     if (shouldStop && shouldStop()) {
         error = "Cancelled";
         return false;
     }
-    
+
     if (!proxyUrl.empty()) {
-        HttpClient::Response viaProxy = HttpClient::get(proxyUrl, ua, 20, shouldStop);
+        HttpClient::Response viaProxy =
+            HttpClient::get(proxyUrl, ua, 20, shouldStop);
         if (viaProxy.ok && usable(viaProxy.body)) {
             resp = viaProxy;
             usedVia = "proxy";
@@ -121,34 +122,33 @@ static bool fetchWithFallback(const std::string& url,
             error = viaProxy.error;
         }
     }
-    
+
     if (error.empty()) error = "Could not reach the site";
     return false;
 }
 
 bool SearchEngine::fetchPage(const std::string& query,
-                              const std::string& category,
-                              int page,
-                              const StopCheck& shouldStop,
-                              std::vector<SearchResult>& out,
-                              std::string& error,
-                              PageInfo* info) const {
+                             const std::string& category, int page,
+                             const StopCheck& shouldStop,
+                             std::vector<SearchResult>& out, std::string& error,
+                             PageInfo* info) const {
     std::string url = buildUrl(query, category, page);
     std::string proxyUrl = buildProxyUrl(query, category, page);
-    
+
     if (!HttpClient::isSecure(url) && proxyUrl.empty()) {
         error = "The site does not use https";
         return false;
     }
-    
+
     HttpClient::Response resp;
     std::string usedVia;
-    if (!fetchWithFallback(url, proxyUrl, resp, error, usedVia,
-                           [this](const std::string& body) {
-                               std::vector<SearchResult> probe;
-                               return parse(body, probe);
-                           },
-                           shouldStop)) {
+    if (!fetchWithFallback(
+            url, proxyUrl, resp, error, usedVia,
+            [this](const std::string& body) {
+                std::vector<SearchResult> probe;
+                return parse(body, probe);
+            },
+            shouldStop)) {
         if (info) {
             info->httpStatus = resp.httpStatus;
             info->bodyBytes = resp.body.size();
@@ -156,7 +156,7 @@ bool SearchEngine::fetchPage(const std::string& query,
         }
         return false;
     }
-    
+
     if (shouldStop && shouldStop()) {
         error = "Cancelled";
         return false;
@@ -211,7 +211,8 @@ void SearchEngine::resolveDetails(std::vector<SearchResult>& rows,
             }
             HttpClient::Response res = HttpClient::get(url, ua, 10, shouldStop);
             std::string magnet;
-            if (res.ok && jsonField(res.body, "magnet", magnet) && !magnet.empty()) {
+            if (res.ok && jsonField(res.body, "magnet", magnet) &&
+                !magnet.empty()) {
                 std::lock_guard<std::mutex> lock(writeLock);
                 r.magnet = magnet;
                 normalizeResult(r);
@@ -227,9 +228,10 @@ void SearchEngine::resolveDetails(std::vector<SearchResult>& rows,
 
     // An entry with no torrent behind it has nothing to offer here, and a row
     // without a magnet cannot be downloaded from the results table.
-    rows.erase(std::remove_if(rows.begin(), rows.end(),
-                              [](const SearchResult& r) { return r.magnet.empty(); }),
-               rows.end());
+    rows.erase(
+        std::remove_if(rows.begin(), rows.end(),
+                       [](const SearchResult& r) { return r.magnet.empty(); }),
+        rows.end());
 }
 
 // Short human form of a fetch ("HTTP 200, 22 KB via direct") for error lines.
@@ -242,7 +244,8 @@ static std::string describeFetch(const SearchEngine::PageInfo& info) {
     }
     char buf[64];
     if (info.bodyBytes < 1024) {
-        snprintf(buf, sizeof(buf), "%llu B", (unsigned long long)info.bodyBytes);
+        snprintf(buf, sizeof(buf), "%llu B",
+                 (unsigned long long)info.bodyBytes);
     } else {
         snprintf(buf, sizeof(buf), "%.0f KB", info.bodyBytes / 1024.0);
     }
@@ -256,23 +259,22 @@ static std::string describeFetch(const SearchEngine::PageInfo& info) {
 }
 
 bool SearchEngine::search(const std::string& query,
-                          std::vector<SearchResult>& out,
-                          std::string& error,
+                          std::vector<SearchResult>& out, std::string& error,
                           const StopCheck& shouldStop,
                           const std::string& category) const {
     if (query.empty()) {
         error = "Empty query";
         return false;
     }
-    
+
     std::string url = buildUrl(query, category, 1);
     std::string proxyUrl = buildProxyUrl(query, category, 1);
-    
+
     if (!HttpClient::isSecure(url) && proxyUrl.empty()) {
         error = "The site does not use https";
         return false;
     }
-    
+
     // Walk result pages 1..N. A page that yields nothing ends the walk: on
     // page 1 that is a failure, later it just means there is no more.
     // Templates without %p always build the same address, so only page 1 is
@@ -287,14 +289,15 @@ bool SearchEngine::search(const std::string& query,
         }
         std::vector<SearchResult> found;
         PageInfo info;
-        if (!fetchPage(query, category, page, shouldStop, found, error, &info)) {
+        if (!fetchPage(query, category, page, shouldStop, found, error,
+                       &info)) {
             if (page == 1) return false;
             break;
         }
         if (found.empty()) {
             if (page == 1) {
-                error = "No results found on " + m_def.name +
-                        " (" + describeFetch(info) + ", parsed 0)";
+                error = "No results found on " + m_def.name + " (" +
+                        describeFetch(info) + ", parsed 0)";
                 return false;
             }
             break;
@@ -315,15 +318,15 @@ bool SearchEngine::searchStreaming(const std::string& query,
         error = "Empty query";
         return false;
     }
-    
+
     std::string url = buildUrl(query, category, 1);
     std::string proxyUrl = buildProxyUrl(query, category, 1);
-    
+
     if (!HttpClient::isSecure(url) && proxyUrl.empty()) {
         error = "The site does not use https";
         return false;
     }
-    
+
     // Same walk as search(), but every page is emitted as it arrives so the
     // table fills progressively instead of waiting for the last page.
     bool paged = m_def.urlTemplate.find("%p") != std::string::npos ||
@@ -338,19 +341,21 @@ bool SearchEngine::searchStreaming(const std::string& query,
         }
         if (onStage) {
             onStage("Contacting " + m_def.name +
-                    (pages > 1 ? " (page " + std::to_string(page) +
-                                 "/" + std::to_string(pages) + ")..." : "..."));
+                    (pages > 1 ? " (page " + std::to_string(page) + "/" +
+                                     std::to_string(pages) + ")..."
+                               : "..."));
         }
         std::vector<SearchResult> found;
         PageInfo info;
-        if (!fetchPage(query, category, page, shouldStop, found, error, &info)) {
+        if (!fetchPage(query, category, page, shouldStop, found, error,
+                       &info)) {
             if (page == 1) return false;
             break;
         }
         if (found.empty()) {
             if (page == 1) {
-                error = "No results found on " + m_def.name +
-                        " (" + describeFetch(info) + ", parsed 0)";
+                error = "No results found on " + m_def.name + " (" +
+                        describeFetch(info) + ", parsed 0)";
                 return false;
             }
             break;
@@ -362,7 +367,8 @@ bool SearchEngine::searchStreaming(const std::string& query,
             }
             size_t end = std::min(i + BATCH, found.size());
             end = std::min(end, i + (200 - total));
-            std::vector<SearchResult> chunk(found.begin() + i, found.begin() + end);
+            std::vector<SearchResult> chunk(found.begin() + i,
+                                            found.begin() + end);
             total += chunk.size();
             if (onBatch) onBatch(chunk);
         }

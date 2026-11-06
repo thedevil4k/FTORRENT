@@ -45,10 +45,10 @@ struct SearchResult {
     // link has to be asked for separately (Pirate Face returns the catalogue
     // and hands out one magnet per request). Empty for every other engine.
     std::string detailId;
-    int64_t size = 0;          // Bytes, 0 when unknown
-    int seeders = -1;          // -1 when unknown
-    int leechers = -1;         // -1 when unknown
-    std::string source;        // Engine name that produced it
+    int64_t size = 0;   // Bytes, 0 when unknown
+    int seeders = -1;   // -1 when unknown
+    int leechers = -1;  // -1 when unknown
+    std::string source; // Engine name that produced it
 };
 
 class SearchEngine {
@@ -62,9 +62,9 @@ public:
     // built-in catalogue survive sites changing their domain.
     struct Definition {
         std::string name;
-        std::string urlTemplate;           // direct address + pattern
-        std::string proxyTemplate;         // same, against a mirror/proxy
-        std::string type = "html";         // "html", "json" or "lines"
+        std::string urlTemplate;   // direct address + pattern
+        std::string proxyTemplate; // same, against a mirror/proxy
+        std::string type = "html"; // "html", "json" or "lines"
         // Optional per-site extraction rules. When rowSelector is empty the
         // parser falls back to harvesting every magnet link it can find, which
         // is what keeps unknown or redesigned sites working.
@@ -99,7 +99,8 @@ public:
         bool enabled = true;
     };
 
-    explicit SearchEngine(const Definition& def) : m_def(def) {}
+    explicit SearchEngine(const Definition& def)
+        : m_def(def) {}
 
     const Definition& definition() const { return m_def; }
 
@@ -122,19 +123,15 @@ public:
     using StopCheck = std::function<bool()>;
 
     // Fetches and parses. Returns false and fills 'error' on failure.
-    bool search(const std::string& query,
-                std::vector<SearchResult>& out,
-                std::string& error,
-                const StopCheck& shouldStop = nullptr,
+    bool search(const std::string& query, std::vector<SearchResult>& out,
+                std::string& error, const StopCheck& shouldStop = nullptr,
                 const std::string& category = "all") const;
 
     // Same, but calls onResult for every batch as it arrives so the UI can
     // fill the table progressively instead of waiting for the whole page.
     // Stops early and returns false if shouldStop() turns true (cancel button).
-    bool searchStreaming(const std::string& query,
-                         const BatchCallback& onBatch,
-                         const StopCheck& shouldStop,
-                         std::string& error,
+    bool searchStreaming(const std::string& query, const BatchCallback& onBatch,
+                         const StopCheck& shouldStop, std::string& error,
                          const std::string& category = "all",
                          const StageCallback& onStage = nullptr) const;
 
@@ -153,14 +150,11 @@ public:
     struct PageInfo {
         long httpStatus = 0;
         size_t bodyBytes = 0;
-        std::string via;   // "direct" or "proxy"
+        std::string via; // "direct" or "proxy"
     };
-    bool fetchPage(const std::string& query,
-                   const std::string& category,
-                   int page,
-                   const StopCheck& shouldStop,
-                   std::vector<SearchResult>& out,
-                   std::string& error,
+    bool fetchPage(const std::string& query, const std::string& category,
+                   int page, const StopCheck& shouldStop,
+                   std::vector<SearchResult>& out, std::string& error,
                    PageInfo* info = nullptr) const;
 
 private:

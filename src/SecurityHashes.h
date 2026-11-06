@@ -27,9 +27,8 @@ const std::int64_t kBlockSize = 16 * 1024;
 // Fills 'file.sha256' and 'file.sha256Complete' from 'info'/'fs'.
 // Leaves both empty/false for v1-only torrents, pad files, and files that do
 // not fit in a single block.
-void fillWholeFileHash(const lt::torrent_info& info,
-                       const lt::file_storage& fs, int fileIndex,
-                       SecurityFile& file);
+void fillWholeFileHash(const lt::torrent_info& info, const lt::file_storage& fs,
+                       int fileIndex, SecurityFile& file);
 
 } // namespace SecurityHashes
 

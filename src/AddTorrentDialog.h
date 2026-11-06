@@ -9,7 +9,7 @@
 #include <FL/Fl_Check_Browser.H>
 #include <FL/Fl_Hold_Browser.H>
 #include <FL/Fl_Box.H>
-#include "TorrentFileList.h"   // TorrentFileEntry, for pre-filling magnets
+#include "TorrentFileList.h" // TorrentFileEntry, for pre-filling magnets
 #include "SecurityBadge.h"
 #include "SecurityReputation.h"
 #include <memory>
@@ -20,7 +20,7 @@ class ArchiveCheckTask;
 
 /**
  * @brief Diálogo avanzado para añadir torrents
- * 
+ *
  * Permite:
  * - Seleccionar archivo .torrent o ingresar magnet link
  * - Elegir ruta de descarga
@@ -29,18 +29,14 @@ class ArchiveCheckTask;
  */
 class AddTorrentDialog : public Fl_Window {
 public:
-    enum class Priority {
-        Normal = 0,
-        High = 1,
-        Low = 2
-    };
-    
+    enum class Priority { Normal = 0, High = 1, Low = 2 };
+
     AddTorrentDialog();
     ~AddTorrentDialog();
-    
+
     // Show dialog and return true if OK was clicked
     bool show_modal();
-    
+
     // Get results
     std::string getTorrentPath() const { return m_torrentPath; }
     std::string getMagnetLink() const { return m_magnetLink; }
@@ -49,7 +45,7 @@ public:
     Priority getPriority() const { return m_priority; }
     std::vector<int> getFilePriorities() const { return m_filePriorities; }
     bool isMagnet() const { return !m_magnetLink.empty(); }
-    
+
     // Setters for pre-filling
     void setTorrentPath(const std::string& path);
     void setMagnetLink(const std::string& magnet);
@@ -63,26 +59,25 @@ public:
     // exchange with the swarm; without them it falls back to the magnet.
     void setTorrentUrl(const std::string& url) { m_torrentUrl = url; }
     void setTorrentBody(const std::string& body) { m_torrentBody = body; }
-    
+
 private:
-    
     // Common widgets
     Fl_Input* m_savePathInput;
     Fl_Button* m_browseSavePath;
     Fl_Check_Button* m_startImmediately;
     Fl_Choice* m_priorityChoice;
-    
+
     // File-specific widgets
     Fl_Input* m_filePathInput;
     Fl_Button* m_browseFile;
-    
+
     // Magnet-specific widgets
     Fl_Input* m_magnetInput;
     // Green dot drawn at the right end of the magnet field while this import
     // is the one going through a magnet link. Shown or hidden as the fields
     // change; it carries no state of its own.
     Fl_Box* m_magnetOriginDot;
-    
+
     // Files display
     Fl_Check_Browser* m_fileBrowser;
     Fl_Button* m_selectNonExecutables;
@@ -110,11 +105,11 @@ private:
     std::string m_torrentSha256Path;
     std::vector<SecurityFile> m_archiveEntries;
     void showArchiveEntries();
-    
+
     // Buttons
     Fl_Button* m_okButton;
     Fl_Button* m_cancelButton;
-    
+
     // Results
     std::string m_torrentPath;
     std::string m_magnetLink;
@@ -140,14 +135,14 @@ private:
     // The archive check currently running, so the destructor can stop it.
     // Null when nothing is being read.
     std::shared_ptr<ArchiveCheckTask> m_archiveTask;
-    
+
     // UI Creation
     void createUI();
     void createButtons();
-    
+
     // Validation
     bool validate();
-    
+
     // Callbacks
     static void onBrowseFile(Fl_Widget* w, void* data);
     static void onBrowseSavePath(Fl_Widget* w, void* data);
@@ -156,14 +151,15 @@ private:
     static void onMagnetFieldChanged(Fl_Widget* w, void* data);
     static void onFileSelectionChanged(Fl_Widget* w, void* data);
     static void onSelectNonExecutables(Fl_Widget* w, void* data);
-    
+
     // Helper
     void loadDefaults();
     void updateFileList(const std::string& torrentPath);
     // Fills the browser and the security panel from a resolved list. The
     // total count includes pad files, because file priorities are indexed by
     // the libtorrent file index, not by visible row.
-    void showFiles(const std::vector<TorrentFileEntry>& files, int totalFileCount);
+    void showFiles(const std::vector<TorrentFileEntry>& files,
+                   int totalFileCount);
     std::vector<TorrentFileEntry> selectedFiles() const;
     void updateSecurityPanel();
     void checkReputation();

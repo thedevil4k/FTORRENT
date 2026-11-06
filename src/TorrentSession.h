@@ -25,35 +25,40 @@ public:
     // Session management
     bool initialize();
     void shutdown();
-    
+
     // Torrent operations
-    bool addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities = {});
+    bool addTorrentFile(const std::string& torrentFile,
+                        const std::string& savePath,
+                        const std::vector<int>& file_priorities = {});
     // file_priorities is applied once the metadata arrives. It must list every
     // file of the torrent in order (1 = download, 0 = skip); empty means all.
     // Kept defaulted so existing callers compile unchanged on every platform.
-    bool addMagnetLink(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities = {});
-    void removeTorrent(const lt::torrent_handle& handle, bool deleteFiles = false);
+    bool addMagnetLink(const std::string& magnetLink,
+                       const std::string& savePath,
+                       const std::vector<int>& file_priorities = {});
+    void removeTorrent(const lt::torrent_handle& handle,
+                       bool deleteFiles = false);
     void pauseTorrent(const lt::torrent_handle& handle);
     void resumeTorrent(const lt::torrent_handle& handle);
-    
+
     // Rate limiting
     void setRateLimits(int downloadKBps, int uploadKBps);
     void setRamMode(int mode);
-    
+
     // Persistence
     void triggerSaveResumeData();
     void loadResidentTorrents();
     void removeResumeData(const std::string& hash);
-    
+
     // Information getters
     std::vector<lt::torrent_handle> getTorrents() const;
     std::string getSessionStats() const;
     int getDownloadRate() const;
     int getUploadRate() const;
-    
+
     // Process alerts
     void processAlerts();
-    
+
     // Callbacks
     void setErrorCallback(ErrorCallback cb) { m_errorCallback = cb; }
 
@@ -61,7 +66,7 @@ private:
     std::unique_ptr<lt::session> m_session;
     bool m_initialized;
     ErrorCallback m_errorCallback;
-    
+
     void setupSessionSettings();
     void writeResumeData(const lt::save_resume_data_alert* rd);
     std::string getResumeDataPath() const;

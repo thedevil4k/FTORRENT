@@ -7,23 +7,15 @@ namespace {
 
 const ToolbarLayout::Spec kTable[3] = {
     // ICONS
-    {nullptr,           ToolbarLayout::kIconButton,
-     nullptr,           ToolbarLayout::kIconButton,
-     nullptr,           ToolbarLayout::kIconButton,
-     0},
+    {nullptr, ToolbarLayout::kIconButton, nullptr, ToolbarLayout::kIconButton,
+     nullptr, ToolbarLayout::kIconButton, 0},
     // SHORT
-    {" Add",            100,
-     " Create",         105,
-     "Prefs",           85,
-     8},
+    {" Add", 100, " Create", 105, "Prefs", 85, 8},
     // FULL
-    {" Add Torrent",    140,
-     " Create Torrent", 140,
-     "Preferences",     130,
-     20},
+    {" Add Torrent", 140, " Create Torrent", 140, "Preferences", 130, 20},
 };
 
-}  // namespace
+} // namespace
 
 const ToolbarLayout::Spec& ToolbarLayout::spec(Level level) {
     return kTable[level];
@@ -40,9 +32,9 @@ int ToolbarLayout::requiredWidth(Level level) {
     // beside it, so a spacer that has collapsed to zero width stays visible
     // (see the header) rather than quietly shortening the row that this number
     // is measuring.
-    return s.addWidth + s.createWidth + s.prefsWidth + kGroupSpacers * s.spacerWidth
-         + kIconButtons * kIconButton + kThemeButton + kRamButton
-         + kSpacing * (kChildCount - 1);
+    return s.addWidth + s.createWidth + s.prefsWidth +
+           kGroupSpacers * s.spacerWidth + kIconButtons * kIconButton +
+           kThemeButton + kRamButton + kSpacing * (kChildCount - 1);
 }
 
 ToolbarLayout::Level ToolbarLayout::forWidth(int available) {

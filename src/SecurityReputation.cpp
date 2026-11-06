@@ -15,7 +15,8 @@ ReputationTarget findReputationTarget(const std::vector<SecurityFile>& files) {
         if (SecurityAnalyzer::isRunnable(file)) {
             return ReputationTarget{file.sha256, file.path};
         }
-        if (!fallback.found()) fallback = ReputationTarget{file.sha256, file.path};
+        if (!fallback.found())
+            fallback = ReputationTarget{file.sha256, file.path};
     }
     return fallback;
 }
@@ -71,8 +72,7 @@ std::string archiveSummary(const std::string& archivePath,
 
     const SecurityReport report = SecurityAnalyzer::analyze(entries);
     message += std::to_string(entries.size()) + " entries, ";
-    if (report.executables > 0 || report.scripts > 0 ||
-        report.shortcuts > 0) {
+    if (report.executables > 0 || report.scripts > 0 || report.shortcuts > 0) {
         message += std::to_string(report.executables) + " executable(s), " +
                    std::to_string(report.scripts) + " script(s). " +
                    "Review before downloading.";
@@ -86,9 +86,8 @@ std::string archiveSummary(const std::string& archivePath,
     if (report.encrypted > 0) {
         message += " ";
         message += std::to_string(report.encrypted);
-        message += report.encrypted == 1
-                       ? " entry is password-protected"
-                       : " entries are password-protected";
+        message += report.encrypted == 1 ? " entry is password-protected"
+                                         : " entries are password-protected";
         message += ", so the content behind it cannot be inspected before "
                    "downloading.";
     }
@@ -98,8 +97,8 @@ std::string archiveSummary(const std::string& archivePath,
 std::string archiveCheckMessage(const std::string& archivePath,
                                 const std::vector<SecurityFile>& entries,
                                 const std::string& note) {
-    // The note goes first on purpose: the search row elides the end of the line,
-    // and "this list is partial" is the part the user must not miss.
+    // The note goes first on purpose: the search row elides the end of the
+    // line, and "this list is partial" is the part the user must not miss.
     if (note.empty()) return archiveSummary(archivePath, entries);
     return note + " " + archiveSummary(archivePath, entries);
 }

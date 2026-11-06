@@ -13,7 +13,8 @@ int main() {
 
     testsupport::section("bytes");
     ok(Format::bytes(0) == "0.00 B", "zero is 0.00 B");
-    ok(Format::bytes(1023) == "1023.00 B", "below a kibibyte it stays in bytes");
+    ok(Format::bytes(1023) == "1023.00 B",
+       "below a kibibyte it stays in bytes");
     ok(Format::bytes(1024) == "1.00 KB", "a kibibyte switches the unit");
     ok(Format::bytes(1536) == "1.50 KB", "fractions keep two decimals");
     ok(Format::bytes(5LL * 1024 * 1024) == "5.00 MB", "megabytes are binary");

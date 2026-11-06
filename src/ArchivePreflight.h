@@ -29,23 +29,24 @@ public:
     // What was fetched for one file: its first and last piece.
     struct Snippet {
         std::int64_t fileSize = 0;
-        std::string head;   // Bytes from the start of the file
-        std::string tail;   // Bytes from the end of the file
+        std::string head; // Bytes from the start of the file
+        std::string tail; // Bytes from the end of the file
     };
 
     // Where the pieces of one file live in the piece space.
     struct PieceRange {
         int firstPiece = 0;
-        int firstOffset = 0;   // Offset of the file's first byte in that piece
+        int firstOffset = 0; // Offset of the file's first byte in that piece
         int firstLength = 0;
         int lastPiece = 0;
-        int lastOffset = 0;    // Offset of the file's bytes in the last piece
+        int lastOffset = 0; // Offset of the file's bytes in the last piece
         int lastLength = 0;
     };
 
     // Pure arithmetic, exposed for the tests.
-    static PieceRange computeRange(std::int64_t fileOffset, std::int64_t fileSize,
-                                   int pieceLength, std::int64_t torrentSize);
+    static PieceRange computeRange(std::int64_t fileOffset,
+                                   std::int64_t fileSize, int pieceLength,
+                                   std::int64_t torrentSize);
 
     // Fetches only the piece(s) holding the first and last byte of one file.
     // 'torrentPathOrUrl' may be an https:// .torrent link, a local .torrent
@@ -85,8 +86,8 @@ public:
                         bool* encryptedHeaders = nullptr);
 
     static bool inspect(const lt::add_torrent_params& params, int fileIndex,
-                        std::vector<SecurityFile>& entries,
-                        std::string& error, const std::atomic<bool>* cancelled,
+                        std::vector<SecurityFile>& entries, std::string& error,
+                        const std::atomic<bool>* cancelled,
                         int timeoutSeconds = 120, std::string* note = nullptr,
                         bool* encryptedHeaders = nullptr);
 

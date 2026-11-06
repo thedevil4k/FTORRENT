@@ -117,7 +117,8 @@ std::vector<SearchResult> parse(const SearchEngine::Definition& def,
 int main() {
     section("a published magnet keeps its trackers");
     {
-        const std::vector<SearchResult> rows = parse(builtin("Nyaa.si"), NYAA_BODY);
+        const std::vector<SearchResult> rows =
+            parse(builtin("Nyaa.si"), NYAA_BODY);
         ok(rows.size() == 3, "three Nyaa rows parsed");
 
         if (rows.size() == 3) {
@@ -130,8 +131,9 @@ int main() {
                "row 1 keeps the link exactly as published, trackers included");
             ok(rows[0].magnet.find("tr=") != std::string::npos,
                "row 1 still carries tr= entries");
-            ok(rows[1].magnet.find("tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce")
-                   != std::string::npos,
+            ok(rows[1].magnet.find(
+                   "tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce") !=
+                   std::string::npos,
                "row 2 keeps its own tracker");
             ok(rows[0].name == "[NanakoRaws] One Piece - 994",
                "the name still comes from the magnet's dn=");
@@ -140,7 +142,8 @@ int main() {
 
     section("each row gets its own .torrent link");
     {
-        const std::vector<SearchResult> rows = parse(builtin("Nyaa.si"), NYAA_BODY);
+        const std::vector<SearchResult> rows =
+            parse(builtin("Nyaa.si"), NYAA_BODY);
         if (rows.size() == 3) {
             ok(rows[0].torrentUrl == "https://nyaa.si/download/2180637.torrent",
                "row 1 points at its own .torrent");
@@ -154,22 +157,21 @@ int main() {
     section("the shared BitSearch markup");
     {
         const SearchEngine::Definition def = builtin("BitSearch");
-        ok(!def.torrentSelector.empty(), "BitSearch declares a .torrent selector");
+        ok(!def.torrentSelector.empty(),
+           "BitSearch declares a .torrent selector");
 
         const std::vector<SearchResult> rows = parse(def, SOLID_BODY);
         ok(rows.size() == 2, "two cards parsed");
 
         if (rows.size() == 2) {
-            ok(rows[0].torrentUrl ==
-                   "https://bitsearch.eu/download/torrent/"
-                   "46B55A78EB8C1673083EEB924E4EFA64DAE2F05C",
+            ok(rows[0].torrentUrl == "https://bitsearch.eu/download/torrent/"
+                                     "46B55A78EB8C1673083EEB924E4EFA64DAE2F05C",
                "the ?title= tail is left out of the .torrent URL");
-            ok(rows[1].torrentUrl ==
-                   "https://bitsearch.eu/download/torrent/"
-                   "8A7A8C340B6E2D294AD8A359BEDDFE602B53F3DC",
+            ok(rows[1].torrentUrl == "https://bitsearch.eu/download/torrent/"
+                                     "8A7A8C340B6E2D294AD8A359BEDDFE602B53F3DC",
                "the second card keeps its own hash");
-            ok(rows[0].magnet.find("tr=udp%3A%2F%2Ftracker.opentrackr.org")
-                   != std::string::npos,
+            ok(rows[0].magnet.find("tr=udp%3A%2F%2Ftracker.opentrackr.org") !=
+                   std::string::npos,
                "explicit magnets keep their trackers too");
             ok(rows[0].name == "[Bitsearch.to] Adobe Premiere Pro 2024",
                "the title selector still wins over the magnet's dn=");
@@ -182,16 +184,15 @@ int main() {
            "the apibay API declares none");
         ok(builtin("The Pirate Bay").torrentSelector.empty(),
            "the HTML Pirate Bay declares none");
-        ok(builtin("BTDig").torrentSelector.empty(),
-           "BTDig declares none");
+        ok(builtin("BTDig").torrentSelector.empty(), "BTDig declares none");
 
         const std::vector<SearchResult> rows =
             parse(builtin("The Pirate Bay (API)"), APIBAY_BODY);
         ok(rows.size() == 1, "one apibay row parsed");
         if (rows.size() == 1) {
-            ok(rows[0].magnet ==
-                   "magnet:?xt=urn:btih:2C6B6858D61DA9543D4231A71DB4B1C9264B0685"
-                   "&dn=Ubuntu%2022.04%20LTS",
+            ok(rows[0].magnet == "magnet:?xt=urn:btih:"
+                                 "2C6B6858D61DA9543D4231A71DB4B1C9264B0685"
+                                 "&dn=Ubuntu%2022.04%20LTS",
                "a bare info hash still becomes a magnet");
             ok(rows[0].torrentUrl.empty(), "and it carries no .torrent link");
         }
@@ -204,7 +205,8 @@ int main() {
         ok(ini.find("torrent=") != std::string::npos,
            "serializeDefinition writes the torrent= key");
 
-        const SearchEngine::Definition back = SearchEngine::parseDefinition(ini);
+        const SearchEngine::Definition back =
+            SearchEngine::parseDefinition(ini);
         ok(back.torrentSelector == original.torrentSelector,
            "parseDefinition reads it back unchanged");
     }
@@ -224,7 +226,7 @@ int main() {
            "a root-relative link with no known host is dropped, not guessed");
     }
 
-    std::cout << "\nsearch_parse checks=" << checks
-              << " failures=" << failures << "\n";
+    std::cout << "\nsearch_parse checks=" << checks << " failures=" << failures
+              << "\n";
     return failures ? 1 : 0;
 }

@@ -80,7 +80,8 @@ bool createZip(const std::filesystem::path& path,
         } else if (!spec.directory && !spec.bytes.empty()) {
             const la_ssize_t written = archive_write_data(
                 writer, spec.bytes.data(), spec.bytes.size());
-            if (written != static_cast<la_ssize_t>(spec.bytes.size())) ok = false;
+            if (written != static_cast<la_ssize_t>(spec.bytes.size()))
+                ok = false;
         }
 
         archive_entry_free(entry);
@@ -126,9 +127,9 @@ bool createEncryptedZip(const std::filesystem::path& path,
     return ok;
 }
 
-const ArchiveInspector::Entry* findEntry(
-    const std::vector<ArchiveInspector::Entry>& entries,
-    const std::string& path) {
+const ArchiveInspector::Entry*
+findEntry(const std::vector<ArchiveInspector::Entry>& entries,
+          const std::string& path) {
     for (const ArchiveInspector::Entry& entry : entries) {
         if (entry.path == path) return &entry;
     }
@@ -161,10 +162,8 @@ int main() {
     const std::filesystem::path zipPath = dir / "sample.zip";
     const std::string million(1000000, 'a');
     const std::vector<EntrySpec> entries = {
-        {"readme.txt", "ignored", false},
-        {"nested", "", true},
-        {"nested/inner.EXE", "", false},
-        {"setup.exe", "abc", false},
+        {"readme.txt", "ignored", false}, {"nested", "", true},
+        {"nested/inner.EXE", "", false},  {"setup.exe", "abc", false},
         {"big.exe", million, false},
     };
     ok(createZip(zipPath, entries), "a test ZIP could be created");
@@ -198,7 +197,8 @@ int main() {
         const ArchiveInspector::ListingAll cancelledListing =
             ArchiveInspector::listEntries(zipPath.string(), &cancelled);
         ok(!cancelledListing.ok, "a cancelled listing fails");
-        ok(cancelledListing.error == "cancelled", "a cancelled listing says so");
+        ok(cancelledListing.error == "cancelled",
+           "a cancelled listing says so");
     }
 
     // Password-protected entries must be visible and flagged. The writer's
@@ -258,15 +258,16 @@ int main() {
     // The RAR case the lock badge exists for: rar5 marks each entry that needs
     // a password, and the preflight listing has to carry that through.
     {
-        const ArchiveInspector::ListingAll guarded = ArchiveInspector::listEntries(
-            (fixtures / "test_read_format_rar5_encrypted.rar").string());
+        const ArchiveInspector::ListingAll guarded =
+            ArchiveInspector::listEntries(
+                (fixtures / "test_read_format_rar5_encrypted.rar").string());
         ok(guarded.ok, "the encrypted RAR5 fixture lists its entries");
         int locked = 0;
         for (const ArchiveInspector::Entry& entry : guarded.entries) {
             if (entry.encrypted) ++locked;
         }
-        ok(locked > 0,
-           "the encrypted RAR5 fixture's entries are marked password-protected");
+        ok(locked > 0, "the encrypted RAR5 fixture's entries are marked "
+                       "password-protected");
     }
 
     // A ZIP built for this suite: one plain .exe, one double-extension .exe and
@@ -276,7 +277,8 @@ int main() {
     const ArchiveInspector::ListingAll setupZip =
         ArchiveInspector::listEntries((fixtures / "setup.zip").string());
     ok(setupZip.ok, "the hostile-name ZIP lists cleanly");
-    if (!setupZip.ok) std::cout << "      setup.zip: " << setupZip.error << '\n';
+    if (!setupZip.ok)
+        std::cout << "      setup.zip: " << setupZip.error << '\n';
     ok(setupZip.entries.size() == 4, "the hostile-name ZIP lists four files");
     ok(findEntry(setupZip.entries, "setup.exe") != nullptr,
        "the plain .exe is listed");

@@ -19,7 +19,7 @@ void MainWindow::setupTrayIcon() {
     if (!hIcon) hIcon = (HICON)SendMessage(hwnd, WM_GETICON, ICON_SMALL, 0);
     if (!hIcon) hIcon = (HICON)GetClassLongPtr(hwnd, GCLP_HICON);
     if (!hIcon) hIcon = (HICON)GetClassLongPtr(hwnd, GCLP_HICONSM);
-    
+
     // Fallback to application icon
     if (!hIcon) {
         hIcon = LoadIcon(GetModuleHandle(NULL), IDI_APPLICATION);
@@ -35,7 +35,7 @@ void MainWindow::setupTrayIcon() {
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAY_MESSAGE;
     nid.hIcon = hIcon;
-    
+
     // Set tooltip
     strncpy(nid.szTip, "FTorrent", sizeof(nid.szTip) - 1);
     nid.szTip[sizeof(nid.szTip) - 1] = '\0';
@@ -86,7 +86,8 @@ int MainWindow::win_event_handler(int) {
     // ─────────────────────────────────────────────────────────────────────
 
     if (fl_msg.message == WM_TRAY_MESSAGE) {
-        if (LOWORD(fl_msg.lParam) == WM_LBUTTONDBLCLK || LOWORD(fl_msg.lParam) == WM_LBUTTONUP) {
+        if (LOWORD(fl_msg.lParam) == WM_LBUTTONDBLCLK ||
+            LOWORD(fl_msg.lParam) == WM_LBUTTONUP) {
             // Show/Restore window
             MainWindow* win = (MainWindow*)Fl::first_window();
             if (win) {
@@ -108,16 +109,18 @@ int MainWindow::win_event_handler(int) {
             AppendMenu(hMenu, MF_STRING, 4, "Resume All");
             AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenu(hMenu, MF_STRING, 2, "Exit");
-            
+
             POINT pt;
             GetCursorPos(&pt);
-            
-            // SetForegroundWindow is necessary for the menu to close when clicking away
+
+            // SetForegroundWindow is necessary for the menu to close when
+            // clicking away
             SetForegroundWindow(fl_msg.hwnd);
-            
-            int id = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, fl_msg.hwnd, NULL);
+
+            int id = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x,
+                                    pt.y, 0, fl_msg.hwnd, NULL);
             DestroyMenu(hMenu);
-            
+
             MainWindow* win = (MainWindow*)Fl::first_window();
             if (!win) return 0;
 
@@ -128,7 +131,7 @@ int MainWindow::win_event_handler(int) {
                 // Actual exit from program
                 win->removeTrayIcon();
                 // Close the session and exit
-                exit(0); 
+                exit(0);
             } else if (id == 3) {
                 // Pause all (Optional: could be implemented in manager)
                 if (win->m_manager) {

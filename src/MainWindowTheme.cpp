@@ -43,7 +43,7 @@ void MainWindow::applyLimitStyle() {
 
 void MainWindow::updateCensorButtonState() {
     if (!m_btnCensor) return;
-    
+
     // The eye button only makes sense while the public IP is shown at all
     if (m_showPublicIp) {
         m_btnCensor->show();
@@ -56,54 +56,61 @@ void MainWindow::updateCensorButtonState() {
         m_btnCensor->hide();
         m_btnCensor->image(nullptr);
     }
-    
+
     // Give the freed space back to the status text
     if (m_statusBar && m_statusGroup) {
         int rightMargin = m_showPublicIp ? 35 : 8;
-        m_statusBar->resize(2, m_statusBar->y(), m_statusGroup->w() - rightMargin, m_statusBar->h());
+        m_statusBar->resize(2, m_statusBar->y(),
+                            m_statusGroup->w() - rightMargin, m_statusBar->h());
         m_statusBar->redraw();
     }
-    
+
     // Keep the eye button pinned to the right edge of the status bar
     if (m_btnCensor && m_statusGroup) {
-        m_btnCensor->resize(m_statusGroup->w() - 30, m_statusGroup->y() + 2, 26, STATUS_HEIGHT - 4);
+        m_btnCensor->resize(m_statusGroup->w() - 30, m_statusGroup->y() + 2, 26,
+                            STATUS_HEIGHT - 4);
     }
-    
+
     m_btnCensor->redraw();
 }
 
 void MainWindow::updateToolbar() {
     if (!m_torrentList) return;
-    
+
     bool hasSelection = m_torrentList->hasSelection();
-    
+
     if (m_btnTogglePause) {
         if (hasSelection) {
             m_btnTogglePause->activate();
-            
+
             // Check state of first selected item to determine button state
             bool isPaused = false;
             auto selected = m_torrentList->getSelectedTorrents();
             if (!selected.empty()) {
-                isPaused = (selected[0]->getState() == TorrentItem::State::Paused);
+                isPaused =
+                    (selected[0]->getState() == TorrentItem::State::Paused);
             }
-            
+
             if (isPaused) {
                 m_btnTogglePause->tooltip("Resume");
-                if (Resources::getPlayIcon()) m_btnTogglePause->image(Resources::getPlayIcon());
+                if (Resources::getPlayIcon())
+                    m_btnTogglePause->image(Resources::getPlayIcon());
             } else {
                 m_btnTogglePause->tooltip("Pause");
-                if (Resources::getPauseIcon()) m_btnTogglePause->image(Resources::getPauseIcon());
+                if (Resources::getPauseIcon())
+                    m_btnTogglePause->image(Resources::getPauseIcon());
             }
         } else {
             m_btnTogglePause->deactivate();
             m_btnTogglePause->tooltip("Pause");
-            if (Resources::getPauseIcon()) m_btnTogglePause->image(Resources::getPauseIcon());
+            if (Resources::getPauseIcon())
+                m_btnTogglePause->image(Resources::getPauseIcon());
         }
         m_btnTogglePause->redraw();
     }
-    
-    if (m_btnRemove) hasSelection ? m_btnRemove->activate() : m_btnRemove->deactivate();
+
+    if (m_btnRemove)
+        hasSelection ? m_btnRemove->activate() : m_btnRemove->deactivate();
 }
 
 // The censoring eye icons are the only images that follow the theme, so they
@@ -115,27 +122,31 @@ void MainWindow::reloadEyeIcons() {
 
     delete m_eyeOpenedIcon;
     delete m_eyeClosedIcon;
-    m_eyeOpenedIcon = AssetLoader::load(dark ? "eye_opened_bright.png" : "eye_opened_dark.png", ToolbarLayout::kIconSize);
-    m_eyeClosedIcon = AssetLoader::load(dark ? "eye_closed_bright.png" : "eye_closed_dark.png", ToolbarLayout::kIconSize);
+    m_eyeOpenedIcon = AssetLoader::load(dark ? "eye_opened_bright.png"
+                                             : "eye_opened_dark.png",
+                                        ToolbarLayout::kIconSize);
+    m_eyeClosedIcon = AssetLoader::load(dark ? "eye_closed_bright.png"
+                                             : "eye_closed_dark.png",
+                                        ToolbarLayout::kIconSize);
 }
 
 void MainWindow::applyTheme() {
     bool darkMode = m_darkMode;
-    
+
     if (darkMode) {
         // Dark Mode Colors
         Fl::background(0, 0, 0);       // Absolute black background for window
         Fl::background2(20, 20, 20);   // Near black for lists
         Fl::foreground(255, 255, 255); // Pure white for text
-        
+
         // Selection colors
         Fl::set_color(FL_SELECTION_COLOR, 40, 80, 160);
-        
+
         // 3D effect colors (redefining grays for borders)
-        Fl::set_color(FL_GRAY0, 70, 70, 70);   // Dark-mid gray for borders
-        Fl::set_color(FL_DARK3, 40, 40, 40);   // Darker gray for deep shadows
+        Fl::set_color(FL_GRAY0, 70, 70, 70);     // Dark-mid gray for borders
+        Fl::set_color(FL_DARK3, 40, 40, 40);     // Darker gray for deep shadows
         Fl::set_color(FL_LIGHT3, 100, 100, 100); // Lighter gray for highlights
-        
+
         if (m_darkModeBtn) {
             m_darkModeBtn->label(nullptr);
             if (m_darkIcon) m_darkModeBtn->image(m_darkIcon);
@@ -146,10 +157,10 @@ void MainWindow::applyTheme() {
         Fl::background(225, 225, 225); // Standard light gray
         Fl::background2(255, 255, 255);
         Fl::foreground(0, 0, 0);
-        
+
         // Reset colors to defaults
         Fl::set_color(FL_SELECTION_COLOR, 0, 81, 255); // Standard Blue
-        
+
         if (m_darkModeBtn) {
             m_darkModeBtn->label(nullptr);
             if (m_brightIcon) m_darkModeBtn->image(m_brightIcon);
@@ -168,12 +179,12 @@ void MainWindow::applyTheme() {
         }
     }
     updateCensorButtonState();
-    
+
     // Aplicar a todos los widgets existentes
     for (int i = 0; i < children(); i++) {
         child(i)->redraw();
     }
-    
+
     // Forzamos el rediseño de la ventana y sus hijos
     redraw();
     if (m_torrentList) {
@@ -182,7 +193,7 @@ void MainWindow::applyTheme() {
     if (m_searchResults) {
         m_searchResults->applyTheme(darkMode);
     }
-    
+
     // The limit button keeps its magenta while the limit is on, so its colour
     // is owned by applyLimitStyle(), which the toggle also goes through.
     if (m_btnLimit) applyLimitStyle();
@@ -204,31 +215,31 @@ void MainWindow::toggleDarkMode() {
 
 void MainWindow::toggleNetworkLimit() {
     m_limitModerate = !m_limitModerate;
-    
+
     if (m_btnLimit) {
         applyLimitStyle();
     }
-    
+
     if (m_manager) {
         if (m_limitModerate) {
             // Half the speed of what is in settings (or a default if 0)
             int maxDown = SettingsManager::instance().getMaxDownloadRate();
             int maxUp = SettingsManager::instance().getMaxUploadRate();
-            
-            // If settings say unlimited (0), we pick a reasonable high value to halve, 
-            // but usually limit means some fixed restriction.
-            // Let's assume moderate is halving the current settings, 
-            // and if they are 0, we set a specific moderate limit (e.g. 500 KB/s down, 100 KB/s up)
-            int limitDown = (maxDown > 0) ? maxDown / 2 : 1000; 
+
+            // If settings say unlimited (0), we pick a reasonable high value to
+            // halve, but usually limit means some fixed restriction. Let's
+            // assume moderate is halving the current settings, and if they are
+            // 0, we set a specific moderate limit (e.g. 500 KB/s down, 100 KB/s
+            // up)
+            int limitDown = (maxDown > 0) ? maxDown / 2 : 1000;
             int limitUp = (maxUp > 0) ? maxUp / 2 : 200;
-            
+
             m_manager->setRateLimits(limitDown, limitUp);
         } else {
             // Restore from settings
             m_manager->setRateLimits(
                 SettingsManager::instance().getMaxDownloadRate(),
-                SettingsManager::instance().getMaxUploadRate()
-            );
+                SettingsManager::instance().getMaxUploadRate());
         }
     }
 }
@@ -237,11 +248,11 @@ void MainWindow::toggleCensorship() {
     if (!m_showPublicIp) {
         return; // Nothing to censor while the public IP is disabled
     }
-    
+
     m_censored = !m_censored;
     SettingsManager::instance().setIpCensored(m_censored);
     SettingsManager::instance().save();
-    
+
     updateCensorButtonState();
     updateStatusBar();
 }
@@ -250,47 +261,49 @@ std::string MainWindow::formatStatusBar() const {
     if (!m_manager) {
         return "Not initialized";
     }
-    
+
     int totalTorrents = m_manager->getTorrentCount();
     int activeTorrents = m_manager->getActiveTorrentsCount();
     int downRate = m_manager->getTotalDownloadRate();
     int upRate = m_manager->getTotalUploadRate();
-    
+
     std::ostringstream oss;
-    oss << "Torrents: " << totalTorrents 
-        << " (Active: " << activeTorrents << ")  |  ";
-    
+    oss << "Torrents: " << totalTorrents << " (Active: " << activeTorrents
+        << ")  |  ";
+
     if (downRate > 0 || upRate > 0) {
         oss << "↓ " << Format::perSecond(downRate) << "  "
             << "↑ " << Format::perSecond(upRate);
     } else {
         oss << "Idle";
     }
-    
+
     // Add RAM usage
     oss << "  |  RAM: " << SystemUtils::getRamUsage();
-    
+
     // Add Application Version
     oss << "  |  FTORRENT " << VERSION;
-    
-    // Public IP (only when enabled in Preferences; the flag is hidden too while censored)
+
+    // Public IP (only when enabled in Preferences; the flag is hidden too while
+    // censored)
     if (m_showPublicIp) {
         std::string ip = m_manager->getPublicIp();
         if (!ip.empty()) {
             if (m_censored) {
                 oss << "  |  IP: ***.***.***.***";
             } else {
-                oss << "  |  IP: " << ip << " " << getFlagEmoji(m_manager->getCountryCode());
+                oss << "  |  IP: " << ip << " "
+                    << getFlagEmoji(m_manager->getCountryCode());
             }
         }
     }
-    
+
     if (m_latency >= 0) {
         oss << "  |  LATENCY: " << m_latency << " ms";
     } else if (m_latency == -2) {
         oss << "  |  LATENCY: -- ms";
     }
-    
+
     return oss.str();
 }
 
@@ -324,7 +337,7 @@ void MainWindow::onRamModeCycle(Fl_Widget*, void* data) {
     MainWindow* win = (MainWindow*)data;
     if (!win || !win->m_manager) return;
     int cur = SettingsManager::instance().getRamMode();
-    int next = (cur == 1) ? 2 : (cur == 2) ? 0 : 1;   // NORMAL->TURBO->ECO
+    int next = (cur == 1) ? 2 : (cur == 2) ? 0 : 1; // NORMAL->TURBO->ECO
     SettingsManager::instance().setRamMode(next);
     SettingsManager::instance().save();
     win->m_manager->setRamMode(next);

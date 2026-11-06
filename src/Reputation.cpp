@@ -13,7 +13,8 @@ namespace {
 
 const std::string USER_AGENT = Version::httpUserAgent();
 
-const char* const VIRUSTOTAL_FILE_API = "https://www.virustotal.com/api/v3/files/";
+const char* const VIRUSTOTAL_FILE_API =
+    "https://www.virustotal.com/api/v3/files/";
 const char* const MALWAREBAZAAR_API = "https://mb-api.abuse.ch/api/v1/";
 
 // A tag or a signature is remote text. Control characters would let it break a
@@ -66,7 +67,8 @@ struct Json {
 
 class JsonParser {
 public:
-    explicit JsonParser(const std::string& text) : m_text(text) {}
+    explicit JsonParser(const std::string& text)
+        : m_text(text) {}
 
     bool parse(Json& out) {
         skipSpace();
@@ -100,8 +102,10 @@ private:
 
         const char ch = m_text[m_pos];
         switch (ch) {
-            case '{': return object(out, depth);
-            case '[': return array(out, depth);
+            case '{':
+                return object(out, depth);
+            case '[':
+                return array(out, depth);
             case '"':
                 out.type = Json::Type::String;
                 return string(out.text);
@@ -126,7 +130,7 @@ private:
 
     bool object(Json& out, int depth) {
         out.type = Json::Type::Object;
-        ++m_pos;                       // '{'
+        ++m_pos; // '{'
         skipSpace();
         if (m_pos < m_text.size() && m_text[m_pos] == '}') {
             ++m_pos;
@@ -160,7 +164,7 @@ private:
 
     bool array(Json& out, int depth) {
         out.type = Json::Type::Array;
-        ++m_pos;                       // '['
+        ++m_pos; // '['
         skipSpace();
         if (m_pos < m_text.size() && m_text[m_pos] == ']') {
             ++m_pos;
@@ -209,9 +213,12 @@ private:
         for (int i = 0; i < 4; ++i) {
             const char ch = m_text[m_pos + static_cast<std::size_t>(i)];
             unsigned int digit = 0;
-            if (ch >= '0' && ch <= '9') digit = static_cast<unsigned int>(ch - '0');
-            else if (ch >= 'a' && ch <= 'f') digit = static_cast<unsigned int>(ch - 'a' + 10);
-            else if (ch >= 'A' && ch <= 'F') digit = static_cast<unsigned int>(ch - 'A' + 10);
+            if (ch >= '0' && ch <= '9')
+                digit = static_cast<unsigned int>(ch - '0');
+            else if (ch >= 'a' && ch <= 'f')
+                digit = static_cast<unsigned int>(ch - 'a' + 10);
+            else if (ch >= 'A' && ch <= 'F')
+                digit = static_cast<unsigned int>(ch - 'A' + 10);
             else return false;
             out = (out << 4) | digit;
         }
@@ -233,22 +240,38 @@ private:
             if (m_pos >= m_text.size()) return false;
             const char escape = m_text[m_pos++];
             switch (escape) {
-                case '"':  out.push_back('"'); break;
-                case '\\': out.push_back('\\'); break;
-                case '/':  out.push_back('/'); break;
-                case 'b':  out.push_back('\b'); break;
-                case 'f':  out.push_back('\f'); break;
-                case 'n':  out.push_back('\n'); break;
-                case 'r':  out.push_back('\r'); break;
-                case 't':  out.push_back('\t'); break;
+                case '"':
+                    out.push_back('"');
+                    break;
+                case '\\':
+                    out.push_back('\\');
+                    break;
+                case '/':
+                    out.push_back('/');
+                    break;
+                case 'b':
+                    out.push_back('\b');
+                    break;
+                case 'f':
+                    out.push_back('\f');
+                    break;
+                case 'n':
+                    out.push_back('\n');
+                    break;
+                case 'r':
+                    out.push_back('\r');
+                    break;
+                case 't':
+                    out.push_back('\t');
+                    break;
                 case 'u': {
                     unsigned int code = 0;
                     if (!hex4(code)) return false;
                     // A surrogate pair is two escapes; combine them so a tag
                     // with an emoji does not turn into two broken halves.
                     if (code >= 0xD800 && code <= 0xDBFF &&
-                        m_pos + 1 < m_text.size() &&
-                        m_text[m_pos] == '\\' && m_text[m_pos + 1] == 'u') {
+                        m_pos + 1 < m_text.size() && m_text[m_pos] == '\\' &&
+                        m_text[m_pos + 1] == 'u') {
                         m_pos += 2;
                         unsigned int low = 0;
                         if (!hex4(low)) return false;
@@ -286,8 +309,8 @@ private:
         }
         if (!digits) return false;
         out.type = Json::Type::Number;
-        out.number = std::strtod(m_text.substr(start, m_pos - start).c_str(),
-                                 nullptr);
+        out.number =
+            std::strtod(m_text.substr(start, m_pos - start).c_str(), nullptr);
         return true;
     }
 
@@ -340,8 +363,8 @@ ProviderVerdict VirusTotalProvider::parseReport(const std::string& body) {
 
     const Json* data = root.member("data");
     const Json* attributes = data ? data->member("attributes") : nullptr;
-    const Json* stats = attributes ? attributes->member("last_analysis_stats")
-                                   : nullptr;
+    const Json* stats =
+        attributes ? attributes->member("last_analysis_stats") : nullptr;
     if (!stats || stats->type != Json::Type::Object) {
         verdict.summary = "VirusTotal sent an answer with no analysis.";
         return verdict;
@@ -359,25 +382,27 @@ ProviderVerdict VirusTotalProvider::parseReport(const std::string& body) {
                       " of " + std::to_string(verdict.total) +
                       " engines flag this file";
     if (verdict.suspicious > 0) {
-        verdict.summary += ", " + std::to_string(verdict.suspicious) +
-                           " suspicious";
+        verdict.summary +=
+            ", " + std::to_string(verdict.suspicious) + " suspicious";
     }
     verdict.summary += ".";
     return verdict;
 }
 
-ProviderVerdict VirusTotalProvider::query(const std::string& sha256,
-                                          const std::string& apiKey,
-                                          const std::atomic<bool>& cancel) const {
+ProviderVerdict
+VirusTotalProvider::query(const std::string& sha256, const std::string& apiKey,
+                          const std::atomic<bool>& cancel) const {
     ProviderVerdict verdict;
     verdict.provider = "VirusTotal";
 
     if (!isSha256Hex(sha256)) {
-        verdict.summary = "VirusTotal was not asked: the hash is not a SHA-256.";
+        verdict.summary =
+            "VirusTotal was not asked: the hash is not a SHA-256.";
         return verdict;
     }
     if (apiKey.empty()) {
-        verdict.summary = "VirusTotal needs an API key (Preferences, Security).";
+        verdict.summary =
+            "VirusTotal needs an API key (Preferences, Security).";
         return verdict;
     }
 
@@ -396,7 +421,8 @@ ProviderVerdict VirusTotalProvider::query(const std::string& sha256,
         return verdict;
     }
     if (res.httpStatus == 429) {
-        verdict.summary = "VirusTotal's rate limit was reached. Try again later.";
+        verdict.summary =
+            "VirusTotal's rate limit was reached. Try again later.";
         return verdict;
     }
     if (!res.ok) {
@@ -413,7 +439,8 @@ ProviderVerdict MalwareBazaarProvider::parseReport(const std::string& body) {
     Json root;
     JsonParser parser(body);
     if (!parser.parse(root) || root.type != Json::Type::Object) {
-        verdict.summary = "MalwareBazaar sent an answer that could not be read.";
+        verdict.summary =
+            "MalwareBazaar sent an answer that could not be read.";
         return verdict;
     }
 
@@ -453,9 +480,10 @@ ProviderVerdict MalwareBazaarProvider::parseReport(const std::string& body) {
     return verdict;
 }
 
-ProviderVerdict MalwareBazaarProvider::query(const std::string& sha256,
-                                             const std::string& apiKey,
-                                             const std::atomic<bool>& cancel) const {
+ProviderVerdict
+MalwareBazaarProvider::query(const std::string& sha256,
+                             const std::string& apiKey,
+                             const std::atomic<bool>& cancel) const {
     ProviderVerdict verdict;
     verdict.provider = "MalwareBazaar";
 

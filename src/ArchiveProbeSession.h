@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "ArchivePreflight.h"   // PieceRange and computeRange
+#include "ArchivePreflight.h" // PieceRange and computeRange
 
 /**
  * @brief One throwaway libtorrent session that reads byte ranges of one file.

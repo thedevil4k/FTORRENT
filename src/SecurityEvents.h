@@ -18,10 +18,10 @@
  * the packets on the wire.
  */
 struct SecurityEvent {
-    std::int64_t when = 0;    // Seconds since the epoch
-    std::string torrent;      // Torrent name, may be empty
-    std::string kind;         // "Peer banned", "Invalid request", ...
-    std::string detail;       // libtorrent's own sentence, shown as-is
+    std::int64_t when = 0; // Seconds since the epoch
+    std::string torrent;   // Torrent name, may be empty
+    std::string kind;      // "Peer banned", "Invalid request", ...
+    std::string detail;    // libtorrent's own sentence, shown as-is
 };
 
 /**

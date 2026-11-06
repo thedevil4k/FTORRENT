@@ -26,7 +26,7 @@
 // enum with B0 already a macro. FLTK 1.4 renamed those members, which is why
 // this only bites against 1.3. Nothing here wants the baud constant.
 #ifdef B0
-#  undef B0
+#undef B0
 #endif
 #include <FL/Fl.H>
 #include <FL/Fl_Image.H>
@@ -82,8 +82,8 @@ inline std::filesystem::path configDir() {
     return std::filesystem::path(appdata ? appdata : ".") / "FTorrent";
 #elif defined(__APPLE__)
     const char* home = getenv("HOME");
-    return std::filesystem::path(home ? home : ".") /
-           "Library" / "Application Support" / "FTorrent";
+    return std::filesystem::path(home ? home : ".") / "Library" /
+           "Application Support" / "FTorrent";
 #else
     const char* xdg = getenv("XDG_CONFIG_HOME");
     if (xdg && *xdg) return std::filesystem::path(xdg) / "ftorrent";
@@ -128,7 +128,6 @@ inline void useScratchConfig(const char* name) {
     std::error_code ec2;
     std::filesystem::create_directories(configDir(), ec2);
 }
-
 
 // Remove the scratch directory, so a test run leaves nothing behind.
 inline void removeScratchConfig(const char* name) {
@@ -190,7 +189,7 @@ inline bool samePixels(Fl_Image* a, Fl_Image* b) {
         Fl_RGB_Image* out = nullptr;
         {
             SurfaceScope here(&surf);
-            fl_color(FL_BLACK);                       // same backdrop for both
+            fl_color(FL_BLACK); // same backdrop for both
             fl_rectf(0, 0, w, h);
             (pass == 0 ? a : b)->draw(0, 0);
             out = surf.image();
@@ -199,28 +198,37 @@ inline bool samePixels(Fl_Image* a, Fl_Image* b) {
             if (out) delete out;
             return false;
         }
-        (pass == 0 ? pa : pb).assign(out->array,
-                                     out->array + (size_t)w * h * 3);
+        (pass == 0 ? pa : pb)
+            .assign(out->array, out->array + (size_t)w * h * 3);
         delete out;
     }
     return pa == pb;
 }
 
-struct Rgb { unsigned char r, g, b; };
+struct Rgb {
+    unsigned char r, g, b;
+};
 
 // Renders the widget offscreen and reports the background it fills itself with
 // plus the extent of everything else it draws (the icon). Rendered pixels, not
 // the colour attributes, because those are what the user actually sees.
-struct Rendered { Rgb bg; int x0, y0, x1, y1, ink; bool ok; };
+struct Rendered {
+    Rgb bg;
+    int x0, y0, x1, y1, ink;
+    bool ok;
+};
 
 inline Rendered renderWidget(Fl_Widget* w) {
     Rendered r{};
-    r.ok = false; r.x0 = r.y0 = r.x1 = r.y1 = -1; r.ink = 0;
+    r.ok = false;
+    r.x0 = r.y0 = r.x1 = r.y1 = -1;
+    r.ink = 0;
     Fl_Image_Surface surf(w->w(), w->h());
     SurfaceScope here(&surf);
     surf.draw(w);
     Fl_RGB_Image* img = surf.image();
-    if (!img || !img->array || img->d() != 3 || img->w() != w->w() || img->h() != w->h()) {
+    if (!img || !img->array || img->d() != 3 || img->w() != w->w() ||
+        img->h() != w->h()) {
         if (img) delete img;
         return r;
     }
@@ -235,14 +243,18 @@ inline Rendered renderWidget(Fl_Widget* w) {
         for (int x = 0; x < img->w(); x++) {
             Rgb p = at(x, y);
             if (std::abs(p.r - r.bg.r) <= 6 && std::abs(p.g - r.bg.g) <= 6 &&
-                std::abs(p.b - r.bg.b) <= 6) continue;
+                std::abs(p.b - r.bg.b) <= 6)
+                continue;
             r.ink++;
             if (r.x0 < 0 || x < r.x0) r.x0 = x;
             if (x > maxx) maxx = x;
             if (r.y0 < 0 || y < r.y0) r.y0 = y;
             if (y > maxy) maxy = y;
         }
-    if (r.x0 >= 0) { r.x1 = maxx; r.y1 = maxy; }
+    if (r.x0 >= 0) {
+        r.x1 = maxx;
+        r.y1 = maxy;
+    }
     r.ok = true;
     delete img;
     return r;
@@ -296,6 +308,6 @@ inline InkBox inkOfImage(int w, int h, Fl_Image* img) {
     return inkOfPaint((w > h ? w : h) + 8, [img] { img->draw(0, 0); });
 }
 
-}  // namespace testsupport
+} // namespace testsupport
 
-#endif  // FTORRENT_TESTS_TEST_SUPPORT_H
+#endif // FTORRENT_TESTS_TEST_SUPPORT_H

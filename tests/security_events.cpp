@@ -42,7 +42,8 @@ int main() {
     {
         events.add("ubuntu.iso", "Peer banned", "peer 10.0.0.1 misbehaved");
         events.add("", "Tracker error", "http://t.example: connection refused");
-        events.add("debian.iso", "Invalid request", "request for a piece we do not have");
+        events.add("debian.iso", "Invalid request",
+                   "request for a piece we do not have");
 
         const std::vector<SecurityEvent> all = events.snapshot();
         ok(all.size() == 3, "three events are kept");
@@ -59,8 +60,7 @@ int main() {
         events.clear();
         const std::size_t overflow = SecurityEvents::kCapacity + 7;
         for (std::size_t i = 0; i < overflow; ++i) {
-            events.add("torrent", "Peer error",
-                       "event " + std::to_string(i));
+            events.add("torrent", "Peer error", "event " + std::to_string(i));
         }
         ok(events.size() == SecurityEvents::kCapacity,
            "the log stops at its capacity");
@@ -91,7 +91,8 @@ int main() {
            "CMake's project version reached src/Version.h");
         ok(Version::httpUserAgent().rfind("FTorrent/", 0) == 0,
            "the HTTP user agent starts with the app name");
-        ok(Version::httpUserAgent().find(Version::string()) != std::string::npos,
+        ok(Version::httpUserAgent().find(Version::string()) !=
+               std::string::npos,
            "the HTTP user agent carries the app version");
         ok(Version::defaultTrackerUserAgent().find(Version::string()) !=
                std::string::npos,

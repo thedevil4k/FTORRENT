@@ -11,7 +11,7 @@
 
 /**
  * @brief Widget de tabla para mostrar la lista de torrents
- * 
+ *
  * Muestra torrents en formato tabla con columnas:
  * - Nombre
  * - Tamaño
@@ -47,42 +47,44 @@ public:
     void removeTorrent(const std::string& hash);
     void updateTorrent(TorrentItem* torrent);
     void clear();
-    
+
     // Selection
     std::vector<TorrentItem*> getSelectedTorrents();
     TorrentItem* getSelectedTorrent();
     bool hasSelection();
-    
+
     // Sorting
     void sortBy(Column column, bool ascending = true);
-    
+
     // Drag-and-drop
-    void setOnDropCallback(std::function<void(const std::string&)> cb) { m_onDropCallback = cb; }
-    
+    void setOnDropCallback(std::function<void(const std::string&)> cb) {
+        m_onDropCallback = cb;
+    }
+
     // Context menu
     void showContextMenu();
-    
+
     // Details
     void showDetailsDialog(TorrentItem* torrent);
-    
+
 protected:
     // Fl_Table overrides
-    void draw_cell(TableContext context, int row, int col, 
-                   int x, int y, int w, int h) override;
-    
+    void draw_cell(TableContext context, int row, int col, int x, int y, int w,
+                   int h) override;
+
     int handle(int event) override;
     void draw() override;
-    
+
     // Colors the scrollbars (trough + knob) and the header for the active theme
     void applyScrollbarTheme(bool darkMode);
-    
+
 public:
     // Public because MainWindow drives the layout from outside
     void resize(int X, int Y, int W, int H) override;
-    
+
     // Re-applies the scrollbar/header colors (called when the theme changes)
     void refreshThemeColors(bool darkMode);
-    
+
 private:
     std::vector<TorrentItem*> m_torrents;
     std::vector<int> m_sortedIndices;
@@ -96,44 +98,44 @@ private:
     int m_shieldPressedRow = -1;
     bool shieldHit(int row, int x, int y);
     void openSecurityReport(TorrentItem* torrent);
-    
+
     Column m_sortColumn;
     bool m_sortAscending;
-    
+
     // Drag-and-drop state
     bool m_dropHighlight;
     bool m_userResizedCol[COL_COUNT];
     std::function<void(const std::string&)> m_onDropCallback;
-    
+
     // Column info
     struct ColumnInfo {
         const char* name;
         int width;
         Fl_Align alignment;
     };
-    
+
     static const ColumnInfo COLUMN_INFO[COL_COUNT];
-    
+
     // Helper methods
     void initializeColumns();
     void layoutColumns();
     void updateSortedIndices();
     TorrentItem* getTorrentAt(int row) const;
     int findTorrentRow(const std::string& hash) const;
-    
+
     // Drawing helpers
     void drawHeader(int col, int x, int y, int w, int h);
     void drawCell(int row, int col, int x, int y, int w, int h);
     void drawProgressBar(double progress, int x, int y, int w, int h);
     void drawDropOverlay();
-    
+
     // Sorting comparator
     bool compareTorrents(int idx1, int idx2) const;
-    
+
     // Colors
     static constexpr Fl_Color COLOR_HEADER_BG = FL_LIGHT2;
     Fl_Color m_headerBg;
-    
+
     // Columns the user has dragged manually: their width is left alone when
     // the table is resized, so a custom layout is not thrown away.
     Fl_Color getRowColor(int row) const;

@@ -11,18 +11,18 @@ class RemoveConfirmDialog : public Fl_Double_Window {
 public:
     RemoveConfirmDialog(int count);
     ~RemoveConfirmDialog();
-    
+
     bool shouldDeleteFiles() const;
     int show_modal(); // Returns 1 for Remove, 0 for Cancel
-    
+
 private:
     Fl_Check_Button* m_chkDeleteFiles;
     Fl_Button* m_btnRemove;
     Fl_Button* m_btnCancel;
     Fl_Box* m_messageText;
-    
+
     int m_result;
-    
+
     static void onRemove(Fl_Widget* w, void* data);
     static void onCancel(Fl_Widget* w, void* data);
 };

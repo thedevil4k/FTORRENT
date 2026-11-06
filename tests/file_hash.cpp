@@ -39,7 +39,8 @@ bool writeFile(const std::filesystem::path& path, const std::string& bytes) {
     return out.good();
 }
 
-void checkDigest(const std::string& bytes, const std::string& expected, const char* what) {
+void checkDigest(const std::string& bytes, const std::string& expected,
+                 const char* what) {
     const std::filesystem::path path = scratchPath();
     if (!writeFile(path, bytes)) {
         ok(false, "could write the test file");
@@ -59,21 +60,25 @@ void checkDigest(const std::string& bytes, const std::string& expected, const ch
 } // namespace
 
 int main() {
-    checkDigest("",
-                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                "empty file");
-    checkDigest("abc",
-                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-                "abc");
-    checkDigest("The quick brown fox jumps over the lazy dog",
-                "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
-                "one block");
-    checkDigest("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
-                "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
-                "length padding crosses a block");
-    checkDigest(std::string(1000000, 'a'),
-                "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
-                "one million a's");
+    checkDigest(
+        "", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty file");
+    checkDigest(
+        "abc",
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "abc");
+    checkDigest(
+        "The quick brown fox jumps over the lazy dog",
+        "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
+        "one block");
+    checkDigest(
+        "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+        "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+        "length padding crosses a block");
+    checkDigest(
+        std::string(1000000, 'a'),
+        "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+        "one million a's");
 
     std::string digest;
     std::string error;
@@ -95,9 +100,10 @@ int main() {
     ok(error == "cancelled", "a cancelled read says so");
     std::filesystem::remove(cancelPath, ec);
 
-    ok(VirusTotal::fileReportUrl(
-           "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD") ==
-           "https://www.virustotal.com/gui/file/ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    ok(VirusTotal::fileReportUrl("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177"
+                                 "A9CB410FF61F20015AD") ==
+           "https://www.virustotal.com/gui/file/"
+           "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
        "valid SHA-256 is normalized and placed in the URL");
     ok(VirusTotal::fileReportUrl("abc").empty(),
        "short digest produces no URL");

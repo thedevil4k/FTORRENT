@@ -13,7 +13,7 @@
 
 /**
  * @brief Thread-safe torrent manager with stable architecture
- * 
+ *
  * This class provides a thread-safe interface between libtorrent and the UI.
  * Features:
  * - Thread-safe operations with mutex protection
@@ -39,10 +39,20 @@ public:
     bool isInitialized() const { return m_initialized.load(); }
 
     // Torrent operations (all thread-safe)
-    std::future<bool> addTorrentFileAsync(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities = {});
-    std::future<bool> addMagnetLinkAsync(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities = {});
-    bool addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities = {});
-    bool addMagnetLink(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities = {});
+    std::future<bool>
+    addTorrentFileAsync(const std::string& torrentFile,
+                        const std::string& savePath,
+                        const std::vector<int>& file_priorities = {});
+    std::future<bool>
+    addMagnetLinkAsync(const std::string& magnetLink,
+                       const std::string& savePath,
+                       const std::vector<int>& file_priorities = {});
+    bool addTorrentFile(const std::string& torrentFile,
+                        const std::string& savePath,
+                        const std::vector<int>& file_priorities = {});
+    bool addMagnetLink(const std::string& magnetLink,
+                       const std::string& savePath,
+                       const std::vector<int>& file_priorities = {});
     void removeTorrent(const std::string& hash, bool deleteFiles = false);
     void pauseTorrent(const std::string& hash);
     void resumeTorrent(const std::string& hash);
@@ -110,7 +120,7 @@ private:
     void syncTorrentsInternal();
     TorrentItem* findTorrentInternal(const std::string& hash);
     const TorrentItem* findTorrentInternal(const std::string& hash) const;
-    
+
     // Thread-safe notification methods
     void notifyTorrentAdded(TorrentItem* item);
     void notifyTorrentRemoved(const std::string& hash);

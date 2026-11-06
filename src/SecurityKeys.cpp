@@ -9,12 +9,12 @@
 #include <vector>
 
 #ifdef _WIN32
-    #include <windows.h>
-    #include <dpapi.h>
+#include <windows.h>
+#include <dpapi.h>
 #else
-    #include <fcntl.h>
-    #include <sys/stat.h>
-    #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 namespace {
@@ -88,8 +88,10 @@ std::string SecurityKeys::storageDescription() {
            "Windows user account on this machine.";
 #else
     return "Keys are kept in a file only your user can read (permissions 0600) "
-           "under " + (std::filesystem::path(SystemUtils::getConfigDir()) /
-                       "security").string() + ".";
+           "under " +
+           (std::filesystem::path(SystemUtils::getConfigDir()) / "security")
+               .string() +
+           ".";
 #endif
 }
 
@@ -102,8 +104,7 @@ namespace {
 bool parsePlain(const std::string& plain, SecurityKeys::Provider provider,
                 std::string& key) {
     const std::size_t magicLen = std::strlen(MAGIC);
-    if (plain.size() < magicLen ||
-        plain.compare(0, magicLen, MAGIC) != 0) {
+    if (plain.size() < magicLen || plain.compare(0, magicLen, MAGIC) != 0) {
         return false;
     }
     const std::string id = SecurityKeys::providerId(provider);
@@ -140,9 +141,9 @@ bool SecurityKeys::save(Provider provider, const std::string& key,
     DATA_BLOB out{};
     DATA_BLOB entropy = entropyBlob();
 
-    const BOOL ok = CryptProtectData(&in, L"FTorrent provider key", &entropy,
-                                    nullptr, nullptr,
-                                    CRYPTPROTECT_UI_FORBIDDEN, &out);
+    const BOOL ok =
+        CryptProtectData(&in, L"FTorrent provider key", &entropy, nullptr,
+                         nullptr, CRYPTPROTECT_UI_FORBIDDEN, &out);
     wipe(plain);
     if (!ok) {
         error = "Windows could not protect the key (error " +
@@ -185,7 +186,7 @@ bool SecurityKeys::load(Provider provider, std::string& key) {
     DATA_BLOB entropy = entropyBlob();
     if (!CryptUnprotectData(&in, nullptr, &entropy, nullptr, nullptr,
                             CRYPTPROTECT_UI_FORBIDDEN, &out)) {
-        return false;   // A different user, or a corrupted file.
+        return false; // A different user, or a corrupted file.
     }
 
     std::string plain(reinterpret_cast<const char*>(out.pbData), out.cbData);
@@ -205,8 +206,8 @@ bool SecurityKeys::save(Provider provider, const std::string& key,
     if (!ensureDirectory(error)) return false;
 
     const std::filesystem::path path = keyPath(provider);
-    const std::string plain = std::string(MAGIC) + providerId(provider) + "\n" +
-                              cleaned;
+    const std::string plain =
+        std::string(MAGIC) + providerId(provider) + "\n" + cleaned;
 
     // 0600 at creation time, not after the fact: a chmod that follows the
     // write leaves a window in which the key is world-readable.
@@ -220,8 +221,8 @@ bool SecurityKeys::save(Provider provider, const std::string& key,
     // truncated it, so the file is the new length already.
     std::size_t written = 0;
     while (written < plain.size()) {
-        const ssize_t n = ::write(fd, plain.data() + written,
-                                  plain.size() - written);
+        const ssize_t n =
+            ::write(fd, plain.data() + written, plain.size() - written);
         if (n <= 0) break;
         written += static_cast<std::size_t>(n);
     }

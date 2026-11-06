@@ -71,7 +71,10 @@ static int menuRowInkOn(const Fl_Menu_Item* m, Fl_Choice* menu, Fl_Color bg) {
     // releases and not on others; this spelling compiles against both.
     const_cast<Fl_Menu_Item*>(m)->draw(2, 2, W - 4, H - 4, menu, 0);
     Fl_RGB_Image* img = surf.image();
-    if (!img || !img->array || img->d() != 3) { delete img; return -1; }
+    if (!img || !img->array || img->d() != 3) {
+        delete img;
+        return -1;
+    }
     unsigned char br = 0, bgc = 0, bb = 0;
     Fl::get_color(bg, br, bgc, bb);
     int ink = 0;
@@ -121,9 +124,10 @@ int main() {
             continue;
         }
         snprintf(msg, sizeof msg,
-                 "%s is fully on screen at 720px (%dx%d at x=%d..%d)",
-                 o, b->w(), b->h(), b->x(), b->x() + b->w());
-        ok(b->w() > 0 && b->h() > 0 && b->x() >= 0 && b->x() + b->w() <= 720, msg);
+                 "%s is fully on screen at 720px (%dx%d at x=%d..%d)", o,
+                 b->w(), b->h(), b->x(), b->x() + b->w());
+        ok(b->w() > 0 && b->h() > 0 && b->x() >= 0 && b->x() + b->w() <= 720,
+           msg);
     }
 
     const char* order[] = {"Pause", "Remove Torrent", "Switch Theme",
@@ -136,9 +140,10 @@ int main() {
             ok(false, msg);
             continue;
         }
-        snprintf(msg, sizeof msg, "%s clicked at 720px (%dx%d at x=%d..%d)",
-                 o, b->w(), b->h(), b->x(), b->x() + b->w());
-        ok(b->w() > 0 && b->h() > 0 && b->x() >= 0 && b->x() + b->w() <= 720, msg);
+        snprintf(msg, sizeof msg, "%s clicked at 720px (%dx%d at x=%d..%d)", o,
+                 b->w(), b->h(), b->x(), b->x() + b->w());
+        ok(b->w() > 0 && b->h() > 0 && b->x() >= 0 && b->x() + b->w() <= 720,
+           msg);
         b->do_callback();
         Fl::flush();
     }
@@ -188,13 +193,15 @@ int main() {
         for (const Fl_Menu_Item* m = engines->menu(); m && m->label(); ++m) {
             // Row 0 is "All engines", a mode rather than a site: it has no
             // reachability of its own, so it carries no bullet on purpose.
-            const bool isMode = rows == 0 && strcmp(m->label(), "All engines") == 0;
+            const bool isMode =
+                rows == 0 && strcmp(m->label(), "All engines") == 0;
             if (isMode) allFirst = true;
             rows++;
             // No images, ever: a non-normal labeltype means someone rehung a
             // picture on the rows, which is how the blank dropdowns happened.
             if (m->labeltype() == FL_NORMAL_LABEL) nPlain++;
-            if (isMode || strncmp(m->label(), "\xE2\x97\x8F ", 4) == 0) nBulleted++;
+            if (isMode || strncmp(m->label(), "\xE2\x97\x8F ", 4) == 0)
+                nBulleted++;
             int ink = menuRowInk(m, engines);
             char inkMsg[160];
             snprintf(inkMsg, sizeof inkMsg,
@@ -209,14 +216,16 @@ int main() {
        "every dropdown row is plain text (no menu images)");
     ok(nBulleted == rows && rows > 0,
        "every engine row carries the status bullet, and the mode row does not");
-    ok(nDrawn == rows && rows > 0,
-       "no dropdown row renders blank");
+    ok(nDrawn == rows && rows > 0, "no dropdown row renders blank");
     // Let the probes run and deliver (Fl::awake is drained by Fl::wait); the
     // verdict itself is network-dependent and is not asserted, but surviving
     // the deliveries without hanging is.
     for (int i = 0; i < 20; i++) Fl::wait(0.1);
     Fl_Button* back = (Fl_Button*)byTip(top, "Back to my torrents");
-    if (back) { back->do_callback(); Fl::flush(); }
+    if (back) {
+        back->do_callback();
+        Fl::flush();
+    }
     ok(byTip(top, "Search torrents") != nullptr,
        "toggle back restores the torrent list");
 

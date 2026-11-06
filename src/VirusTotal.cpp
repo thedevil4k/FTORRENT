@@ -2,8 +2,7 @@
 
 #include <cctype>
 
-std::string VirusTotal::fileReportUrl(const std::string& sha256Hex)
-{
+std::string VirusTotal::fileReportUrl(const std::string& sha256Hex) {
     if (sha256Hex.size() != 64) {
         return {};
     }

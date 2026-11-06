@@ -5,21 +5,9 @@
 #include <string>
 #include <vector>
 
-enum class RiskLevel {
-    Unknown = 0,
-    Low,
-    Medium,
-    High,
-    Critical
-};
+enum class RiskLevel { Unknown = 0, Low, Medium, High, Critical };
 
-enum class Severity {
-    Info = 0,
-    Low,
-    Medium,
-    High,
-    Critical
-};
+enum class Severity { Info = 0, Low, Medium, High, Critical };
 
 /**
  * @brief One file as the security analyzer sees it.
@@ -30,15 +18,15 @@ enum class Severity {
  * and easy to test.
  */
 struct SecurityFile {
-    int fileIndex = -1;       // libtorrent index, -1 when unknown
-    std::string path;         // Path inside the torrent, as stored
-    std::int64_t size = 0;    // Bytes
-    bool padFile = false;     // Internal piece-alignment file
-    bool hidden = false;      // Hidden attribute or a leading dot
-    bool executable = false;  // Executable attribute in the torrent metadata
+    int fileIndex = -1;      // libtorrent index, -1 when unknown
+    std::string path;        // Path inside the torrent, as stored
+    std::int64_t size = 0;   // Bytes
+    bool padFile = false;    // Internal piece-alignment file
+    bool hidden = false;     // Hidden attribute or a leading dot
+    bool executable = false; // Executable attribute in the torrent metadata
     bool symlink = false;
     bool absolutePath = false;
-    std::string symlinkPath;  // Target when symlink is true
+    std::string symlinkPath; // Target when symlink is true
     // True when the container's own index says this entry needs a password to
     // be read (a RAR/ZIP file header carrying the encryption flag). Only the
     // level-2 archive check can know this: a torrent's file list lists names,
@@ -87,7 +75,7 @@ enum class FindingCode {
 struct Finding {
     FindingCode code = FindingCode::Unknown;
     Severity severity = Severity::Info;
-    int fileIndex = -1;       // -1 means a torrent-level finding
+    int fileIndex = -1; // -1 means a torrent-level finding
     std::string detail;
 };
 
@@ -148,21 +136,21 @@ enum class ReputationState {
 };
 
 struct ProviderVerdict {
-    std::string provider;     // "VirusTotal", "MalwareBazaar"
-    bool answered = false;    // The provider gave a usable answer
-    bool known = false;       // It has a record for this hash
-    bool needsKey = false;    // Not asked: no API key is configured
+    std::string provider;  // "VirusTotal", "MalwareBazaar"
+    bool answered = false; // The provider gave a usable answer
+    bool known = false;    // It has a record for this hash
+    bool needsKey = false; // Not asked: no API key is configured
     int malicious = 0;
     int suspicious = 0;
-    int total = 0;            // Engines reporting, 0 when the provider has none
-    std::string summary;      // One line, safe to show as-is
+    int total = 0;       // Engines reporting, 0 when the provider has none
+    std::string summary; // One line, safe to show as-is
 };
 
 struct ReputationResult {
     ReputationState state = ReputationState::NotRequested;
-    std::string sha256;       // Lowercase hex, empty when unavailable
+    std::string sha256; // Lowercase hex, empty when unavailable
     std::vector<ProviderVerdict> verdicts;
-    std::string message;      // Ready to display; never says "safe"
+    std::string message; // Ready to display; never says "safe"
 };
 
 // The exact wording the product requires when there is no whole-file hash

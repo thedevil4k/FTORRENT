@@ -23,18 +23,18 @@ private:
     Fl_Input* m_sourcePath;
     Fl_Button* m_btnSelectFile;
     Fl_Button* m_btnSelectFolder;
-    
+
     Fl_Choice* m_pieceSize;
     Fl_Multiline_Input* m_trackers;
     Fl_Button* m_btnAddGenericTrackers;
     Fl_Multiline_Input* m_webSeeds;
     Fl_Multiline_Input* m_comment;
     Fl_Input* m_origin;
-    
+
     Fl_Check_Button* m_isPrivate;
     Fl_Check_Button* m_startSeeding;
     Fl_Check_Button* m_optimizeAlignment;
-    
+
     Fl_Progress* m_progress;
     Fl_Button* m_btnCreate;
     Fl_Button* m_btnCancel;
@@ -44,7 +44,7 @@ private:
     // UI creation
     void createUI();
     void createButtons();
-    
+
     // Callbacks
     static void onSelectFile(Fl_Widget* w, void* data);
     static void onSelectFolder(Fl_Widget* w, void* data);

@@ -22,8 +22,7 @@ TorrentItem::TorrentItem(const lt::torrent_handle& handle)
     , m_numPeers(0)
     , m_numSeeds(0)
     , m_addedTime(0)
-    , m_completedTime(0)
-{
+    , m_completedTime(0) {
     if (m_handle.is_valid()) {
         update();
     }
@@ -36,10 +35,10 @@ void TorrentItem::update() {
 
     try {
         lt::torrent_status status = m_handle.status();
-        
+
         // Basic info
         m_name = status.name;
-        
+
         m_savePath = status.save_path;
         // The hash must come from the handle, not from torrent_status:
         // status.info_hashes.v1 comes back with its first 16 bytes zeroed in
@@ -48,31 +47,31 @@ void TorrentItem::update() {
         // on this hash), which threw the whole list away and rebuilt it on
         // every sync. handle.info_hashes() returns the real value.
         m_hash = toHex(m_handle.info_hashes().v1);
-        
+
         // Size info
         m_totalSize = status.total_wanted;
         m_downloaded = status.total_wanted_done;
         m_uploaded = status.total_upload;
         m_progress = status.progress;
-        
+
         // Speed info
         m_downloadRate = status.download_rate;
         m_uploadRate = status.upload_rate;
-        
+
         // Peer info
         m_numPeers = status.num_peers;
         m_numSeeds = status.num_seeds;
-        
+
         // State info
         updateState(status);
-        
+
         // If paused, force rates to 0 for UI clarity
         if (m_state == State::Paused) {
             m_downloadRate = 0;
             m_uploadRate = 0;
             m_numPeers = 0;
         }
-        
+
         // Time info
         m_addedTime = status.added_time;
 
@@ -87,14 +86,22 @@ void TorrentItem::update() {
 
 std::string TorrentItem::getStateString() const {
     switch (m_state) {
-        case State::Queued:      return "Queued";
-        case State::Checking:    return "Checking";
-        case State::Downloading: return "Downloading";
-        case State::Seeding:     return "Seeding";
-        case State::Paused:      return "Paused";
-        case State::Error:       return "Error";
-        case State::Complete:    return "Complete";
-        default:                 return "Unknown";
+        case State::Queued:
+            return "Queued";
+        case State::Checking:
+            return "Checking";
+        case State::Downloading:
+            return "Downloading";
+        case State::Seeding:
+            return "Seeding";
+        case State::Paused:
+            return "Paused";
+        case State::Error:
+            return "Error";
+        case State::Complete:
+            return "Complete";
+        default:
+            return "Unknown";
     }
 }
 
@@ -102,10 +109,10 @@ int TorrentItem::getETA() const {
     if (m_state != State::Downloading || m_downloadRate <= 0) {
         return -1; // No ETA
     }
-    
+
     int64_t remaining = m_totalSize - m_downloaded;
     if (remaining <= 0) return 0;
-    
+
     return static_cast<int>(remaining / m_downloadRate);
 }
 
@@ -129,19 +136,20 @@ void TorrentItem::updateState(const lt::torrent_status& status) {
         m_state = State::Paused;
     } else {
         m_state = convertState(status.state);
-        
+
         // If finished but seeding
         if (m_progress >= 1.0 && m_state == State::Downloading) {
             m_state = State::Complete;
         }
     }
-    
+
     if (status.errc) {
         m_state = State::Error;
     }
 }
 
-TorrentItem::State TorrentItem::convertState(lt::torrent_status::state_t ltState) const {
+TorrentItem::State
+TorrentItem::convertState(lt::torrent_status::state_t ltState) const {
     switch (ltState) {
         case lt::torrent_status::checking_files:
             return State::Checking;
@@ -204,14 +212,15 @@ std::vector<TorrentItem::PeerInfo> TorrentItem::getPeers() const {
         info.client = p.client;
         // Direction and encryption are facts about the link, not about the
         // data, so the monitor can state them without inspecting traffic.
-        info.outgoing = static_cast<bool>(p.flags & lt::peer_info::outgoing_connection);
-        info.encrypted = static_cast<bool>(
-            p.flags & (lt::peer_info::rc4_encrypted |
-                       lt::peer_info::plaintext_encrypted));
+        info.outgoing =
+            static_cast<bool>(p.flags & lt::peer_info::outgoing_connection);
+        info.encrypted =
+            static_cast<bool>(p.flags & (lt::peer_info::rc4_encrypted |
+                                         lt::peer_info::plaintext_encrypted));
         info.downloadRate = p.down_speed;
         info.uploadRate = p.up_speed;
         info.progress = p.progress;
-        
+
         // Flags
         if (p.flags & lt::peer_info::interesting) info.flags += "I";
         if (p.flags & lt::peer_info::choked) info.flags += "C";
@@ -219,12 +228,13 @@ std::vector<TorrentItem::PeerInfo> TorrentItem::getPeers() const {
         if (p.flags & lt::peer_info::remote_choked) info.flags += "c";
         if (p.flags & lt::peer_info::supports_extensions) info.flags += "e";
 #if LIBTORRENT_VERSION_NUM >= 20100
-        // local_connection was removed in libtorrent 2.1, outgoing_connection is equivalent.
+        // local_connection was removed in libtorrent 2.1, outgoing_connection
+        // is equivalent.
         if (p.flags & lt::peer_info::outgoing_connection) info.flags += "L";
 #else
         if (p.flags & lt::peer_info::local_connection) info.flags += "L";
 #endif
-        
+
         result.push_back(info);
     }
     return result;
@@ -238,7 +248,8 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
     if (!info) return result;
 
 #if LIBTORRENT_VERSION_NUM >= 20100
-    // torrent_info::files() was removed in libtorrent 2.1, use layout() instead.
+    // torrent_info::files() was removed in libtorrent 2.1, use layout()
+    // instead.
     lt::file_storage const& fs = info->layout();
 #else
     lt::file_storage const& fs = info->files();
@@ -271,7 +282,7 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
         SecurityHashes::fillWholeFileHash(*info, fs, i, hashSource);
         fi.sha256 = hashSource.sha256;
         fi.sha256Complete = hashSource.sha256Complete;
-        
+
         if (fi.size > 0 && i < (int)file_progress.size()) {
             fi.progress = (double)file_progress[i] / fi.size;
             fi.complete = file_progress[i] >= fi.size;
@@ -279,8 +290,9 @@ std::vector<TorrentItem::FileInfo> TorrentItem::getFiles() const {
             fi.progress = 0.0;
             fi.complete = fi.size == 0;
         }
-        
-        fi.priority = (int)static_cast<std::uint8_t>(m_handle.file_priority(lt::file_index_t(i)));
+
+        fi.priority = (int)static_cast<std::uint8_t>(
+            m_handle.file_priority(lt::file_index_t(i)));
         result.push_back(fi);
     }
     return result;

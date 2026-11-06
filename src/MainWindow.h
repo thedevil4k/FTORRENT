@@ -32,13 +32,14 @@
 
 /**
  * @brief FTorrent main window
- * 
+ *
  * Contains the menu, toolbar, torrent list and status bar.
  * Inspired by qBittorrent/Transmission.
  */
 
 class MainWindow : public Fl_Double_Window {
-public:    MainWindow(int w, int h, const char* title);
+public:
+    MainWindow(int w, int h, const char* title);
     ~MainWindow();
 
     static constexpr const char* VERSION = "0.6.0";
@@ -51,24 +52,24 @@ public:    MainWindow(int w, int h, const char* title);
     void show();
     int handle(int event) override;
     void resize(int x, int y, int w, int h) override;
-    
+
     // TorrentManager integration
     void setTorrentManager(TorrentManager* manager);
-    
+
     // Update UI
     void updateUI();
     void updateStatusBar();
     void updateToolbar();
-    
+
     // Theme
     void applyTheme();
     void toggleDarkMode();
     void toggleNetworkLimit();
     void toggleCensorship();
-    
+
     // Syncs the censor (eye) button with m_censored / m_showPublicIp
     void updateCensorButtonState();
-    
+
     // Actions
     // True when the user confirmed and the torrent was handed to the session.
     // Callers may ignore the result; search uses it to stay on the results
@@ -86,7 +87,7 @@ public:    MainWindow(int w, int h, const char* title);
     void showCreateTorrentDialog();
     void showPreferencesDialog();
     void showAboutDialog();
-    
+
     // Torrent actions
     void toggleSelectedTorrents();
     // The confirmation dialog asks whether the files go too, so there is no
@@ -125,7 +126,7 @@ private:
     // Opens the network monitor: connections and engine events.
     Fl_Button* m_btnNetwork;
     TorrentListWidget* m_torrentList;
-    
+
     // Reachability of each search engine, shown as a dot in the engine
     // dropdown: green = answered, red = unreachable, gray = not checked yet.
     // Green means the host answered, not that its results are good.
@@ -147,7 +148,7 @@ private:
     // Incremented on every search. A thread whose number is no longer the
     // current one has been superseded and must not touch the UI state.
     std::atomic<unsigned long> m_searchGeneration;
-    
+
     // Which view is currently visible
     bool m_showSearchView;
     Fl_Box* m_statusBar;
@@ -164,12 +165,12 @@ private:
     Fl_Color m_limitIdleColor;
     bool m_censored;
     bool m_showPublicIp;
-    
+
     // The theme is not a preference any more. It is true from the moment the
     // window is built and nothing but the toolbar button can change it, so no
     // settings.ini can hand the light theme over to the next launch.
     bool m_darkMode;
-    
+
     // How much room the toolbar had when it was last laid out, as a level of
     // detail. The policy behind the number lives in ToolbarLayout.
     ToolbarLayout::Level m_toolbarLevel;
@@ -177,11 +178,11 @@ private:
     // not enough to tell whether the layout needs redoing: widening the window
     // inside the same level still has to move the block and re-centre it.
     int m_toolbarSlack;
-    
+
     // False once the window is destroyed: worker threads check it before
     // handing results back, so a search in flight cannot touch freed memory.
     static std::atomic<bool> s_alive;
-    
+
     // Fl::awake() only accepts a plain function pointer, so a worker thread
     // cannot carry its results inside a capturing lambda. They are parked here
     // under a mutex instead, and the callback (which receives "this") picks
@@ -193,9 +194,9 @@ private:
         enum class Kind { Batch, Stage, EngineDone };
         Kind kind = Kind::Batch;
         std::string engine;
-        std::vector<SearchResult> batch;   // Batch only
-        std::string text;                  // Stage line, or EngineDone's error
-        bool ok = true;                    // EngineDone: finished without error
+        std::vector<SearchResult> batch; // Batch only
+        std::string text;                // Stage line, or EngineDone's error
+        bool ok = true;                  // EngineDone: finished without error
         // The search this message belongs to. Checked again on the UI thread,
         // so a message parked before a cancel or a new search is dropped
         // instead of painting rows into a table that has moved on.
@@ -223,10 +224,10 @@ private:
     std::deque<SearchEvent> m_pendingEvents;
     // UI-thread only: which engines this search started, and how each is doing.
     std::map<std::string, EngineState> m_engineStates;
-    
+
     // Manager
     TorrentManager* m_manager;
-    
+
     // Last known reachability per engine name; absent means not checked yet.
     // Shown as a colored bullet prefixing the engine name ("● X"): green =
     // answered, red = unreachable, gray = not checked yet. Text-only by
@@ -262,11 +263,11 @@ private:
     // theme, so they are loaded once and never reloaded.
     Fl_Image* m_findIcon;
     Fl_Image* m_limitIcon;
-    
+
     // Latency measurement
     int m_latency = -1;
     int m_latencyTicker = 0;
-    
+
     // Layout constants
     static constexpr int MENU_HEIGHT = 0;
     static constexpr int TOOLBAR_HEIGHT = ToolbarLayout::kBarHeight;
@@ -274,7 +275,7 @@ private:
     // Search bar sits right under the toolbar; the status line under it
     static constexpr int SEARCH_BAR_HEIGHT = 35;
     static constexpr int SEARCH_STATUS_HEIGHT = 18;
-    
+
     // UI Creation
     void createToolbar();
     void createTorrentList();
@@ -298,7 +299,11 @@ private:
     EngineStatus engineStatusOf(const std::string& name) const;
     static Fl_Color engineColor(EngineStatus status);
     static std::string engineLabel(const std::string& name);
-    struct EngineStatusDelivery { MainWindow* win; std::string name; bool up; };
+    struct EngineStatusDelivery {
+        MainWindow* win;
+        std::string name;
+        bool up;
+    };
     static void handleEngineStatus(void* data);
     void updateCategoryChoice();
     void setSearchStatus(const std::string& text);
@@ -311,15 +316,15 @@ private:
     void updateSearchProgressStatus();
     static void onSearchCancelClick(Fl_Widget* w, void* data);
     void loadSearchEngines();
-    
+
     // Responsive layout
     void layoutToolbar(int available);
     void reloadEyeIcons();
     void applyLimitStyle();
-    
+
     // Menu callbacks
     static void menuCallback(Fl_Widget* w, void* data);
-    
+
     // Toolbar button callbacks
     static void onAddTorrent(Fl_Widget* w, void* data);
     static void onCreateTorrent(Fl_Widget* w, void* data);
@@ -336,10 +341,10 @@ private:
     // Paints m_btnRamMode from SettingsManager: icon, label and tooltip for
     // the current mode. Called after every change and once at creation.
     void updateRamModeButton();
-    
+
     // Update timer
     static void updateTimerCallback(void* data);
-    
+
     // Helper methods
     void saveWindowState();
     void restoreWindowState();

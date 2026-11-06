@@ -16,7 +16,8 @@ std::string trim(const std::string& s) {
 
 } // namespace
 
-SearchEngine::Definition SearchEngine::parseDefinition(const std::string& iniText) {
+SearchEngine::Definition
+SearchEngine::parseDefinition(const std::string& iniText) {
     Definition def;
     std::istringstream ss(iniText);
     std::string line;
@@ -27,7 +28,7 @@ SearchEngine::Definition SearchEngine::parseDefinition(const std::string& iniTex
         if (eq == std::string::npos) continue;
         std::string key = trim(line.substr(0, eq));
         std::string val = trim(line.substr(eq + 1));
-        
+
         if (key == "nombre") def.name = val;
         else if (key == "url") def.urlTemplate = val;
         else if (key == "proxy") def.proxyTemplate = val;
@@ -51,8 +52,7 @@ SearchEngine::Definition SearchEngine::parseDefinition(const std::string& iniTex
                 std::string code = trim(entry.substr(split + 1));
                 if (!name.empty() && !code.empty()) def.categories[name] = code;
             }
-        }
-        else if (key == "paginas") def.maxPages = std::atoi(val.c_str());
+        } else if (key == "paginas") def.maxPages = std::atoi(val.c_str());
         else if (key == "activo") def.enabled = (val != "0" && val != "false");
     }
     return def;
@@ -64,14 +64,19 @@ std::string SearchEngine::serializeDefinition(const Definition& def) {
     ss << "url=" << def.urlTemplate << "\n";
     if (!def.proxyTemplate.empty()) ss << "proxy=" << def.proxyTemplate << "\n";
     ss << "tipo=" << def.type << "\n";
-    if (!def.rowSelector.empty())      ss << "fila=" << def.rowSelector << "\n";
-    if (!def.magnetSelector.empty())   ss << "magnet=" << def.magnetSelector << "\n";
-    if (!def.torrentSelector.empty())  ss << "torrent=" << def.torrentSelector << "\n";
-    if (!def.titleSelector.empty())    ss << "titulo=" << def.titleSelector << "\n";
-    if (!def.sizeSelector.empty())     ss << "tamano=" << def.sizeSelector << "\n";
-    if (!def.seedersSelector.empty())  ss << "semillas=" << def.seedersSelector << "\n";
-    if (!def.leechersSelector.empty()) ss << "descargas=" << def.leechersSelector << "\n";
-    if (!def.linePattern.empty())      ss << "linea=" << def.linePattern << "\n";
+    if (!def.rowSelector.empty()) ss << "fila=" << def.rowSelector << "\n";
+    if (!def.magnetSelector.empty())
+        ss << "magnet=" << def.magnetSelector << "\n";
+    if (!def.torrentSelector.empty())
+        ss << "torrent=" << def.torrentSelector << "\n";
+    if (!def.titleSelector.empty())
+        ss << "titulo=" << def.titleSelector << "\n";
+    if (!def.sizeSelector.empty()) ss << "tamano=" << def.sizeSelector << "\n";
+    if (!def.seedersSelector.empty())
+        ss << "semillas=" << def.seedersSelector << "\n";
+    if (!def.leechersSelector.empty())
+        ss << "descargas=" << def.leechersSelector << "\n";
+    if (!def.linePattern.empty()) ss << "linea=" << def.linePattern << "\n";
     if (!def.categories.empty()) {
         ss << "categorias=";
         bool first = true;
@@ -89,11 +94,11 @@ std::string SearchEngine::serializeDefinition(const Definition& def) {
 
 std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
     std::vector<Definition> engines;
-    
+
     // Only sites that answer a plain HTTP request are enabled by default: a
     // search box that silently returns nothing is worse than a shorter list.
     // Each of these was checked to return magnets to a non-browser client.
-    
+
     // SolidTorrents and BitSearch share a backend and its markup: every
     // result card carries the title link, a size cell and seeder/leecher
     // cells, so explicit selectors give exact numbers where the generic
@@ -101,12 +106,16 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
     // The .to domains now answer 301 to bitsearch.eu, so the addresses below
     // point at the two hosts that still serve the listing directly and use
     // each other as the fallback mirror.
-    struct SolidDef { const char* name; const char* url; const char* proxy; };
-    static const SolidDef solidSites[] = {
-        { "SolidTorrents", "https://solidtorrents.eu", "https://bitsearch.eu" },
-        { "BitSearch",     "https://bitsearch.eu",     "https://solidtorrents.eu" },
+    struct SolidDef {
+        const char* name;
+        const char* url;
+        const char* proxy;
     };
-    
+    static const SolidDef solidSites[] = {
+        {"SolidTorrents", "https://solidtorrents.eu", "https://bitsearch.eu"},
+        {"BitSearch", "https://bitsearch.eu", "https://solidtorrents.eu"},
+    };
+
     for (const SolidDef& site : solidSites) {
         Definition d;
         d.name = site.name;
@@ -120,7 +129,8 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         // The card also carries a .torrent button; the hash-only form is kept
         // so the probe does not have to send the title back to the site.
         d.torrentSelector = "href=\"(/download/torrent/[0-9A-Fa-f]{40})";
-        d.titleSelector = "<a href=\"/torrent/[^\"]*\"[^>]*>\\s*([^<]+?)\\s*</a>";
+        d.titleSelector =
+            "<a href=\"/torrent/[^\"]*\"[^>]*>\\s*([^<]+?)\\s*</a>";
         d.sizeSelector = "<span>([0-9][0-9.,]*\\s*[KMGT]i?B)</span>";
         d.seedersSelector = "\">([0-9][0-9.,]*)</span>\\s*<span>seeders";
         d.leechersSelector = "\">([0-9][0-9.,]*)</span>\\s*<span>leechers";
@@ -128,7 +138,7 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         d.enabled = true;
         engines.push_back(d);
     }
-    
+
     // Nyaa.si: categories and pages travel as query parameters. No row
     // selectors: the generic harvest reads names straight out of the magnets'
     // dn= fields, which is exactly what the reference plugin does by hand.
@@ -151,7 +161,7 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         d.enabled = true;
         engines.push_back(d);
     }
-    
+
     // The Pirate Bay through a proxy serving its classic markup. Rows are
     // fully structured (<tr> with detLink title, magnet href, Size cell and
     // seeder/leecher cells), so explicit selectors beat the generic harvest
@@ -167,7 +177,8 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         d.titleSelector = "title=\"Details for ([^\"]+)\"";
         d.sizeSelector = ",\\s*Size\\s+([0-9][0-9.,]*(?:\\s|&nbsp;)+[KMGT]i?B)";
         d.seedersSelector = "<td align=\"right\">([0-9]+)</td>";
-        d.leechersSelector = "<td align=\"right\">[0-9]+</td>\\s*<td align=\"right\">([0-9]+)</td>";
+        d.leechersSelector = "<td align=\"right\">[0-9]+</td>\\s*<td "
+                             "align=\"right\">([0-9]+)</td>";
         d.categories["All"] = "0";
         d.categories["Music"] = "101";
         d.categories["Movies"] = "201";
@@ -181,7 +192,7 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         d.enabled = true;
         engines.push_back(d);
     }
-    
+
     // TorrentGalaxy was dropped from the catalogue: /torrents.php?search= now
     // answers 302 to the home page, and even the real listing stopped carrying
     // magnet links (they only appear on the per-torrent page), so there is
@@ -203,7 +214,7 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         d.enabled = true;
         engines.push_back(d);
     }
-    
+
     // Apibay: the Pirate Bay's own JSON API, kept because it needs no scraping
     // at all. Flat objects, so the small dotted-path extractor is enough, and
     // it answers a bare info_hash which the parser turns into a full magnet.
@@ -224,7 +235,7 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         d.enabled = true;
         engines.push_back(d);
     }
-    
+
     // Pirate Face (pirateface.co) is the AI-model repository: the thing people
     // come here for is a model, and every mirrored repo also ships as a
     // torrent. The site is a Next.js app and its /s/<query> page answers
@@ -273,6 +284,6 @@ std::vector<SearchEngine::Definition> SearchEngine::builtinEngines() {
         };
         engines.push_back(d);
     }
-    
+
     return engines;
 }

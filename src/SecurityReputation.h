@@ -7,15 +7,16 @@
 #include <vector>
 
 /**
- * @brief Which hash a shield click should ask about, and how to word the answer.
+ * @brief Which hash a shield click should ask about, and how to word the
+ * answer.
  *
  * Kept apart from the providers so the decision ("is there anything worth
  * asking about, and what do we say when there is not") can be read and tested
  * without any network or widget state.
  */
 struct ReputationTarget {
-    std::string sha256;   // Lowercase hex, empty when nothing can be asked
-    std::string path;     // File the hash belongs to
+    std::string sha256; // Lowercase hex, empty when nothing can be asked
+    std::string path;   // File the hash belongs to
 
     bool found() const { return !sha256.empty(); }
 };

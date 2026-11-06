@@ -105,6 +105,7 @@ set(SOURCES
     src/AddTorrentDialog.cpp
     src/CreateTorrentDialog.cpp
     src/TorrentDetailsDialog.cpp
+    src/TorrentDetailsDialogSecurity.cpp
     src/ArchiveInspector.cpp
     src/FileHash.cpp
     src/VirusTotal.cpp

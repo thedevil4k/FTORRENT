@@ -8,6 +8,13 @@ lines. A file that outgrew that was split by topic, moving whole functions
 unchanged rather than rewriting them, so the split is a move and not a
 behaviour change.
 
+The tree is formatted with the project's own `.clang-format`: four spaces,
+eighty columns, the opening brace on the line that opens it. The file
+describes the style the code was already written in, so the pass that
+applied it only fixed what was inconsistent - trailing whitespace, lines
+over the limit, the wrapping of a long call - and left the shape of every
+function alone.
+
 `MainWindow` is the clearest example. The class still lives in
 `src/MainWindow.{h,cpp}`; its implementation is spread over four files that
 answer one question each:
@@ -45,6 +52,18 @@ draw the row share one answer instead of each carrying a copy. The three
 helpers that more than one of the `SearchEngine` files need - `urlEncode()`,
 `jsonField()` and `normalizeResult()` - became private static members of
 `SearchEngine` for the same reason.
+
+`TorrentDetailsDialog` follows the same rule, with the security half in its
+own file:
+
+| File | What it holds |
+| :--- | :--- |
+| `src/TorrentDetailsDialog.cpp` | the window: the tabs, the general information, the trackers, the peers and the file list |
+| `src/TorrentDetailsDialogSecurity.cpp` | the security tab: the report, the archive check, the local hash and the provider lookup |
+
+The `icons` test follows it too: `tests/icons.cpp` checks the pictures the
+buttons draw, `tests/icons_geometry.cpp` checks the geometry of the bar they
+sit in, and `tests/icons_support.h` holds the helpers both halves need.
 
 One file was not code at all: `src/LogoIcon.h` held the window logo as 3 300
 lines of hex bytes. The PNG is the source of truth now

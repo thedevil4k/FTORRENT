@@ -26,8 +26,8 @@
 class ArchiveInspector {
 public:
     struct Entry {
-        int index = 0;          // Position in the archive
-        std::string path;       // Path as stored in the archive, display only
+        int index = 0;    // Position in the archive
+        std::string path; // Path as stored in the archive, display only
         std::uint64_t size = 0;
         bool sizeKnown = false;
         bool encrypted = false;
@@ -68,9 +68,9 @@ public:
     // can be walked header by header: libarchive skips the compressed data and
     // only the pieces holding a header are ever fetched. Returning false with a
     // non-empty 'error' stops the listing and that error is reported.
-    using RangeFetcher = std::function<bool(
-        std::int64_t offset, std::size_t length, std::string& out,
-        std::string& error)>;
+    using RangeFetcher =
+        std::function<bool(std::int64_t offset, std::size_t length,
+                           std::string& out, std::string& error)>;
 
     /**
      * @brief List every regular file from the bytes of an archive the caller
@@ -86,8 +86,7 @@ public:
      */
     static ListingAll listEntriesFromWindows(
         std::int64_t fileSize, const std::string& head, const std::string& tail,
-        const std::atomic<bool>* cancelled = nullptr,
-        RangeFetcher fetch = {});
+        const std::atomic<bool>* cancelled = nullptr, RangeFetcher fetch = {});
 
 private:
     static std::string extensionLower(const std::string& path);

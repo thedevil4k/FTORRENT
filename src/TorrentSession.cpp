@@ -31,9 +31,8 @@ std::string torrentNameOf(const lt::torrent_handle& handle) {
 
 } // namespace
 
-TorrentSession::TorrentSession() 
-    : m_initialized(false) {
-}
+TorrentSession::TorrentSession()
+    : m_initialized(false) {}
 
 TorrentSession::~TorrentSession() {
     shutdown();
@@ -47,62 +46,73 @@ bool TorrentSession::initialize() {
     try {
         auto& sm = SettingsManager::instance();
         sm.load();
-        
+
         // Create session with parameters
         lt::session_params params;
-        
+
         // Alert mask - expand for better diagnostics
-        params.settings.set_int(lt::settings_pack::alert_mask, 
-            lt::alert_category::error | 
-            lt::alert_category::status | 
-            lt::alert_category::storage |
-            lt::alert_category::tracker |
-            lt::alert_category::connect |
-            lt::alert_category::peer |
-            lt::alert_category::dht |
-            lt::alert_category::port_mapping);
-        
+        params.settings.set_int(
+            lt::settings_pack::alert_mask,
+            lt::alert_category::error | lt::alert_category::status |
+                lt::alert_category::storage | lt::alert_category::tracker |
+                lt::alert_category::connect | lt::alert_category::peer |
+                lt::alert_category::dht | lt::alert_category::port_mapping);
+
         // Connectivity and Discovery
-        params.settings.set_bool(lt::settings_pack::enable_dht, sm.getDHTEnabled());
-        params.settings.set_bool(lt::settings_pack::enable_lsd, sm.getLSDEnabled());
-        params.settings.set_bool(lt::settings_pack::enable_upnp, sm.getUPnPEnabled());
+        params.settings.set_bool(lt::settings_pack::enable_dht,
+                                 sm.getDHTEnabled());
+        params.settings.set_bool(lt::settings_pack::enable_lsd,
+                                 sm.getLSDEnabled());
+        params.settings.set_bool(lt::settings_pack::enable_upnp,
+                                 sm.getUPnPEnabled());
         params.settings.set_bool(lt::settings_pack::enable_natpmp, true);
-        
+
         // Default trackers for bootstrapping if needed
-        params.settings.set_str(lt::settings_pack::dht_bootstrap_nodes, 
-            "router.bittorrent.com:6881,router.utorrent.com:6881,dht.transmissionbt.com:6881,dht.libtorrent.org:25401");
-        
+        params.settings.set_str(
+            lt::settings_pack::dht_bootstrap_nodes,
+            "router.bittorrent.com:6881,router.utorrent.com:6881,dht."
+            "transmissionbt.com:6881,dht.libtorrent.org:25401");
+
         // Network settings
-        std::string listen_if = "0.0.0.0:" + std::to_string(sm.getListenPort()) + ",[::]:" + std::to_string(sm.getListenPort());
-        params.settings.set_str(lt::settings_pack::listen_interfaces, listen_if);
-        
+        std::string listen_if =
+            "0.0.0.0:" + std::to_string(sm.getListenPort()) +
+            ",[::]:" + std::to_string(sm.getListenPort());
+        params.settings.set_str(lt::settings_pack::listen_interfaces,
+                                listen_if);
+
         // Limits
         params.settings.set_int(lt::settings_pack::active_downloads, 20);
         params.settings.set_int(lt::settings_pack::active_seeds, 20);
         params.settings.set_int(lt::settings_pack::active_limit, 50);
 
         if (sm.getMaxDownloadRate() > 0)
-            params.settings.set_int(lt::settings_pack::download_rate_limit, sm.getMaxDownloadRate() * 1024);
+            params.settings.set_int(lt::settings_pack::download_rate_limit,
+                                    sm.getMaxDownloadRate() * 1024);
         if (sm.getMaxUploadRate() > 0)
-            params.settings.set_int(lt::settings_pack::upload_rate_limit, sm.getMaxUploadRate() * 1024);
-        
-        params.settings.set_int(lt::settings_pack::connections_limit, sm.getMaxConnections());
-        
+            params.settings.set_int(lt::settings_pack::upload_rate_limit,
+                                    sm.getMaxUploadRate() * 1024);
+
+        params.settings.set_int(lt::settings_pack::connections_limit,
+                                sm.getMaxConnections());
+
         // User agent
-        params.settings.set_str(lt::settings_pack::user_agent, sm.getUserAgent());
-        
+        params.settings.set_str(lt::settings_pack::user_agent,
+                                sm.getUserAgent());
+
         // Create session
         m_session = std::make_unique<lt::session>(params);
-        
+
         // Apply RAM mode settings
         setRamMode(sm.getRamMode());
-        
+
         m_initialized = true;
-        std::cout << "TorrentSession initialized with port " << sm.getListenPort() << std::endl;
+        std::cout << "TorrentSession initialized with port "
+                  << sm.getListenPort() << std::endl;
         return true;
-        
+
     } catch (const std::exception& e) {
-        std::cerr << "Failed to initialize TorrentSession: " << e.what() << std::endl;
+        std::cerr << "Failed to initialize TorrentSession: " << e.what()
+                  << std::endl;
         return false;
     }
 }
@@ -110,7 +120,7 @@ bool TorrentSession::initialize() {
 void TorrentSession::shutdown() {
     if (m_initialized && m_session) {
         std::cout << "Shutting down TorrentSession..." << std::endl;
-        
+
         // Pause all torrents
         std::vector<lt::torrent_handle> torrents = m_session->get_torrents();
         for (auto& handle : torrents) {
@@ -118,7 +128,7 @@ void TorrentSession::shutdown() {
                 handle.pause();
             }
         }
-        
+
         m_session.reset();
         m_initialized = false;
     }
@@ -129,7 +139,9 @@ void TorrentSession::setupSessionSettings() {
     // For now, using defaults from initialize()
 }
 
-bool TorrentSession::addTorrentFile(const std::string& torrentFile, const std::string& savePath, const std::vector<int>& file_priorities) {
+bool TorrentSession::addTorrentFile(const std::string& torrentFile,
+                                    const std::string& savePath,
+                                    const std::vector<int>& file_priorities) {
     if (!m_initialized || !m_session) {
         std::cerr << "Session not initialized" << std::endl;
         return false;
@@ -141,30 +153,36 @@ bool TorrentSession::addTorrentFile(const std::string& torrentFile, const std::s
         // (the torrent_info filename constructor was removed in 2.1).
         params.ti = lt::load_torrent_file(torrentFile).ti;
         params.save_path = savePath;
-        
+
         // Apply file priorities if provided
         if (!file_priorities.empty()) {
             params.file_priorities.reserve(file_priorities.size());
             for (int p : file_priorities) {
-                params.file_priorities.push_back(lt::download_priority_t(static_cast<std::uint8_t>(p)));
+                params.file_priorities.push_back(
+                    lt::download_priority_t(static_cast<std::uint8_t>(p)));
             }
         }
-        
+
         // Add flags for better handling
-        params.flags |= lt::torrent_flags::auto_managed | lt::torrent_flags::duplicate_is_error;
-        
+        params.flags |= lt::torrent_flags::auto_managed |
+                        lt::torrent_flags::duplicate_is_error;
+
         m_session->async_add_torrent(params);
-        
-        std::cout << "Added torrent: " << params.ti->name() << " with " << file_priorities.size() << " priority overrides." << std::endl;
+
+        std::cout << "Added torrent: " << params.ti->name() << " with "
+                  << file_priorities.size() << " priority overrides."
+                  << std::endl;
         return true;
-        
+
     } catch (const std::exception& e) {
         std::cerr << "Failed to add torrent file: " << e.what() << std::endl;
         return false;
     }
 }
 
-bool TorrentSession::addMagnetLink(const std::string& magnetLink, const std::string& savePath, const std::vector<int>& file_priorities) {
+bool TorrentSession::addMagnetLink(const std::string& magnetLink,
+                                   const std::string& savePath,
+                                   const std::vector<int>& file_priorities) {
     if (!m_initialized || !m_session) {
         std::cerr << "Session not initialized" << std::endl;
         return false;
@@ -188,15 +206,18 @@ bool TorrentSession::addMagnetLink(const std::string& magnetLink, const std::str
         if (!file_priorities.empty()) {
             params.file_priorities.reserve(file_priorities.size());
             for (int p : file_priorities) {
-                params.file_priorities.push_back(lt::download_priority_t(static_cast<std::uint8_t>(p)));
+                params.file_priorities.push_back(
+                    lt::download_priority_t(static_cast<std::uint8_t>(p)));
             }
         }
 
-        params.flags |= lt::torrent_flags::auto_managed | lt::torrent_flags::duplicate_is_error;
+        params.flags |= lt::torrent_flags::auto_managed |
+                        lt::torrent_flags::duplicate_is_error;
 
         m_session->async_add_torrent(params);
 
-        std::cout << "Added magnet link with " << file_priorities.size() << " priority overrides." << std::endl;
+        std::cout << "Added magnet link with " << file_priorities.size()
+                  << " priority overrides." << std::endl;
         return true;
 
     } catch (const std::exception& e) {
@@ -205,7 +226,8 @@ bool TorrentSession::addMagnetLink(const std::string& magnetLink, const std::str
     }
 }
 
-void TorrentSession::removeTorrent(const lt::torrent_handle& handle, bool deleteFiles) {
+void TorrentSession::removeTorrent(const lt::torrent_handle& handle,
+                                   bool deleteFiles) {
     if (!m_initialized || !m_session || !handle.is_valid()) {
         return;
     }
@@ -214,7 +236,7 @@ void TorrentSession::removeTorrent(const lt::torrent_handle& handle, bool delete
     if (deleteFiles) {
         flags |= lt::session::delete_files;
     }
-    
+
     m_session->remove_torrent(handle, flags);
 }
 
@@ -252,38 +274,43 @@ std::string TorrentSession::getSessionStats() const {
 
 void TorrentSession::setRateLimits(int downloadKBps, int uploadKBps) {
     if (!m_initialized || !m_session) return;
-    
+
     int finalDown = downloadKBps;
     int finalUp = uploadKBps;
-    
-    // Si estamos en ECO, forzamos máximos de 2MB/s y 512KB/s 
+
+    // Si estamos en ECO, forzamos máximos de 2MB/s y 512KB/s
     // a menos que el límite solicitado sea aún menor
     if (SettingsManager::instance().getRamMode() == 0) {
         if (finalDown == 0 || finalDown > 2048) finalDown = 2048;
         if (finalUp == 0 || finalUp > 512) finalUp = 512;
     }
-    
+
     lt::settings_pack pack;
-    pack.set_int(lt::settings_pack::download_rate_limit, finalDown > 0 ? finalDown * 1024 : 0);
-    pack.set_int(lt::settings_pack::upload_rate_limit, finalUp > 0 ? finalUp * 1024 : 0);
-    
+    pack.set_int(lt::settings_pack::download_rate_limit,
+                 finalDown > 0 ? finalDown * 1024 : 0);
+    pack.set_int(lt::settings_pack::upload_rate_limit,
+                 finalUp > 0 ? finalUp * 1024 : 0);
+
     m_session->apply_settings(pack);
 }
 
 void TorrentSession::setRamMode(int mode) {
     if (!m_initialized || !m_session) return;
-    
+
     lt::settings_pack pack;
     auto& sm = SettingsManager::instance();
-    
+
     if (mode == 0) { // MODO ECO: Escritura inmediata "al corte", CERO retención
-        // Cola de disco al mínimo técnico (64KB es el bloque mínimo de libtorrent)
-        pack.set_int(lt::settings_pack::max_queued_disk_bytes, 64 * 1024); 
-        
+        // Cola de disco al mínimo técnico (64KB es el bloque mínimo de
+        // libtorrent)
+        pack.set_int(lt::settings_pack::max_queued_disk_bytes, 64 * 1024);
+
         // NO usar el caché del Sistema Operativo
-        pack.set_int(lt::settings_pack::disk_io_write_mode, lt::settings_pack::disable_os_cache);
-        pack.set_int(lt::settings_pack::disk_io_read_mode, lt::settings_pack::disable_os_cache);
-        
+        pack.set_int(lt::settings_pack::disk_io_write_mode,
+                     lt::settings_pack::disable_os_cache);
+        pack.set_int(lt::settings_pack::disk_io_read_mode,
+                     lt::settings_pack::disable_os_cache);
+
         // Minimizar buffers de red para no retener paquetes
         pack.set_int(lt::settings_pack::send_buffer_watermark, 16 * 1024);
         pack.set_int(lt::settings_pack::send_buffer_low_watermark, 8 * 1024);
@@ -293,38 +320,47 @@ void TorrentSession::setRamMode(int mode) {
         pack.set_int(lt::settings_pack::unchoke_slots_limit, 2);
         pack.set_int(lt::settings_pack::active_downloads, 1);
         pack.set_int(lt::settings_pack::active_limit, 2);
-    } 
-    else if (mode == 1) { // MODO NORMAL: Balanceado
-        pack.set_int(lt::settings_pack::max_queued_disk_bytes, 256 * 1024 * 1024);
-        pack.set_int(lt::settings_pack::disk_io_write_mode, lt::settings_pack::enable_os_cache);
-        pack.set_int(lt::settings_pack::disk_io_read_mode, lt::settings_pack::enable_os_cache);
+    } else if (mode == 1) { // MODO NORMAL: Balanceado
+        pack.set_int(lt::settings_pack::max_queued_disk_bytes,
+                     256 * 1024 * 1024);
+        pack.set_int(lt::settings_pack::disk_io_write_mode,
+                     lt::settings_pack::enable_os_cache);
+        pack.set_int(lt::settings_pack::disk_io_read_mode,
+                     lt::settings_pack::enable_os_cache);
         pack.set_int(lt::settings_pack::connections_limit, 200);
         pack.set_int(lt::settings_pack::active_limit, 20);
-    }
-    else { // MODO TURBO: Descarga máxima, RAM como buffer masivo
-        // Buffer de disco masivo (2GB) para descargar a tope sin esperar al disco
-        pack.set_int(lt::settings_pack::max_queued_disk_bytes, 2000 * 1024 * 1024); 
-        
+    } else { // MODO TURBO: Descarga máxima, RAM como buffer masivo
+        // Buffer de disco masivo (2GB) para descargar a tope sin esperar al
+        // disco
+        pack.set_int(lt::settings_pack::max_queued_disk_bytes,
+                     2000 * 1024 * 1024);
+
         // Habilitar caché del OS para máxima suavidad y velocidad
-        pack.set_int(lt::settings_pack::disk_io_write_mode, lt::settings_pack::enable_os_cache);
-        pack.set_int(lt::settings_pack::disk_io_read_mode, lt::settings_pack::enable_os_cache);
-        
+        pack.set_int(lt::settings_pack::disk_io_write_mode,
+                     lt::settings_pack::enable_os_cache);
+        pack.set_int(lt::settings_pack::disk_io_read_mode,
+                     lt::settings_pack::enable_os_cache);
+
         // Conexiones masivas para encontrar todos los peers posibles
         pack.set_int(lt::settings_pack::connections_limit, 2000);
         pack.set_int(lt::settings_pack::active_downloads, 100);
         pack.set_int(lt::settings_pack::active_limit, 200);
-        
+
         // Buffers de red optimizados para alta velocidad
         pack.set_int(lt::settings_pack::send_buffer_watermark, 5 * 1024 * 1024);
-        pack.set_int(lt::settings_pack::send_buffer_low_watermark, 1 * 1024 * 1024);
+        pack.set_int(lt::settings_pack::send_buffer_low_watermark,
+                     1 * 1024 * 1024);
     }
-    
-    // Aplicar los límites de velocidad globales definidos en settings (si existen)
+
+    // Aplicar los límites de velocidad globales definidos en settings (si
+    // existen)
     int userDown = sm.getMaxDownloadRate();
     int userUp = sm.getMaxUploadRate();
-    pack.set_int(lt::settings_pack::download_rate_limit, userDown > 0 ? userDown * 1024 : 0);
-    pack.set_int(lt::settings_pack::upload_rate_limit, userUp > 0 ? userUp * 1024 : 0);
-    
+    pack.set_int(lt::settings_pack::download_rate_limit,
+                 userDown > 0 ? userDown * 1024 : 0);
+    pack.set_int(lt::settings_pack::upload_rate_limit,
+                 userUp > 0 ? userUp * 1024 : 0);
+
     m_session->apply_settings(pack);
 }
 
@@ -371,28 +407,30 @@ void TorrentSession::processAlerts() {
 
     std::vector<lt::alert*> alerts;
     m_session->pop_alerts(&alerts);
-    
+
     for (lt::alert* alert : alerts) {
         // Handle different alert types
         if (auto* err = lt::alert_cast<lt::torrent_error_alert>(alert)) {
-            // torrent_alert::torrent_name() was removed in libtorrent 2.1 builds
-            // with deprecated functions disabled (vcpkg); use filename() instead.
-            std::string msg = std::string("Torrent error [") + err->filename() + "]: " + err->message();
+            // torrent_alert::torrent_name() was removed in libtorrent 2.1
+            // builds with deprecated functions disabled (vcpkg); use filename()
+            // instead.
+            std::string msg = std::string("Torrent error [") + err->filename() +
+                              "]: " + err->message();
             std::cerr << msg << std::endl;
             SecurityEvents::instance().add(torrentNameOf(err->handle),
                                            "Torrent error", err->message());
             if (m_errorCallback) m_errorCallback(msg);
-        }
-        else if (auto* fea = lt::alert_cast<lt::file_error_alert>(alert)) {
-            std::string msg = std::string("File error: ") + fea->filename() + " - " + fea->message();
+        } else if (auto* fea = lt::alert_cast<lt::file_error_alert>(alert)) {
+            std::string msg = std::string("File error: ") + fea->filename() +
+                              " - " + fea->message();
             std::cerr << msg << std::endl;
             SecurityEvents::instance().add(torrentNameOf(fea->handle),
                                            "File error", fea->message());
             if (m_errorCallback) m_errorCallback(msg);
-        }
-        else if (auto* add = lt::alert_cast<lt::add_torrent_alert>(alert)) {
+        } else if (auto* add = lt::alert_cast<lt::add_torrent_alert>(alert)) {
             if (add->error) {
-                std::string msg = std::string("Failed to add torrent: ") + add->error.message();
+                std::string msg = std::string("Failed to add torrent: ") +
+                                  add->error.message();
                 std::cerr << msg << std::endl;
                 if (m_errorCallback) m_errorCallback(msg);
             } else if (add->handle.is_valid()) {
@@ -409,26 +447,30 @@ void TorrentSession::processAlerts() {
                 std::cerr << "Add torrent alert without a torrent; ignoring it"
                           << std::endl;
             }
-        }
-        else if (auto* ma = lt::alert_cast<lt::metadata_received_alert>(alert)) {
-            // torrent_alert::torrent_name() was removed in libtorrent 2.1 builds
-            // with deprecated functions disabled (vcpkg); get the name from torrent_file().
+        } else if (auto* ma =
+                       lt::alert_cast<lt::metadata_received_alert>(alert)) {
+            // torrent_alert::torrent_name() was removed in libtorrent 2.1
+            // builds with deprecated functions disabled (vcpkg); get the name
+            // from torrent_file().
             std::string metaName = "torrent";
             try {
                 if (auto ti = ma->handle.torrent_file()) metaName = ti->name();
             } catch (...) {}
             std::cout << "Metadata received for: " << metaName << std::endl;
             ma->handle.save_resume_data();
-        }
-        else if (auto* rd = lt::alert_cast<lt::save_resume_data_alert>(alert)) {
+        } else if (auto* rd =
+                       lt::alert_cast<lt::save_resume_data_alert>(alert)) {
             writeResumeData(rd);
-        }
-        else if (auto* rdf = lt::alert_cast<lt::save_resume_data_failed_alert>(alert)) {
-            std::cerr << "Save resume data failed: " << rdf->message() << std::endl;
-        }
-        else if (auto* tea = lt::alert_cast<lt::tracker_error_alert>(alert)) {
-            // Log tracker errors but don't alert user every time as they are common
-            std::cerr << "Tracker error: " << tea->tracker_url() << " - " << tea->error_message() << std::endl;
+        } else if (auto* rdf =
+                       lt::alert_cast<lt::save_resume_data_failed_alert>(
+                           alert)) {
+            std::cerr << "Save resume data failed: " << rdf->message()
+                      << std::endl;
+        } else if (auto* tea = lt::alert_cast<lt::tracker_error_alert>(alert)) {
+            // Log tracker errors but don't alert user every time as they are
+            // common
+            std::cerr << "Tracker error: " << tea->tracker_url() << " - "
+                      << tea->error_message() << std::endl;
             SecurityEvents::instance().add(
                 torrentNameOf(tea->handle), "Tracker error",
                 std::string(tea->tracker_url()) + ": " + tea->error_message());
@@ -439,12 +481,11 @@ void TorrentSession::processAlerts() {
         else if (auto* ban = lt::alert_cast<lt::peer_ban_alert>(alert)) {
             SecurityEvents::instance().add(torrentNameOf(ban->handle),
                                            "Peer banned", ban->message());
-        }
-        else if (auto* perr = lt::alert_cast<lt::peer_error_alert>(alert)) {
+        } else if (auto* perr = lt::alert_cast<lt::peer_error_alert>(alert)) {
             SecurityEvents::instance().add(torrentNameOf(perr->handle),
                                            "Peer error", perr->message());
-        }
-        else if (auto* inv = lt::alert_cast<lt::invalid_request_alert>(alert)) {
+        } else if (auto* inv =
+                       lt::alert_cast<lt::invalid_request_alert>(alert)) {
             SecurityEvents::instance().add(torrentNameOf(inv->handle),
                                            "Invalid request", inv->message());
         }
@@ -453,7 +494,7 @@ void TorrentSession::processAlerts() {
 
 void TorrentSession::triggerSaveResumeData() {
     if (!m_initialized || !m_session) return;
-    
+
     auto torrents = m_session->get_torrents();
     for (auto& h : torrents) {
         if (h.is_valid() && h.status().has_metadata) {
@@ -464,50 +505,56 @@ void TorrentSession::triggerSaveResumeData() {
 
 void TorrentSession::loadResidentTorrents() {
     if (!m_initialized || !m_session) return;
-    
+
     std::string path = getResumeDataPath();
     if (!fs::exists(path)) return;
-    
+
     int loaded = 0;
     for (const auto& entry : fs::directory_iterator(path)) {
         if (entry.path().extension() == ".fastresume") {
             try {
                 std::ifstream is(entry.path(), std::ios::binary);
-                std::vector<char> resume_data((std::istreambuf_iterator<char>(is)), std::istreambuf_iterator<char>());
-                
+                std::vector<char> resume_data(
+                    (std::istreambuf_iterator<char>(is)),
+                    std::istreambuf_iterator<char>());
+
                 if (resume_data.empty()) continue;
-                
+
                 lt::error_code ec;
-                lt::add_torrent_params params = lt::read_resume_data(resume_data, ec);
-                
+                lt::add_torrent_params params =
+                    lt::read_resume_data(resume_data, ec);
+
                 if (ec) {
-                    std::cerr << "Error reading resume data: " << ec.message() << std::endl;
+                    std::cerr << "Error reading resume data: " << ec.message()
+                              << std::endl;
                     continue;
                 }
-                
+
                 params.flags |= lt::torrent_flags::auto_managed;
                 m_session->async_add_torrent(params);
                 loaded++;
             } catch (...) {
-                std::cerr << "Failed to load: " << entry.path().string() << std::endl;
+                std::cerr << "Failed to load: " << entry.path().string()
+                          << std::endl;
             }
         }
     }
-    std::cout << "Loaded " << loaded << " torrents from resume data." << std::endl;
+    std::cout << "Loaded " << loaded << " torrents from resume data."
+              << std::endl;
 }
 
 void TorrentSession::writeResumeData(const lt::save_resume_data_alert* rd) {
     if (!rd) return;
-    
+
     std::string path = getResumeDataPath();
     if (!fs::exists(path)) {
         fs::create_directories(path);
     }
-    
+
     // Use info-hash as filename
     std::string hash = TorrentItem::toHex(rd->handle.info_hashes().v1);
     std::string fileName = path + "/" + hash + ".fastresume";
-    
+
     std::ofstream os(fileName, std::ios::binary);
     if (os.is_open()) {
         std::vector<char> bencoded = lt::write_resume_data_buf(rd->params);

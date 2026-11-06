@@ -102,8 +102,7 @@ void ArchiveProbeSession::shutdown(lt::session& session,
 ArchiveProbeSession::ArchiveProbeSession(const lt::add_torrent_params& params,
                                          int fileIndex,
                                          const std::atomic<bool>* cancel,
-                                         int timeoutSeconds,
-                                         std::string& error)
+                                         int timeoutSeconds, std::string& error)
     : m_cancel(cancel) {
     if (fileIndex < 0) {
         error = "no file to look at";
@@ -115,11 +114,11 @@ ArchiveProbeSession::ArchiveProbeSession(const lt::add_torrent_params& params,
     }
 
     std::error_code ec;
-    m_workDir = fs::path(ArchivePreflight::tempRoot()) /
-                ("run-" + std::to_string(static_cast<unsigned long long>(
-                              std::chrono::steady_clock::now()
-                                  .time_since_epoch()
-                                  .count())));
+    m_workDir =
+        fs::path(ArchivePreflight::tempRoot()) /
+        ("run-" +
+         std::to_string(static_cast<unsigned long long>(
+             std::chrono::steady_clock::now().time_since_epoch().count())));
     fs::create_directories(m_workDir, ec);
     if (ec) {
         error = "could not create the temporary folder: " + ec.message();
@@ -159,8 +158,8 @@ ArchiveProbeSession::ArchiveProbeSession(const lt::add_torrent_params& params,
     const auto now = std::chrono::steady_clock::now();
     m_deadline = now + std::chrono::seconds(timeoutSeconds);
     const auto metadataDeadline =
-        now + std::chrono::seconds(std::min(timeoutSeconds,
-                                            METADATA_TIMEOUT_SECONDS));
+        now + std::chrono::seconds(
+                  std::min(timeoutSeconds, METADATA_TIMEOUT_SECONDS));
     while (std::chrono::steady_clock::now() < metadataDeadline) {
         if (cancelled(m_cancel)) {
             error = "cancelled";
@@ -257,8 +256,7 @@ bool ArchiveProbeSession::readLast(std::string& out, std::string& error) {
 }
 
 bool ArchiveProbeSession::readArchiveRange(std::int64_t offset,
-                                           std::size_t length,
-                                           std::string& out,
+                                           std::size_t length, std::string& out,
                                            std::string& error) {
     if (offset < 0 || length == 0 || offset > m_fileSize ||
         static_cast<std::int64_t>(length) > m_fileSize - offset) {
@@ -280,7 +278,8 @@ bool ArchiveProbeSession::readArchiveRange(std::int64_t offset,
             error = "the fetched piece is shorter than expected";
             return false;
         }
-        const std::size_t take = std::min(length - done, bytes.size() - inPiece);
+        const std::size_t take =
+            std::min(length - done, bytes.size() - inPiece);
         out.append(bytes, inPiece, take);
         done += take;
     }
@@ -340,7 +339,8 @@ void ArchiveProbeSession::settleFilePriorities() {
     // waited out its whole timeout. Waiting for the check to settle and then
     // asking for the piece revives the torrent and downloads only that piece.
     if (m_settled) return;
-    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    const auto until =
+        std::chrono::steady_clock::now() + std::chrono::seconds(5);
     while (std::chrono::steady_clock::now() < until) {
         const lt::torrent_status status = m_handle.status();
         if (status.is_finished ||
@@ -395,9 +395,9 @@ void ArchiveProbeSession::reviveSwarm(bool force) {
     // peers and then ignores connect_peer for endpoints it already tried: on a
     // local seeder the first piece arrived in 0.3 s and every later piece never
     // did, with connect_peer called again every half second. Clearing the peer
-    // list first makes the same endpoints connect again, and costs nothing else.
-    // The peers are remembered while they are still connected, because once the
-    // torrent is finished the list is already empty.
+    // list first makes the same endpoints connect again, and costs nothing
+    // else. The peers are remembered while they are still connected, because
+    // once the torrent is finished the list is already empty.
     const auto now = std::chrono::steady_clock::now();
     if (!force && now - m_lastRevive < std::chrono::milliseconds(250)) {
         return;
@@ -464,9 +464,8 @@ bool ArchiveProbeSession::waitForPiece(int piece, std::string& error,
     // stops there, says so, and keeps what it already read.
     const auto pieceDeadline =
         maxWaitSeconds > 0
-            ? std::min(m_deadline,
-                       std::chrono::steady_clock::now() +
-                           std::chrono::seconds(maxWaitSeconds))
+            ? std::min(m_deadline, std::chrono::steady_clock::now() +
+                                       std::chrono::seconds(maxWaitSeconds))
             : m_deadline;
     while (std::chrono::steady_clock::now() < pieceDeadline) {
         if (cancelled(m_cancel)) {
@@ -488,8 +487,9 @@ bool ArchiveProbeSession::waitForPiece(int piece, std::string& error,
         if (now - m_lastAsk >= std::chrono::seconds(5)) {
             // A deadline set before the torrent finished starting is answered
             // with an error and never retried.
-            m_handle.set_piece_deadline(lt::piece_index_t(piece), 0,
-                                        lt::torrent_handle::alert_when_available);
+            m_handle.set_piece_deadline(
+                lt::piece_index_t(piece), 0,
+                lt::torrent_handle::alert_when_available);
             m_lastAsk = now;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(120));

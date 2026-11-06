@@ -7,10 +7,10 @@
 #include <string>
 #include <vector>
 
-bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const std::string& prefilledMagnet,
-                                       const std::vector<TorrentFileEntry>& prefilledFiles,
-                                       const std::string& prefilledTorrentUrl,
-                                       const std::string& prefilledBody) {
+bool MainWindow::showAddTorrentDialog(
+    const std::string& prefilledPath, const std::string& prefilledMagnet,
+    const std::vector<TorrentFileEntry>& prefilledFiles,
+    const std::string& prefilledTorrentUrl, const std::string& prefilledBody) {
     AddTorrentDialog* dlg = new AddTorrentDialog();
 
     if (!prefilledPath.empty()) {
@@ -59,7 +59,8 @@ bool MainWindow::showAddTorrentDialog(const std::string& prefilledPath, const st
                        static_cast<std::size_t>(expectedFiles)) {
                 filePriorities.clear();
             }
-            success = m_manager->addMagnetLink(magnet, savePath, filePriorities);
+            success =
+                m_manager->addMagnetLink(magnet, savePath, filePriorities);
         }
 
         if (success) {
@@ -82,7 +83,7 @@ void MainWindow::showCreateTorrentDialog() {
 
 void MainWindow::showPreferencesDialog() {
     PreferencesDialog* dlg = new PreferencesDialog();
-    
+
     if (dlg->show_modal()) {
         // Settings were saved, might need to apply some changes
         auto& settings = SettingsManager::instance();
@@ -92,7 +93,7 @@ void MainWindow::showPreferencesDialog() {
         updateStatusBar();
         updateUI();
     }
-    
+
     delete dlg;
 }
 
@@ -108,7 +109,7 @@ void MainWindow::showAboutDialog() {
 
 void MainWindow::toggleSelectedTorrents() {
     if (!m_manager || !m_torrentList) return;
-    
+
     auto selected = m_torrentList->getSelectedTorrents();
     if (selected.empty()) return;
 
@@ -122,30 +123,31 @@ void MainWindow::toggleSelectedTorrents() {
             m_manager->pauseTorrent(torrent->getHash());
         }
     }
-    
+
     updateUI();
 }
 
 void MainWindow::removeSelectedTorrents() {
     if (!m_manager || !m_torrentList) return;
-    
+
     auto selected = m_torrentList->getSelectedTorrents();
     if (selected.empty()) return;
-    
+
     RemoveConfirmDialog* dlg = new RemoveConfirmDialog(selected.size());
     int result = dlg->show_modal();
     bool shouldDeleteFiles = dlg->shouldDeleteFiles();
     delete dlg;
-    
+
     if (result == 1) { // Removed
-        // Collect hashes first to avoid dangling pointers if removals trigger list updates
+        // Collect hashes first to avoid dangling pointers if removals trigger
+        // list updates
         std::vector<std::string> hashes;
         for (auto* torrent : selected) {
             if (torrent) {
                 hashes.push_back(torrent->getHash());
             }
         }
-        
+
         for (const auto& hash : hashes) {
             m_manager->removeTorrent(hash, shouldDeleteFiles);
         }

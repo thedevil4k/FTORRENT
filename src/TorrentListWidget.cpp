@@ -10,37 +10,32 @@
 #include <string>
 #include <vector>
 
-const TorrentListWidget::ColumnInfo TorrentListWidget::COLUMN_INFO[COL_COUNT] = {
-    {"Name",        300, FL_ALIGN_LEFT},
-    {"Size",        80,  FL_ALIGN_RIGHT},
-    {"Progress",    100, FL_ALIGN_CENTER},
-    {"Status",      100, FL_ALIGN_CENTER},
-    {"Down Speed",  100, FL_ALIGN_RIGHT},
-    {"Up Speed",    100, FL_ALIGN_RIGHT},
-    {"ETA",         80,  FL_ALIGN_RIGHT},
-    {"Ratio",       60,  FL_ALIGN_RIGHT},
-    {"Peers",       60,  FL_ALIGN_RIGHT}
-};
+const TorrentListWidget::ColumnInfo TorrentListWidget::COLUMN_INFO[COL_COUNT] =
+    {{"Name", 300, FL_ALIGN_LEFT},        {"Size", 80, FL_ALIGN_RIGHT},
+     {"Progress", 100, FL_ALIGN_CENTER},  {"Status", 100, FL_ALIGN_CENTER},
+     {"Down Speed", 100, FL_ALIGN_RIGHT}, {"Up Speed", 100, FL_ALIGN_RIGHT},
+     {"ETA", 80, FL_ALIGN_RIGHT},         {"Ratio", 60, FL_ALIGN_RIGHT},
+     {"Peers", 60, FL_ALIGN_RIGHT}};
 
 // Colors are now dynamic
 
-TorrentListWidget::TorrentListWidget(int x, int y, int w, int h, const char* label)
+TorrentListWidget::TorrentListWidget(int x, int y, int w, int h,
+                                     const char* label)
     : Fl_Table_Row(x, y, w, h, label)
     , m_sortColumn(COL_NAME)
     , m_sortAscending(true)
     , m_dropHighlight(false)
-    , m_headerBg(COLOR_HEADER_BG)
-{
+    , m_headerBg(COLOR_HEADER_BG) {
     for (int i = 0; i < COL_COUNT; i++) {
         m_userResizedCol[i] = false;
     }
-    
+
     initializeColumns();
-    
+
     // Table settings
     type(SELECT_MULTI);
     when(FL_WHEN_RELEASE);
-    
+
     // Scrollbar width. Fl_Table::scrollbar_size() only exists when FLTK is
     // built with the extended 1.3 ABI (>= 10301); distro, vcpkg and
     // Flatpak builds all use the default ABI 10300, where the global
@@ -54,14 +49,14 @@ TorrentListWidget::TorrentListWidget(int x, int y, int w, int h, const char* lab
     vscrollbar->box(FL_FLAT_BOX);
     hscrollbar->box(FL_FLAT_BOX);
     applyScrollbarTheme(false);
-    
+
     end();
 }
 
 void TorrentListWidget::applyScrollbarTheme(bool darkMode) {
     Fl_Color trough;
     Fl_Color knob;
-    
+
     if (darkMode) {
         trough = fl_rgb_color(45, 45, 45);
         knob = fl_rgb_color(120, 120, 120);
@@ -71,7 +66,7 @@ void TorrentListWidget::applyScrollbarTheme(bool darkMode) {
         knob = fl_rgb_color(150, 150, 150);
         m_headerBg = COLOR_HEADER_BG;
     }
-    
+
     if (vscrollbar) {
         vscrollbar->color(trough);
         vscrollbar->selection_color(knob);
@@ -89,24 +84,23 @@ void TorrentListWidget::refreshThemeColors(bool darkMode) {
     redraw();
 }
 
-TorrentListWidget::~TorrentListWidget() {
-}
+TorrentListWidget::~TorrentListWidget() {}
 
 void TorrentListWidget::initializeColumns() {
     // Set up columns
     cols(COL_COUNT);
     col_header(1);
     col_resize(1);
-    
+
     // Set column widths
     for (int i = 0; i < COL_COUNT; i++) {
         col_width(i, COLUMN_INFO[i].width);
     }
-    
+
     // Row settings
     row_height_all(25);
     row_header(0);
-    
+
     layoutColumns();
 }
 
@@ -119,17 +113,17 @@ void TorrentListWidget::initializeColumns() {
 void TorrentListWidget::layoutColumns() {
     int available = w();
     if (available <= 0) return;
-    
+
     int fixedTotal = 0;
     for (int i = 0; i < COL_COUNT; i++) {
         if (i != COL_NAME && !m_userResizedCol[i]) {
             fixedTotal += COLUMN_INFO[i].width;
         }
     }
-    
+
     for (int i = 0; i < COL_COUNT; i++) {
         if (m_userResizedCol[i]) continue;
-        
+
         if (i == COL_NAME) {
             col_width(i, available - fixedTotal);
         } else {
@@ -152,7 +146,7 @@ void TorrentListWidget::setTorrents(const std::vector<TorrentItem*>& torrents) {
 
 void TorrentListWidget::addTorrent(TorrentItem* torrent) {
     if (!torrent) return;
-    
+
     m_torrents.push_back(torrent);
     updateSortedIndices();
     rows(m_torrents.size());
@@ -160,17 +154,16 @@ void TorrentListWidget::addTorrent(TorrentItem* torrent) {
 }
 
 void TorrentListWidget::removeTorrent(const std::string& hash) {
-    auto it = std::remove_if(m_torrents.begin(), m_torrents.end(),
-        [&hash](TorrentItem* item) {
-            return item && item->getHash() == hash;
-        });
-    
+    auto it = std::remove_if(
+        m_torrents.begin(), m_torrents.end(),
+        [&hash](TorrentItem* item) { return item && item->getHash() == hash; });
+
     if (it != m_torrents.end()) {
         // Clear selection to avoid graphical glitches with indices
         for (int i = 0; i < rows(); i++) {
             select_row(i, 0);
         }
-        
+
         m_torrents.erase(it, m_torrents.end());
         m_reports.erase(hash);
         updateSortedIndices();
@@ -194,7 +187,7 @@ void TorrentListWidget::clear() {
 
 std::vector<TorrentItem*> TorrentListWidget::getSelectedTorrents() {
     std::vector<TorrentItem*> selected;
-    
+
     for (int i = 0; i < this->rows(); i++) {
         if (this->row_selected(i)) {
             TorrentItem* torrent = getTorrentAt(i);
@@ -203,7 +196,7 @@ std::vector<TorrentItem*> TorrentListWidget::getSelectedTorrents() {
             }
         }
     }
-    
+
     return selected;
 }
 
@@ -235,24 +228,24 @@ void TorrentListWidget::sortBy(Column column, bool ascending) {
 void TorrentListWidget::updateSortedIndices() {
     m_sortedIndices.clear();
     m_sortedIndices.reserve(m_torrents.size());
-    
+
     for (size_t i = 0; i < m_torrents.size(); i++) {
         m_sortedIndices.push_back(i);
     }
-    
+
     // Sort indices based on current sort column
     std::sort(m_sortedIndices.begin(), m_sortedIndices.end(),
-        [this](int a, int b) { return compareTorrents(a, b); });
+              [this](int a, int b) { return compareTorrents(a, b); });
 }
 
 bool TorrentListWidget::compareTorrents(int idx1, int idx2) const {
     TorrentItem* t1 = m_torrents[idx1];
     TorrentItem* t2 = m_torrents[idx2];
-    
+
     if (!t1 || !t2) return false;
-    
+
     bool result = false;
-    
+
     switch (m_sortColumn) {
         case COL_NAME:
             result = t1->getName() < t2->getName();
@@ -284,7 +277,7 @@ bool TorrentListWidget::compareTorrents(int idx1, int idx2) const {
         default:
             result = false;
     }
-    
+
     return m_sortAscending ? result : !result;
 }
 
@@ -292,16 +285,17 @@ TorrentItem* TorrentListWidget::getTorrentAt(int row) const {
     if (row < 0 || row >= (int)m_sortedIndices.size()) {
         return nullptr;
     }
-    
+
     int idx = m_sortedIndices[row];
     if (idx < 0 || idx >= (int)m_torrents.size()) {
         return nullptr;
     }
-    
+
     return m_torrents[idx];
 }
 
-const SecurityReport& TorrentListWidget::reportForTorrent(TorrentItem* torrent) {
+const SecurityReport&
+TorrentListWidget::reportForTorrent(TorrentItem* torrent) {
     static const SecurityReport unknown = [] {
         SecurityReport report;
         report.summary = "No file list available. Metadata risk is unknown.";
@@ -324,18 +318,17 @@ const SecurityReport& TorrentListWidget::reportForTorrent(TorrentItem* torrent) 
     return inserted.first->second;
 }
 
-void TorrentListWidget::draw_cell(TableContext context, int row, int col,
-                                  int x, int y, int w, int h)
-{
+void TorrentListWidget::draw_cell(TableContext context, int row, int col, int x,
+                                  int y, int w, int h) {
     switch (context) {
         case CONTEXT_COL_HEADER:
             drawHeader(col, x, y, w, h);
             break;
-            
+
         case CONTEXT_CELL:
             drawCell(row, col, x, y, w, h);
             break;
-            
+
         default:
             break;
     }
@@ -343,133 +336,143 @@ void TorrentListWidget::draw_cell(TableContext context, int row, int col,
 
 void TorrentListWidget::drawHeader(int col, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
-    
+
     // Draw background
     fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, m_headerBg);
-    
+
     // Draw text
     if (col >= 0 && col < COL_COUNT) {
         fl_color(FL_FOREGROUND_COLOR);
         fl_font(FL_HELVETICA_BOLD, 12);
-        
+
         std::string label = COLUMN_INFO[col].name;
-        
+
         // Add sort indicator
         if (col == m_sortColumn) {
             label += m_sortAscending ? " ▲" : " ▼";
         }
-        
+
         fl_draw(label.c_str(), x + 5, y, w - 10, h, COLUMN_INFO[col].alignment);
     }
-    
+
     fl_pop_clip();
 }
 
 void TorrentListWidget::drawCell(int row, int col, int x, int y, int w, int h) {
     fl_push_clip(x, y, w, h);
-    
+
     TorrentItem* torrent = getTorrentAt(row);
     if (!torrent) {
         fl_pop_clip();
         return;
     }
-    
+
     // Background
     Fl_Color bg_color = getRowColor(row);
     fl_color(bg_color);
     fl_rectf(x, y, w, h);
-    
+
     // Text color
     fl_color(getTextColor(row));
     fl_font(FL_HELVETICA, 12);
-    
+
     std::string text;
-    
+
     switch (col) {
         case COL_NAME: {
             // The shield sits immediately before the name, as in the search
             // results and the Add Torrent dialog.
             constexpr int SHIELD = 15;
-            SecurityBadge::drawShield(x + 5, y + (h - SHIELD) / 2, SHIELD, SHIELD,
-                                      reportForTorrent(torrent).level);
+            SecurityBadge::drawShield(x + 5, y + (h - SHIELD) / 2, SHIELD,
+                                      SHIELD, reportForTorrent(torrent).level);
             fl_color(getTextColor(row));
             text = SecurityBadge::displayText(torrent->getName());
             fl_draw(text.c_str(), x + 5 + SHIELD + 4, y, w - (SHIELD + 14), h,
                     FL_ALIGN_LEFT | FL_ALIGN_CLIP);
             break;
         }
-            
+
         case COL_SIZE:
             text = Format::bytes(torrent->getTotalSize());
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
+            fl_draw(text.c_str(), x + 5, y, w - 10, h,
+                    FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
-            
+
         case COL_PROGRESS:
-            drawProgressBar(torrent->getProgress(), x + 5, y + 5, w - 10, h - 10);
+            drawProgressBar(torrent->getProgress(), x + 5, y + 5, w - 10,
+                            h - 10);
             break;
-            
+
         case COL_STATUS:
             text = torrent->getStateString();
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+            fl_draw(text.c_str(), x + 5, y, w - 10, h,
+                    FL_ALIGN_CENTER | FL_ALIGN_CLIP);
             break;
-            
+
         case COL_DOWN_SPEED:
             text = Format::perSecond(torrent->getDownloadRate());
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
+            fl_draw(text.c_str(), x + 5, y, w - 10, h,
+                    FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
-            
+
         case COL_UP_SPEED:
             text = Format::perSecond(torrent->getUploadRate());
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
+            fl_draw(text.c_str(), x + 5, y, w - 10, h,
+                    FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
-            
+
         case COL_ETA:
             text = torrent->getETAString();
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
+            fl_draw(text.c_str(), x + 5, y, w - 10, h,
+                    FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
-            
+
         case COL_RATIO: {
             std::ostringstream oss;
             oss << std::fixed << std::setprecision(2) << torrent->getRatio();
             text = oss.str();
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
+            fl_draw(text.c_str(), x + 5, y, w - 10, h,
+                    FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
         }
-            
+
         case COL_PEERS: {
             std::ostringstream oss;
-            oss << torrent->getNumPeers() << " (" << torrent->getNumSeeds() << ")";
+            oss << torrent->getNumPeers() << " (" << torrent->getNumSeeds()
+                << ")";
             text = oss.str();
-            fl_draw(text.c_str(), x + 5, y, w - 10, h, FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
+            fl_draw(text.c_str(), x + 5, y, w - 10, h,
+                    FL_ALIGN_RIGHT | FL_ALIGN_CLIP);
             break;
         }
     }
-    
+
     fl_pop_clip();
 }
 
-void TorrentListWidget::drawProgressBar(double progress, int x, int y, int w, int h) {
+void TorrentListWidget::drawProgressBar(double progress, int x, int y, int w,
+                                        int h) {
     // Background
     fl_color(getProgressBgColor());
     fl_rectf(x, y, w, h);
-    
+
     // Progress
     int progress_w = static_cast<int>(w * progress);
     fl_color(getProgressFgColor());
     fl_rectf(x, y, progress_w, h);
-    
+
     // Border
     fl_color(FL_FOREGROUND_COLOR);
     fl_rect(x, y, w, h);
-    
+
     // Text
     fl_color(FL_FOREGROUND_COLOR);
     fl_font(FL_HELVETICA, 10);
-    
+
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(1) << (progress * 100.0) << "%";
     std::string text = oss.str();
-    
+
     fl_draw(text.c_str(), x, y, w, h, FL_ALIGN_CENTER);
 }
 
@@ -490,7 +493,7 @@ static std::vector<std::string> parseDroppedPaths(const char* text) {
         std::string decoded;
         for (size_t i = 0; i < line.size(); i++) {
             if (line[i] == '%' && i + 2 < line.size()) {
-                char h1 = line[i+1], h2 = line[i+2];
+                char h1 = line[i + 1], h2 = line[i + 2];
                 auto hex = [](char c) -> int {
                     if (c >= '0' && c <= '9') return c - '0';
                     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
@@ -519,7 +522,7 @@ int TorrentListWidget::handle(int event) {
     if (event == FL_MOUSEWHEEL) {
         int dy = Fl::event_dy();
         int dx = Fl::event_dx();
-        
+
         // In FLTK dy is positive when scrolling down (see Fl_x.cxx)
         if (dy != 0) {
             row_position(top_row() + 3 * dy);
@@ -529,7 +532,7 @@ int TorrentListWidget::handle(int event) {
         redraw();
         return 1;
     }
-    
+
     // ── Drag-and-drop events (Linux/X11 via FLTK) ─────────────────────────
     if (event == FL_DND_ENTER || event == FL_DND_DRAG) {
         if (!m_dropHighlight) {
@@ -558,8 +561,7 @@ int TorrentListWidget::handle(int event) {
             auto paths = parseDroppedPaths(text);
             for (const auto& p : paths) {
                 // Only accept .torrent files
-                if (p.size() > 8 &&
-                    p.substr(p.size() - 8) == ".torrent") {
+                if (p.size() > 8 && p.substr(p.size() - 8) == ".torrent") {
                     m_onDropCallback(p);
                 }
             }
@@ -591,13 +593,13 @@ int TorrentListWidget::handle(int event) {
         }
     }
 
-int result = Fl_Table_Row::handle(event);
+    int result = Fl_Table_Row::handle(event);
 
     // Handle column header clicks for sorting
     if (event == FL_RELEASE) {
         if (callback_context() == CONTEXT_COL_HEADER) {
             int clickedCol = callback_col();
-            
+
             // A drag that ends on the header border resized that column: stop
             // treating it as automatic layout from now on.
             if (clickedCol >= 0 && clickedCol < COL_COUNT) {
@@ -607,7 +609,7 @@ int result = Fl_Table_Row::handle(event);
                     }
                 }
             }
-            
+
             // Check it's a click, not a column-resize drag
             if (Fl::event_is_click()) {
                 int col = callback_col();
@@ -618,8 +620,8 @@ int result = Fl_Table_Row::handle(event);
                         sortBy((Column)col, !m_sortAscending);
                     } else {
                         bool defaultAscending = true;
-                        if (col == COL_SIZE || col == COL_PROGRESS || 
-                            col == COL_DOWN_SPEED || col == COL_UP_SPEED || 
+                        if (col == COL_SIZE || col == COL_PROGRESS ||
+                            col == COL_DOWN_SPEED || col == COL_UP_SPEED ||
                             col == COL_RATIO || col == COL_PEERS) {
                             defaultAscending = false;
                         }
@@ -630,7 +632,7 @@ int result = Fl_Table_Row::handle(event);
             }
         }
     }
-    
+
     // Handle double-click on rows
     if (event == FL_PUSH && Fl::event_clicks() > 0) {
         if (callback_context() == CONTEXT_CELL) {
@@ -640,7 +642,7 @@ int result = Fl_Table_Row::handle(event);
             }
         }
     }
-    
+
     return result;
 }
 
@@ -695,15 +697,13 @@ void TorrentListWidget::drawDropOverlay() {
     // Centered text
     fl_color(FL_WHITE);
     fl_font(FL_HELVETICA_BOLD, 22);
-    fl_draw("Drop .torrent files here",
-            bx, by, bw, bh,
+    fl_draw("Drop .torrent files here", bx, by, bw, bh,
             FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
 
     fl_color(fl_rgb_color(180, 200, 230));
     fl_font(FL_HELVETICA, 13);
     // Draw hint below the main text
-    fl_draw("or click \"Add Torrent\" to browse",
-            bx, by + 38, bw, bh,
+    fl_draw("or click \"Add Torrent\" to browse", bx, by + 38, bw, bh,
             FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
 }
 
@@ -719,10 +719,11 @@ void TorrentListWidget::draw() {
 }
 
 Fl_Color TorrentListWidget::getRowColor(int row) const {
-    if (const_cast<TorrentListWidget*>(this)->row_selected(row)) return FL_SELECTION_COLOR;
-    
+    if (const_cast<TorrentListWidget*>(this)->row_selected(row))
+        return FL_SELECTION_COLOR;
+
     if (row % 2 == 0) return FL_BACKGROUND2_COLOR;
-    
+
     // For odd rows, we want a slight variation
     uchar r, g, b;
     Fl::get_color(FL_BACKGROUND2_COLOR, r, g, b);
@@ -734,7 +735,8 @@ Fl_Color TorrentListWidget::getRowColor(int row) const {
 }
 
 Fl_Color TorrentListWidget::getTextColor(int row) const {
-    if (const_cast<TorrentListWidget*>(this)->row_selected(row)) return FL_WHITE;
+    if (const_cast<TorrentListWidget*>(this)->row_selected(row))
+        return FL_WHITE;
     return FL_FOREGROUND_COLOR;
 }
 

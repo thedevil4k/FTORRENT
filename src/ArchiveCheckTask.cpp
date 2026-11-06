@@ -26,7 +26,8 @@ const int CHECK_DEADLINE_SECONDS = 120;
 } // namespace
 
 ArchiveCheckTask::ArchiveCheckTask(std::string archivePath, Deliver deliver)
-    : m_archivePath(std::move(archivePath)), m_deliver(std::move(deliver)) {}
+    : m_archivePath(std::move(archivePath))
+    , m_deliver(std::move(deliver)) {}
 
 ArchiveCheckTask::~ArchiveCheckTask() = default;
 
@@ -34,8 +35,9 @@ void ArchiveCheckTask::cancel() {
     m_cancel.store(true);
 }
 
-std::shared_ptr<ArchiveCheckTask> ArchiveCheckTask::start(
-    std::string archivePath, Deliver deliver, Worker worker) {
+std::shared_ptr<ArchiveCheckTask>
+ArchiveCheckTask::start(std::string archivePath, Deliver deliver,
+                        Worker worker) {
     // Not make_shared: the constructor is private and the thread needs the
     // object to stay alive until it posts its answer.
     std::shared_ptr<ArchiveCheckTask> task(
@@ -44,41 +46,40 @@ std::shared_ptr<ArchiveCheckTask> ArchiveCheckTask::start(
     return task;
 }
 
-std::shared_ptr<ArchiveCheckTask> ArchiveCheckTask::startFromTorrentBody(
-    std::string torrentBody, int fileIndex, std::string archivePath,
-    Deliver deliver) {
+std::shared_ptr<ArchiveCheckTask>
+ArchiveCheckTask::startFromTorrentBody(std::string torrentBody, int fileIndex,
+                                       std::string archivePath,
+                                       Deliver deliver) {
     Worker worker = [body = std::move(torrentBody), fileIndex](
                         const std::atomic<bool>& cancelled,
                         std::vector<SecurityFile>& entries, std::string& error,
                         std::string& note, bool& encryptedHeaders) {
-        return ArchivePreflight::inspectTorrent(body, fileIndex, entries, error,
-                                                &cancelled,
-                                                CHECK_DEADLINE_SECONDS, &note,
-                                                &encryptedHeaders);
+        return ArchivePreflight::inspectTorrent(
+            body, fileIndex, entries, error, &cancelled, CHECK_DEADLINE_SECONDS,
+            &note, &encryptedHeaders);
     };
     return start(std::move(archivePath), std::move(deliver), std::move(worker));
 }
 
-std::shared_ptr<ArchiveCheckTask> ArchiveCheckTask::startFromMagnet(
-    std::string magnet, std::string torrentPathOrUrl, int fileIndex,
-    std::string archivePath, Deliver deliver) {
+std::shared_ptr<ArchiveCheckTask>
+ArchiveCheckTask::startFromMagnet(std::string magnet,
+                                  std::string torrentPathOrUrl, int fileIndex,
+                                  std::string archivePath, Deliver deliver) {
     Worker worker = [magnet = std::move(magnet),
-                     torrentPathOrUrl = std::move(torrentPathOrUrl),
-                     fileIndex](const std::atomic<bool>& cancelled,
-                                std::vector<SecurityFile>& entries,
-                                std::string& error, std::string& note,
-                                bool& encryptedHeaders) {
-        return ArchivePreflight::inspect(magnet, torrentPathOrUrl, fileIndex,
-                                         entries, error, &cancelled,
-                                         CHECK_DEADLINE_SECONDS, &note,
-                                         &encryptedHeaders);
+                     torrentPathOrUrl = std::move(torrentPathOrUrl), fileIndex](
+                        const std::atomic<bool>& cancelled,
+                        std::vector<SecurityFile>& entries, std::string& error,
+                        std::string& note, bool& encryptedHeaders) {
+        return ArchivePreflight::inspect(
+            magnet, torrentPathOrUrl, fileIndex, entries, error, &cancelled,
+            CHECK_DEADLINE_SECONDS, &note, &encryptedHeaders);
     };
     return start(std::move(archivePath), std::move(deliver), std::move(worker));
 }
 
-std::shared_ptr<ArchiveCheckTask> ArchiveCheckTask::startFromParams(
-    lt::add_torrent_params params, int fileIndex, std::string archivePath,
-    Deliver deliver) {
+std::shared_ptr<ArchiveCheckTask>
+ArchiveCheckTask::startFromParams(lt::add_torrent_params params, int fileIndex,
+                                  std::string archivePath, Deliver deliver) {
     // The task keeps the cancellation flag alive for the whole run, so the
     // worker sees cancel() the moment it is called.
     Worker worker = [params = std::move(params), fileIndex](
@@ -100,8 +101,7 @@ void ArchiveCheckTask::run(const Worker& worker) {
     std::string error;
     std::string note;
     bool encryptedHeaders = false;
-    const bool ok =
-        worker(m_cancel, entries, error, note, encryptedHeaders);
+    const bool ok = worker(m_cancel, entries, error, note, encryptedHeaders);
 
     // A cancelled check has no answer to give: the surface that asked is
     // usually gone, and if it is not, an error line would be a lie.
@@ -117,7 +117,8 @@ void ArchiveCheckTask::run(const Worker& worker) {
         result.message = archiveCheckMessage(m_archivePath, entries, note);
         result.entries = std::move(entries);
     } else {
-        result.message = "Archive: the index could not be read (" + error + ").";
+        result.message =
+            "Archive: the index could not be read (" + error + ").";
     }
     // The lock badge reads this count and nothing else. Encrypted headers are
     // not a guess: libarchive refused to open the archive for lack of a

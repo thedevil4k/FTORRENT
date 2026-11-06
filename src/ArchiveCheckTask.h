@@ -41,19 +41,19 @@ public:
     using Deliver = std::function<void(Result)>;
 
     // The .torrent bytes a search row already resolved: no metadata exchange.
-    static std::shared_ptr<ArchiveCheckTask> startFromTorrentBody(
-        std::string torrentBody, int fileIndex, std::string archivePath,
-        Deliver deliver);
+    static std::shared_ptr<ArchiveCheckTask>
+    startFromTorrentBody(std::string torrentBody, int fileIndex,
+                         std::string archivePath, Deliver deliver);
 
     // A magnet, with an optional .torrent path or URL to try first.
-    static std::shared_ptr<ArchiveCheckTask> startFromMagnet(
-        std::string magnet, std::string torrentPathOrUrl, int fileIndex,
-        std::string archivePath, Deliver deliver);
+    static std::shared_ptr<ArchiveCheckTask>
+    startFromMagnet(std::string magnet, std::string torrentPathOrUrl,
+                    int fileIndex, std::string archivePath, Deliver deliver);
 
     // A torrent the application already has in hand (Details).
-    static std::shared_ptr<ArchiveCheckTask> startFromParams(
-        lt::add_torrent_params params, int fileIndex, std::string archivePath,
-        Deliver deliver);
+    static std::shared_ptr<ArchiveCheckTask>
+    startFromParams(lt::add_torrent_params params, int fileIndex,
+                    std::string archivePath, Deliver deliver);
 
     // Asks the worker to stop. The callback is not invoked afterwards.
     void cancel();
@@ -67,16 +67,14 @@ private:
     // Returns false and fills error/note/encryptedHeaders like
     // ArchivePreflight::inspect does. The flag is the task's own, so cancel()
     // stops the worker wherever it is waiting.
-    using Worker = std::function<bool(const std::atomic<bool>& cancelled,
-                                      std::vector<SecurityFile>& entries,
-                                      std::string& error, std::string& note,
-                                      bool& encryptedHeaders)>;
+    using Worker = std::function<bool(
+        const std::atomic<bool>& cancelled, std::vector<SecurityFile>& entries,
+        std::string& error, std::string& note, bool& encryptedHeaders)>;
 
     ArchiveCheckTask(std::string archivePath, Deliver deliver);
 
-    static std::shared_ptr<ArchiveCheckTask> start(std::string archivePath,
-                                                   Deliver deliver,
-                                                   Worker worker);
+    static std::shared_ptr<ArchiveCheckTask>
+    start(std::string archivePath, Deliver deliver, Worker worker);
     void run(const Worker& worker);
     static void deliverOnUiThread(void* data);
 

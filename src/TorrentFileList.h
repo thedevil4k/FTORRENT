@@ -20,11 +20,11 @@ using TorrentFileEntry = SecurityFile;
 // error to recover from: most results never get a swarm answer and the row
 // has to stay perfectly usable either way.
 enum class FileListState {
-    NotRequested,   // the user has not opened the row yet
-    Queued,         // accepted, waiting for one of the running probes to end
-    Loading,        // a worker is fetching the metadata
-    Loaded,         // the files are known
-    Failed          // the metadata could not be fetched
+    NotRequested, // the user has not opened the row yet
+    Queued,       // accepted, waiting for one of the running probes to end
+    Loading,      // a worker is fetching the metadata
+    Loaded,       // the files are known
+    Failed        // the metadata could not be fetched
 };
 
 /**
@@ -83,8 +83,7 @@ public:
     // archive" wait on the swarm for a torrent the row had already resolved.
     static bool resolve(const std::string& magnet,
                         const std::string& torrentUrl,
-                        std::vector<TorrentFileEntry>& out,
-                        std::string& error,
+                        std::vector<TorrentFileEntry>& out, std::string& error,
                         int timeoutSeconds = DEFAULT_TIMEOUT_SECONDS,
                         std::string* torrentBody = nullptr);
 

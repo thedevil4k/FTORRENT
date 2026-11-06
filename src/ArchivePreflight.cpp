@@ -21,9 +21,9 @@
 namespace lt = libtorrent;
 namespace fs = std::filesystem;
 
-ArchivePreflight::PieceRange ArchivePreflight::computeRange(
-    std::int64_t fileOffset, std::int64_t fileSize, int pieceLength,
-    std::int64_t torrentSize) {
+ArchivePreflight::PieceRange
+ArchivePreflight::computeRange(std::int64_t fileOffset, std::int64_t fileSize,
+                               int pieceLength, std::int64_t torrentSize) {
     PieceRange range;
     if (fileSize <= 0 || pieceLength <= 0 || fileOffset < 0) return range;
 
@@ -31,8 +31,8 @@ ArchivePreflight::PieceRange ArchivePreflight::computeRange(
     range.firstOffset = static_cast<int>(fileOffset % pieceLength);
 
     const std::int64_t firstPieceBytes = std::min<std::int64_t>(
-        pieceLength,
-        torrentSize - static_cast<std::int64_t>(range.firstPiece) * pieceLength);
+        pieceLength, torrentSize - static_cast<std::int64_t>(range.firstPiece) *
+                                       pieceLength);
     range.firstLength = static_cast<int>(
         std::min<std::int64_t>(fileSize, firstPieceBytes - range.firstOffset));
 
@@ -40,11 +40,10 @@ ArchivePreflight::PieceRange ArchivePreflight::computeRange(
     range.lastPiece = static_cast<int>(lastAbsolute / pieceLength);
     const std::int64_t lastPieceStart =
         static_cast<std::int64_t>(range.lastPiece) * pieceLength;
-    range.lastOffset = static_cast<int>(std::max<std::int64_t>(
-        0, fileOffset - lastPieceStart));
-    range.lastLength =
-        static_cast<int>((fileOffset + fileSize) -
-                         (lastPieceStart + range.lastOffset));
+    range.lastOffset = static_cast<int>(
+        std::max<std::int64_t>(0, fileOffset - lastPieceStart));
+    range.lastLength = static_cast<int>((fileOffset + fileSize) -
+                                        (lastPieceStart + range.lastOffset));
     return range;
 }
 
@@ -77,16 +76,20 @@ bool loadTorrentSource(const std::string& magnet,
                 // A mirror serving a different torrent would make the probe
                 // read pieces of a file the row does not describe, so the hash
                 // has to be the one the magnet names.
-                const std::string expected = TorrentFileList::magnetHash(magnet);
+                const std::string expected =
+                    TorrentFileList::magnetHash(magnet);
                 const std::string actual =
                     TorrentFileList::infoHashOfTorrentFile(res.body);
-                if (!expected.empty() && !actual.empty() && expected != actual) {
-                    fileError = "the .torrent link points at a different torrent";
+                if (!expected.empty() && !actual.empty() &&
+                    expected != actual) {
+                    fileError =
+                        "the .torrent link points at a different torrent";
                 } else {
                     haveFile = true;
                 }
             } catch (const std::exception& e) {
-                fileError = std::string("could not read the .torrent link: ") + e.what();
+                fileError = std::string("could not read the .torrent link: ") +
+                            e.what();
             }
         }
     } else if (!torrentPathOrUrl.empty()) {
@@ -94,7 +97,8 @@ bool loadTorrentSource(const std::string& magnet,
             atp = lt::load_torrent_file(torrentPathOrUrl);
             haveFile = true;
         } catch (const std::exception& e) {
-            fileError = std::string("could not read the .torrent file: ") + e.what();
+            fileError =
+                std::string("could not read the .torrent file: ") + e.what();
         }
     }
 
@@ -157,10 +161,9 @@ namespace {
 std::string readableIndexError(const std::string& raw) {
     const std::string lower = [&] {
         std::string out = raw;
-        std::transform(out.begin(), out.end(), out.begin(),
-                       [](unsigned char c) {
-                           return static_cast<char>(std::tolower(c));
-                       });
+        std::transform(
+            out.begin(), out.end(), out.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return out;
     }();
     if (raw.empty()) {
@@ -266,9 +269,9 @@ std::string partialRarNote(const ArchiveInspector::ListingAll& listing,
         std::to_string(listing.entries.size()) + " entries read from headers";
     if (mib > 0) note += " (" + std::to_string(mib) + " MiB fetched)";
     note += ". ";
-    note += listing.error.empty() ? "The header walk stopped early."
-                                  : "The header walk stopped early: " +
-                                        listing.error + ".";
+    note += listing.error.empty()
+                ? "The header walk stopped early."
+                : "The header walk stopped early: " + listing.error + ".";
     return note;
 }
 
@@ -283,8 +286,8 @@ bool ArchivePreflight::inspect(const std::string& magnet,
                                bool* encryptedHeaders) {
     lt::add_torrent_params atp;
     if (!loadTorrentSource(magnet, torrentPath, atp, error)) return false;
-    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds,
-                   note, encryptedHeaders);
+    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds, note,
+                   encryptedHeaders);
 }
 
 bool ArchivePreflight::inspect(const lt::add_torrent_params& params,
@@ -328,14 +331,14 @@ bool ArchivePreflight::inspect(const lt::add_torrent_params& params,
         if (encryptedHeaders) *encryptedHeaders = listing.encryptedHeaders;
 
         if (listing.entries.empty()) {
-            error = listing.encryptedHeaders
-                        ? "the archive headers are encrypted, so its contents "
-                          "cannot be listed before downloading it"
-                        : (listing.ok
-                               ? "the archive lists no files"
-                               : (listing.error.empty()
-                                      ? "the archive index could not be read"
-                                      : listing.error));
+            error =
+                listing.encryptedHeaders
+                    ? "the archive headers are encrypted, so its contents "
+                      "cannot be listed before downloading it"
+                    : (listing.ok ? "the archive lists no files"
+                                  : (listing.error.empty()
+                                         ? "the archive index could not be read"
+                                         : listing.error));
             return false;
         }
 
@@ -389,6 +392,6 @@ bool ArchivePreflight::inspectTorrent(const std::string& torrentBody,
     // The encrypted-header flag travels all the way down: a search row that
     // already holds the .torrent bytes checks the archive through this path,
     // and the lock badge must appear there too.
-    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds,
-                   note, encryptedHeaders);
+    return inspect(atp, fileIndex, entries, error, cancel, timeoutSeconds, note,
+                   encryptedHeaders);
 }

@@ -23,4 +23,4 @@ Fl_Image* load(const std::string& file, int size) {
     return image.copy(size, size);
 }
 
-}  // namespace AssetLoader
+} // namespace AssetLoader

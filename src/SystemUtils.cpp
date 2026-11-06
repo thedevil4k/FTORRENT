@@ -31,9 +31,11 @@
 std::string SystemUtils::getRamUsage() {
 #ifdef _WIN32
     PROCESS_MEMORY_COUNTERS_EX pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
-        // En Windows, WorkingSetSize incluye el caché de archivos mapeados por el SO.
-        // PrivateUsage representa lo que el programa tiene asignado de forma real y privada (Commit Size).
+    if (GetProcessMemoryInfo(GetCurrentProcess(),
+                             (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+        // En Windows, WorkingSetSize incluye el caché de archivos mapeados por
+        // el SO. PrivateUsage representa lo que el programa tiene asignado de
+        // forma real y privada (Commit Size).
         double memMB = pmc.PrivateUsage / (1024.0 * 1024.0);
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(1) << memMB << " MB";
@@ -42,7 +44,8 @@ std::string SystemUtils::getRamUsage() {
 #elif __APPLE__
     struct mach_task_basic_info info;
     mach_msg_type_number_t infoCount = MACH_TASK_BASIC_INFO_COUNT;
-    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &infoCount) == KERN_SUCCESS) {
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info,
+                  &infoCount) == KERN_SUCCESS) {
         double memMB = info.resident_size / (1024.0 * 1024.0);
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(1) << memMB << " MB";
@@ -70,7 +73,8 @@ std::string SystemUtils::getRamUsage() {
 void SystemUtils::releaseMemory() {
 #ifdef _WIN32
     // Vaciar el "Working Set" del proceso. Esto obliga a Windows a liberar
-    // toda la RAM posible de los archivos mapeados que no se estén usando activamente.
+    // toda la RAM posible de los archivos mapeados que no se estén usando
+    // activamente.
     SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
 #endif
 }
@@ -177,7 +181,8 @@ void SystemUtils::openUrl(const std::string& url) {
 
 void SystemUtils::setProcessPriority(bool high) {
 #ifdef _WIN32
-    SetPriorityClass(GetCurrentProcess(), high ? HIGH_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS);
+    SetPriorityClass(GetCurrentProcess(),
+                     high ? HIGH_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS);
 #else
     // Nice value for Linux/Mac
     nice(high ? -10 : 0);
@@ -190,7 +195,8 @@ std::string SystemUtils::getArchitecture() {
     GetSystemInfo(&si);
     if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) return "x64";
     if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) return "x86";
-    if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64) return "arm64";
+    if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64)
+        return "arm64";
     return "unknown";
 #else
     // Linux/Mac architecture is usually determined at compile time or via uname
@@ -206,36 +212,44 @@ std::string SystemUtils::getArchitecture() {
 #endif
 }
 
-void SystemUtils::fetchPublicIpAndCountry(std::function<void(std::string, std::string)> callback) {
+void SystemUtils::fetchPublicIpAndCountry(
+    std::function<void(std::string, std::string)> callback) {
     if (!callback) return;
-    
+
     std::thread([callback]() {
         std::string ip = "";
         std::string country = "";
-        std::string url = "http://ip-api.com/line/?fields=status,countryCode,query";
+        std::string url =
+            "http://ip-api.com/line/?fields=status,countryCode,query";
 
 #ifdef _WIN32
-        HINTERNET hInternet = InternetOpenA("FTorrent", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+        HINTERNET hInternet = InternetOpenA(
+            "FTorrent", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
         if (hInternet) {
-            HINTERNET hConnect = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+            HINTERNET hConnect = InternetOpenUrlA(hInternet, url.c_str(), NULL,
+                                                  0, INTERNET_FLAG_RELOAD, 0);
             if (hConnect) {
                 char buffer[1024];
                 DWORD bytesRead = 0;
                 std::string response = "";
-                while (InternetReadFile(hConnect, buffer, sizeof(buffer) - 1, &bytesRead) && bytesRead > 0) {
+                while (InternetReadFile(hConnect, buffer, sizeof(buffer) - 1,
+                                        &bytesRead) &&
+                       bytesRead > 0) {
                     buffer[bytesRead] = '\0';
                     response += buffer;
                 }
                 InternetCloseHandle(hConnect);
-                
-                // Parse response: line 1: status, line 2: countryCode, line 3: ip
+
+                // Parse response: line 1: status, line 2: countryCode, line 3:
+                // ip
                 std::stringstream ss(response);
                 std::string status;
                 std::getline(ss, status);
                 if (!status.empty() && status.back() == '\r') status.pop_back();
                 if (status == "success") {
                     std::getline(ss, country);
-                    if (!country.empty() && country.back() == '\r') country.pop_back();
+                    if (!country.empty() && country.back() == '\r')
+                        country.pop_back();
                     std::getline(ss, ip);
                     if (!ip.empty() && ip.back() == '\r') ip.pop_back();
                 }
@@ -253,20 +267,21 @@ void SystemUtils::fetchPublicIpAndCountry(std::function<void(std::string, std::s
                 response += buffer;
             }
             pclose(pipe);
-            
+
             std::stringstream ss(response);
             std::string status;
             std::getline(ss, status);
             if (!status.empty() && status.back() == '\r') status.pop_back();
             if (status == "success") {
                 std::getline(ss, country);
-                if (!country.empty() && country.back() == '\r') country.pop_back();
+                if (!country.empty() && country.back() == '\r')
+                    country.pop_back();
                 std::getline(ss, ip);
                 if (!ip.empty() && ip.back() == '\r') ip.pop_back();
             }
         }
 #endif
-        
+
         callback(ip, country);
     }).detach();
 }
@@ -285,72 +300,76 @@ void SystemUtils::fetchPublicIpAndCountry(std::function<void(std::string, std::s
 int SystemUtils::measureLatency() {
     const char* targetHost = "8.8.8.8";
     int targetPort = 53; // DNS port
-    
+
     auto start = std::chrono::high_resolution_clock::now();
-    
+
 #ifdef _WIN32
-    // Winsock is already initialized by libtorrent/wininet usually, 
+    // Winsock is already initialized by libtorrent/wininet usually,
     // but we can ensure it or just try to create socket.
     SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock == INVALID_SOCKET) return -1;
-    
+
     // Set non-blocking for timeout
     u_long mode = 1;
     ioctlsocket(sock, FIONBIO, &mode);
-    
+
     sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(targetPort);
     inet_pton(AF_INET, targetHost, &addr.sin_addr);
-    
+
     connect(sock, (struct sockaddr*)&addr, sizeof(addr));
-    
+
     fd_set writeSet;
     FD_ZERO(&writeSet);
     FD_SET(sock, &writeSet);
-    
+
     timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
-    
+
     int res = select(0, NULL, &writeSet, NULL, &timeout);
     closesocket(sock);
-    
+
     if (res > 0) {
         auto end = std::chrono::high_resolution_clock::now();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        return std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                     start)
+            .count();
     }
 #else
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) return -1;
-    
+
     // Set non-blocking
     int flags = fcntl(sock, F_GETFL, 0);
     fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-    
+
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(targetPort);
     inet_aton(targetHost, &addr.sin_addr);
-    
+
     connect(sock, (struct sockaddr*)&addr, sizeof(addr));
-    
+
     fd_set writeSet;
     FD_ZERO(&writeSet);
     FD_SET(sock, &writeSet);
-    
+
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
-    
+
     int res = select(sock + 1, NULL, &writeSet, NULL, &timeout);
     close(sock);
-    
+
     if (res > 0) {
         auto end = std::chrono::high_resolution_clock::now();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        return std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                     start)
+            .count();
     }
 #endif
-    
+
     return -1;
 }

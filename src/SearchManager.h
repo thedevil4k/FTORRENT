@@ -14,7 +14,9 @@ class SearchManager {
 public:
     static SearchManager& instance();
 
-    const std::vector<SearchEngine::Definition>& engines() const { return m_engines; }
+    const std::vector<SearchEngine::Definition>& engines() const {
+        return m_engines;
+    }
 
     void addEngine(const SearchEngine::Definition& def);
 

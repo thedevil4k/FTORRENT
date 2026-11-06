@@ -82,12 +82,16 @@ SHIELD_SURFACES = (
 )
 
 # The provider query is started from the surfaces where the user clicks a
-# shield. A fourth caller would mean a provider asked without a click.
-REPUTATION_CALLERS = (
-    "src/AddTorrentDialog.cpp",
-    "src/SearchResultsWidgetBadges.cpp",
-    "src/TorrentDetailsDialog.cpp",
+# shield. These are the actions that do it, by class and method: the rule
+# belongs to the class, so a file that is split later does not change it.
+REPUTATION_ACTIONS = (
+    "AddTorrentDialog::checkReputation",
+    "SearchResultsWidget::startReputationLookup",
+    "TorrentDetailsDialog::requestReputation",
 )
+
+# The action that hashes a whole file the user already has on disk.
+HASH_ACTION = "TorrentDetailsDialog::startLocalHash"
 
 # The two providers the product names, and nothing else.
 PROVIDER_HOSTS = ("www.virustotal.com", "mb-api.abuse.ch")
@@ -124,6 +128,18 @@ def source_files(root):
 def shipping_files(files):
     """The files that end up in the binary. The tests are not shipped."""
     return [rel for rel in files if rel.startswith("src/")]
+
+
+def defines(text, qualified):
+    """Whether the text defines the given Class::method."""
+    name = re.escape(qualified).replace(r"\:\:", "::")
+    return re.search(r"\b%s\s*\(" % name, text) is not None
+
+
+def files_defining(files, root, qualified):
+    """The files that define the given Class::method."""
+    return [rel for rel in files
+            if defines(read_text(os.path.join(root, rel)), qualified)]
 
 
 def strip_comments(text):
@@ -378,7 +394,12 @@ def check_shield_surfaces(report, root):
 
 
 def check_hash_only_on_disk(report, root, files):
+    # The whole file is only hashed where it is already on disk, which is the
+    # action the details dialog offers. The rule belongs to that action, so
+    # the check looks for the action and not for a file name: a file split
+    # later does not change what the code does.
     definition = re.compile(r"bool\s+FileHash::sha256File\s*\(")
+    owner = files_defining(files, root, HASH_ACTION)
     callers = []
     for rel in files:
         text = read_text(os.path.join(root, rel))
@@ -387,32 +408,40 @@ def check_hash_only_on_disk(report, root, files):
         if definition.search(text):
             continue
         callers.append(rel)
-    expected = ["src/TorrentDetailsDialog.cpp"]
     report.check(
-        callers == expected,
+        len(owner) == 1 and callers == owner,
         "a whole file is only hashed where it is already on disk",
-        "called from: %s" % ", ".join(callers),
+        "hashed from: %s; the action lives in: %s"
+        % (", ".join(callers) or "nowhere", ", ".join(owner) or "nowhere"),
     )
 
 
 def check_reputation_callers(report, root, files):
-    # The service owns the request; the owner is not a caller. A caller is a
-    # file that holds a ReputationService and asks it for something, which is
-    # what a provider query looks like from the outside.
+    # The providers are asked only from the surfaces where the user clicks a
+    # shield. Those are the actions above, and only they.
+    owners = []
+    for action in REPUTATION_ACTIONS:
+        owners.extend(files_defining(files, root, action))
+    # The service owns the request, so the service is not a caller. It is
+    # found by the class that owns it, not by the name of its file.
+    service = files_defining(files, root, "ReputationService::request")
     callers = []
     for rel in files:
-        if rel == "src/ReputationService.cpp":
+        if rel in service:
             continue
         text = read_text(os.path.join(root, rel))
         if "ReputationService" not in text:
             continue
         if re.search(r"\.request\s*\(", text):
             callers.append(rel)
-    expected = sorted(REPUTATION_CALLERS)
     report.check(
-        sorted(callers) == expected,
+        len(owners) == len(REPUTATION_ACTIONS)
+        and len(service) == 1
+        and sorted(callers) == sorted(owners),
         "the providers are asked only from the surfaces the user clicks",
-        "asked from: %s" % ", ".join(sorted(callers)),
+        "asked from: %s; the click actions live in: %s"
+        % (", ".join(sorted(callers)) or "nowhere",
+           ", ".join(sorted(owners)) or "nowhere"),
     )
 
 

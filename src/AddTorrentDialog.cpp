@@ -27,7 +27,8 @@ namespace {
 // than imaged, so it needs no asset and no theme lookup.
 class OriginDot : public Fl_Box {
 public:
-    OriginDot(int X, int Y, int W, int H) : Fl_Box(X, Y, W, H) {
+    OriginDot(int X, int Y, int W, int H)
+        : Fl_Box(X, Y, W, H) {
         box(FL_NO_BOX);
     }
     void draw() override {
@@ -40,17 +41,16 @@ public:
 
 AddTorrentDialog::AddTorrentDialog()
     : Fl_Window(500, 760, "Add Torrent")
-    , m_okClicked(false)
-{
+    , m_okClicked(false) {
     m_startImmediatelyResult = true;
     m_priority = Priority::Normal;
-    
+
     createUI();
     createButtons();
-    
+
     end();
     set_modal();
-    
+
     loadDefaults();
 }
 
@@ -70,7 +70,7 @@ void AddTorrentDialog::createUI() {
     Fl_Box* fileLabel = new Fl_Box(20, y, 100, 25, "Torrent File:");
     fileLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     y += 25;
-    
+
     m_filePathInput = new Fl_Input(20, y, 370, 30);
     m_browseFile = new Fl_Button(400, y, 80, 30, "Browse...");
     m_browseFile->callback(onBrowseFile, this);
@@ -80,7 +80,7 @@ void AddTorrentDialog::createUI() {
     Fl_Box* magnetLabel = new Fl_Box(20, y, 100, 25, "Magnet Link:");
     magnetLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     y += 25;
-    
+
     m_magnetInput = new Fl_Input(20, y, 460, 30);
     m_magnetInput->tooltip("Paste magnet link here (magnet:?xt=...)");
     // Marks the magnet field while this import is the one going through it.
@@ -96,19 +96,20 @@ void AddTorrentDialog::createUI() {
     Fl_Box* saveLabel = new Fl_Box(20, y, 100, 25, "Save to:");
     saveLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     y += 25;
-    
+
     m_savePathInput = new Fl_Input(20, y, 370, 30);
     m_browseSavePath = new Fl_Button(400, y, 80, 30, "Browse...");
     m_browseSavePath->callback(onBrowseSavePath, this);
     y += 50;
 
     // --- Options Section ---
-    m_startImmediately = new Fl_Check_Button(20, y, 200, 25, "Start download immediately");
+    m_startImmediately =
+        new Fl_Check_Button(20, y, 200, 25, "Start download immediately");
     m_startImmediately->value(1);
-    
+
     Fl_Box* priorityLabel = new Fl_Box(250, y, 80, 25, "Priority:");
     priorityLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    
+
     m_priorityChoice = new Fl_Choice(330, y, 100, 25);
     m_priorityChoice->add("Normal");
     m_priorityChoice->add("High");
@@ -117,7 +118,8 @@ void AddTorrentDialog::createUI() {
     y += 40;
 
     // --- Files Preview Section ---
-    Fl_Box* filesLabel = new Fl_Box(20, y, 400, 25, "Files to download (uncheck to skip):");
+    Fl_Box* filesLabel =
+        new Fl_Box(20, y, 400, 25, "Files to download (uncheck to skip):");
     filesLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     y += 25;
 
@@ -134,7 +136,7 @@ void AddTorrentDialog::createUI() {
 
     m_securityShield = new SecurityShieldBox(30, y + 10, 20, 20);
     m_securityShield->setRisk(RiskLevel::Unknown,
-        "No file list is available yet.");
+                              "No file list is available yet.");
     // The shield is the only thing that starts a reputation lookup.
     m_securityShield->onClick([this]() { checkReputation(); });
 
@@ -147,16 +149,16 @@ void AddTorrentDialog::createUI() {
     m_securityDetail->labelsize(11);
 
     m_securityHint = new Fl_Box(30, y + 60, 440, 16,
-        "Metadata only. No file contents were read.");
+                                "Metadata only. No file contents were read.");
     m_securityHint->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     m_securityHint->labelsize(10);
     m_securityHint->labelcolor(fl_rgb_color(140, 140, 140));
 
-    m_selectNonExecutables = new Fl_Button(30, y + 78, 220, 26,
-        "Select only non-executables");
+    m_selectNonExecutables =
+        new Fl_Button(30, y + 78, 220, 26, "Select only non-executables");
     m_selectNonExecutables->callback(onSelectNonExecutables, this);
-    m_selectNonExecutables->tooltip(
-        "Uncheck files that run code: executables, scripts, shortcuts and macros");
+    m_selectNonExecutables->tooltip("Uncheck files that run code: executables, "
+                                    "scripts, shortcuts and macros");
 
     // Reputation lives below the metadata analysis: it is a second, explicit
     // step, and it says why it cannot run when there is no whole-file hash.
@@ -186,10 +188,10 @@ void AddTorrentDialog::createButtons() {
     int btn_y = 712;
     int btn_w = 80;
     int btn_h = 30;
-    
+
     m_okButton = new Fl_Button(300, btn_y, btn_w, btn_h, "OK");
     m_okButton->callback(onOK, this);
-    
+
     m_cancelButton = new Fl_Button(390, btn_y, btn_w, btn_h, "Cancel");
     m_cancelButton->callback(onCancel, this);
 }
@@ -202,32 +204,34 @@ void AddTorrentDialog::loadDefaults() {
 bool AddTorrentDialog::validate() {
     m_torrentPath = m_filePathInput->value();
     m_magnetLink = m_magnetInput->value();
-    
+
     // Validate torrent source (at least one must be provided)
     if (m_torrentPath.empty() && m_magnetLink.empty()) {
         fl_alert("Please select a torrent file or enter a magnet link");
         return false;
     }
-    
+
     if (!m_magnetLink.empty()) {
         if (m_magnetLink.substr(0, 8) != "magnet:?") {
             fl_alert("Invalid magnet link format");
             return false;
         }
-        // If magnet is provided, we prioritize it or ensure m_torrentPath is clear if we only want one
+        // If magnet is provided, we prioritize it or ensure m_torrentPath is
+        // clear if we only want one
         if (!m_torrentPath.empty()) {
-            fl_message("Both file and magnet provided. Prioritizing the torrent file.");
+            fl_message("Both file and magnet provided. Prioritizing the "
+                       "torrent file.");
             m_magnetLink = "";
         }
     }
-    
+
     // Validate save path
     if (strlen(m_savePathInput->value()) == 0) {
         fl_alert("Please select a download directory");
         return false;
     }
     m_savePath = m_savePathInput->value();
-    
+
     // Validate file selection. Priorities are indexed by the libtorrent file
     // index, not by the visible row: pad files occupy indices but have no row,
     // and getting this wrong shifts every later file by one.
@@ -245,7 +249,7 @@ bool AddTorrentDialog::validate() {
             }
         }
     }
-    
+
     if (!m_files.empty() && !anySelected) {
         fl_alert("Please select at least one file to download");
         return false;
@@ -255,14 +259,21 @@ bool AddTorrentDialog::validate() {
     if (!confirmRiskySelection()) {
         return false;
     }
-    
+
     switch (m_priorityChoice->value()) {
-        case 0: m_priority = Priority::Normal; break;
-        case 1: m_priority = Priority::High; break;
-        case 2: m_priority = Priority::Low; break;
-        default: m_priority = Priority::Normal;
+        case 0:
+            m_priority = Priority::Normal;
+            break;
+        case 1:
+            m_priority = Priority::High;
+            break;
+        case 2:
+            m_priority = Priority::Low;
+            break;
+        default:
+            m_priority = Priority::Normal;
     }
-    
+
     return true;
 }
 
@@ -284,25 +295,22 @@ bool AddTorrentDialog::show_modal() {
     m_okClicked = false;
     updateOriginDot();
     show();
-    
+
     while (shown()) {
         Fl::wait();
     }
-    
+
     return m_okClicked;
 }
 
 // Static callbacks
 void AddTorrentDialog::onBrowseFile(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = (AddTorrentDialog*)data;
-    
+
     const char* filename = PathUtils::showFileChooser(
-        "Select Torrent File",
-        "Torrent Files (*.torrent)",
-        nullptr,
-        Fl_File_Chooser::SINGLE
-    );
-    
+        "Select Torrent File", "Torrent Files (*.torrent)", nullptr,
+        Fl_File_Chooser::SINGLE);
+
     if (filename) {
         dlg->m_filePathInput->value(filename);
         dlg->updateFileList(filename);
@@ -312,12 +320,10 @@ void AddTorrentDialog::onBrowseFile(Fl_Widget*, void* data) {
 
 void AddTorrentDialog::onBrowseSavePath(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = (AddTorrentDialog*)data;
-    
-    const char* dir = PathUtils::showDirChooser(
-        "Select Download Directory",
-        dlg->m_savePathInput->value()
-    );
-    
+
+    const char* dir = PathUtils::showDirChooser("Select Download Directory",
+                                                dlg->m_savePathInput->value());
+
     if (dir) {
         dlg->m_savePathInput->value(dir);
     }
@@ -325,7 +331,7 @@ void AddTorrentDialog::onBrowseSavePath(Fl_Widget*, void* data) {
 
 void AddTorrentDialog::onOK(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = (AddTorrentDialog*)data;
-    
+
     if (dlg->validate()) {
         dlg->m_okClicked = true;
         dlg->hide();
@@ -460,9 +466,10 @@ void AddTorrentDialog::showFiles(const std::vector<TorrentFileEntry>& files,
     for (const TorrentFileEntry& file : files) {
         if (file.padFile) continue;
         m_files.push_back(file);
-        m_fileBrowser->add(fileRowLabel(file).c_str(), 1);  // checked
+        m_fileBrowser->add(fileRowLabel(file).c_str(), 1); // checked
     }
-    m_totalFileCount = std::max(totalFileCount, static_cast<int>(m_files.size()));
+    m_totalFileCount =
+        std::max(totalFileCount, static_cast<int>(m_files.size()));
     updateSecurityPanel();
     m_fileBrowser->redraw();
 }
@@ -530,8 +537,8 @@ void AddTorrentDialog::updateSecurityPanel() {
         summary = "No files selected. Metadata risk is unknown.";
     }
 
-    m_securityShield->setRisk(
-        level, SecurityBadge::riskLabel(level) + ". " + summary);
+    m_securityShield->setRisk(level,
+                              SecurityBadge::riskLabel(level) + ". " + summary);
 
     if (m_securitySummary) {
         m_securitySummary->copy_label(
@@ -581,11 +588,10 @@ void AddTorrentDialog::updateSecurityPanel() {
     }
 
     if (m_checkArchive) {
-        const bool hasArchive =
-            std::any_of(selected.begin(), selected.end(),
-                        [](const TorrentFileEntry& file) {
-                            return ArchiveInspector::canListBeforeDownload(file.path);
-                        });
+        const bool hasArchive = std::any_of(
+            selected.begin(), selected.end(), [](const TorrentFileEntry& file) {
+                return ArchiveInspector::canListBeforeDownload(file.path);
+            });
         if (hasArchive && !m_archiveRunning) m_checkArchive->activate();
         else m_checkArchive->deactivate();
     }
@@ -616,8 +622,9 @@ void AddTorrentDialog::checkArchive() {
         return;
     }
 
-    const std::string torrentPath =
-        m_filePathInput && m_filePathInput->value() ? m_filePathInput->value() : "";
+    const std::string torrentPath = m_filePathInput && m_filePathInput->value()
+                                        ? m_filePathInput->value()
+                                        : "";
     const std::string magnet =
         m_magnetInput && m_magnetInput->value() ? m_magnetInput->value() : "";
     // The bytes the search row already resolved come first: reading two pieces
@@ -690,8 +697,7 @@ void AddTorrentDialog::showArchiveEntries() {
     // Every entry, in archive order. The browser scrolls, so the list is not
     // cut here the way the search row cuts it at eight.
     for (const SecurityFile& entry : m_archiveEntries) {
-        m_archiveBrowser->add(
-            SecurityBadge::archiveEntryLine(entry).c_str());
+        m_archiveBrowser->add(SecurityBadge::archiveEntryLine(entry).c_str());
     }
     m_archiveBrowser->show();
     redraw();
@@ -735,8 +741,8 @@ void AddTorrentDialog::checkReputation() {
             m_reputation = ReputationResult{};
             m_reputation.state = ReputationState::Error;
             m_reputation.sha256 = target.sha256;
-            m_reputation.message =
-                "Too many reputation checks are running. Try again in a moment.";
+            m_reputation.message = "Too many reputation checks are running. "
+                                   "Try again in a moment.";
             break;
     }
     refreshReputationLabel();
@@ -751,13 +757,12 @@ void AddTorrentDialog::refreshReputationLabel() {
     // none to check.
     std::string line =
         m_checkLine.empty() ? reputationLine(m_reputation) : m_checkLine;
-    const std::string hash = m_reputation.sha256.empty()
-                                 ? m_torrentSha256
-                                 : m_reputation.sha256;
+    const std::string hash =
+        m_reputation.sha256.empty() ? m_torrentSha256 : m_reputation.sha256;
     line += "\n";
-    line += hashSmallPrint(hash, m_reputation.sha256.empty()
-                                     ? m_torrentSha256Path
-                                     : std::string());
+    line +=
+        hashSmallPrint(hash, m_reputation.sha256.empty() ? m_torrentSha256Path
+                                                         : std::string());
     m_reputationLabel->copy_label(line.c_str());
     if (reputationHasDetections(m_reputation)) {
         m_reputationLabel->labelcolor(
@@ -784,8 +789,8 @@ void AddTorrentDialog::onSelectNonExecutables(Fl_Widget*, void* data) {
     // Archives and disk images stay checked: they are containers, not code,
     // and dropping them would silently lose the content the user asked for.
     for (int row = 0; row < static_cast<int>(dlg->m_files.size()); ++row) {
-        const bool runnable =
-            SecurityAnalyzer::isRunnable(dlg->m_files[static_cast<std::size_t>(row)]);
+        const bool runnable = SecurityAnalyzer::isRunnable(
+            dlg->m_files[static_cast<std::size_t>(row)]);
         dlg->m_fileBrowser->checked(row + 1, runnable ? 0 : 1);
     }
     dlg->m_fileBrowser->redraw();
