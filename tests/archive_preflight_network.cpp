@@ -40,6 +40,7 @@
 
 #include <libtorrent/add_torrent_params.hpp>
 #include <libtorrent/alert_types.hpp>
+#include <libtorrent/bdecode.hpp>
 #include <libtorrent/bencode.hpp>
 #include <libtorrent/create_torrent.hpp>
 #include <libtorrent/entry.hpp>
@@ -48,6 +49,7 @@
 #include <libtorrent/settings_pack.hpp>
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/torrent_info.hpp>
+#include <libtorrent/version.hpp>
 
 #include <chrono>
 #include <cstdio>
@@ -173,13 +175,23 @@ private:
         }
         m_size = static_cast<std::int64_t>(fs::file_size(m_file));
 
-        std::vector<lt::create_file_entry> files;
-        files.emplace_back(m_file.filename().string(), m_size);
-        // A v1-only torrent on purpose. The check under test does not care
+        // The file list is built the way each libtorrent asks for it: 2.1
+        // removed add_files() and the file_storage constructor in favour of
+        // the create_file_entry list, and 2.0 does not know that list yet.
+        // A v1-only torrent on purpose: the check under test does not care
         // which version of the protocol carries the pieces, and the v1 hashes
         // are the ones every client can verify.
+#if LIBTORRENT_VERSION_NUM >= 20100
+        std::vector<lt::create_file_entry> files;
+        files.emplace_back(m_file.filename().string(), m_size);
         lt::create_torrent creator(files, pieceLength,
                                    lt::create_torrent::v1_only);
+#else
+        lt::file_storage storage;
+        storage.add_file(m_file.filename().string(), m_size);
+        lt::create_torrent creator(storage, pieceLength,
+                                   lt::create_torrent::v1_only);
+#endif
 
         lt::error_code hashError;
         lt::set_piece_hashes(creator, m_dir.string(), hashError);
@@ -191,8 +203,37 @@ private:
         const lt::entry meta = creator.generate();
         std::vector<char> bytes;
         lt::bencode(std::back_inserter(bytes), meta);
+        // torrent_info comes from the parsed info section: that constructor
+        // is the only in-memory one the new ABI kept, and it exists in every
+        // ABI of 2.1. 2.0 has no info-section constructor but still has the
+        // span one, which 2.1 deprecated and the new ABI removed.
+#if LIBTORRENT_VERSION_NUM >= 20100
+        lt::bdecode_node root;
+        lt::error_code decodeError;
+        lt::bdecode(bytes.data(), bytes.data() + bytes.size(), root,
+                    decodeError);
+        if (decodeError) {
+            m_error = "could not parse the torrent: " + decodeError.message();
+            return;
+        }
+        const lt::bdecode_node info = root.dict_find_dict("info");
+        if (!info) {
+            m_error = "the torrent has no info section";
+            return;
+        }
+        lt::error_code infoError;
         m_info = std::make_shared<lt::torrent_info>(
-            lt::span<char const>(bytes.data(), bytes.size()), lt::from_span);
+            info, infoError, lt::load_torrent_limits{}, lt::from_info_section);
+#else
+        lt::error_code infoError;
+        m_info = std::make_shared<lt::torrent_info>(
+            lt::span<char const>(bytes.data(), bytes.size()), infoError,
+            lt::from_span);
+#endif
+        if (infoError) {
+            m_error = "could not read the torrent back: " + infoError.message();
+            return;
+        }
 
         lt::settings_pack settings;
         settings.set_str(lt::settings_pack::listen_interfaces, "127.0.0.1:0");
