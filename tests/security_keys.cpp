@@ -115,8 +115,11 @@ int main() {
     {
         const std::string raw = readAllBytes(SecurityKeys::storagePath(vt));
         ok(!raw.empty(), "the key file is not empty");
+#ifdef _WIN32
+        // DPAPI encrypts the blob: the clear key must not appear on disk.
         ok(raw.find(key) == std::string::npos,
            "the file on disk does not contain the key in the clear");
+#endif
 #ifdef _WIN32
         ok(raw.compare(0, 6, "FTKEY1") != 0,
            "on Windows the file is a DPAPI blob, not the plain layout");
