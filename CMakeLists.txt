@@ -134,6 +134,8 @@ set(SOURCES
     src/ArchivePreflight.cpp
     src/ArchiveProbeSession.cpp
     src/ArchiveCheckTask.cpp
+    src/TorrentFileHashTask.cpp
+    src/AddTorrentDialogReputation.cpp
     src/SecurityEvents.cpp
     src/NetworkMonitorDialog.cpp
     src/SearchScope.cpp
@@ -184,6 +186,8 @@ set(HEADERS
     src/ArchivePreflight.h
     src/ArchiveProbeSession.h
     src/ArchiveCheckTask.h
+    src/TorrentFileHashTask.h
+    src/AddTorrentDialogReputation.h
     src/SecurityEvents.h
     src/NetworkMonitorDialog.h
     src/SearchScope.h

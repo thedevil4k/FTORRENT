@@ -6,6 +6,8 @@
 #include "ReputationService.h"
 #include "ArchiveCheckTask.h"
 #include "ArchiveInspector.h"
+#include "AddTorrentDialogReputation.h"
+#include "TorrentFileHashTask.h"
 #include "Format.h"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
@@ -14,6 +16,7 @@
 #include "PathUtils.h"
 #include <libtorrent/version.hpp>
 #include <libtorrent/load_torrent.hpp>
+#include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/torrent_info.hpp>
 #include <libtorrent/file_storage.hpp>
 #include <algorithm>
@@ -52,6 +55,7 @@ AddTorrentDialog::AddTorrentDialog()
     set_modal();
 
     loadDefaults();
+    m_reputationHelper = std::make_unique<AddTorrentDialogReputation>(this);
 }
 
 AddTorrentDialog::~AddTorrentDialog() {
@@ -61,6 +65,7 @@ AddTorrentDialog::~AddTorrentDialog() {
     // The archive check stops too, instead of running out its deadline in a
     // swarm nobody is waiting for.
     if (m_archiveTask) m_archiveTask->cancel();
+    if (m_fileHashTask) m_fileHashTask->cancel();
 }
 
 void AddTorrentDialog::createUI() {
@@ -596,7 +601,7 @@ void AddTorrentDialog::updateSecurityPanel() {
         else m_checkArchive->deactivate();
     }
 
-    refreshReputationLabel();
+    m_reputationHelper->refreshReputationLabel();
 }
 
 void AddTorrentDialog::onCheckArchive(Fl_Widget*, void* data) {
@@ -618,7 +623,7 @@ void AddTorrentDialog::checkArchive() {
     }
     if (!archive) {
         m_checkLine = "Archive: select a RAR or ZIP first.";
-        refreshReputationLabel();
+        m_reputationHelper->refreshReputationLabel();
         return;
     }
 
@@ -644,14 +649,14 @@ void AddTorrentDialog::checkArchive() {
     if (torrentPath.empty() && body.empty() && torrentUrl.empty() &&
         magnet.empty()) {
         m_checkLine = "Archive: open a .torrent file or a magnet first.";
-        refreshReputationLabel();
+        m_reputationHelper->refreshReputationLabel();
         return;
     }
 
     m_archiveRunning = true;
     m_checkArchive->deactivate();
     m_checkLine = "Archive: reading the archive index...";
-    refreshReputationLabel();
+    m_reputationHelper->refreshReputationLabel();
     // The previous answer described a check that is no longer the last word.
     m_archiveEntries.clear();
     if (m_archiveBrowser) {
@@ -672,7 +677,7 @@ void AddTorrentDialog::checkArchive() {
         self->m_archiveRunning = false;
         self->m_checkLine = result.message;
         self->m_archiveEntries = std::move(result.entries);
-        self->refreshReputationLabel();
+        self->m_reputationHelper->refreshReputationLabel();
         self->updateSecurityPanel();
         self->showArchiveEntries();
     };
@@ -703,80 +708,6 @@ void AddTorrentDialog::showArchiveEntries() {
     redraw();
 }
 
-void AddTorrentDialog::checkReputation() {
-    const std::vector<TorrentFileEntry> selected = selectedFiles();
-    const ReputationTarget target = findReputationTarget(selected);
-
-    if (!target.found()) {
-        // No whole-file SHA-256 anywhere in the metadata: say so, exactly as
-        // the product requires, instead of offering a check that cannot run.
-        m_reputationSha.clear();
-        m_reputation = ReputationService::noHashResult();
-        refreshReputationLabel();
-        return;
-    }
-
-    ReputationService& service = sharedReputationService();
-    std::shared_ptr<bool> alive = m_alive;
-    AddTorrentDialog* self = this;
-    const ReputationService::Start start = service.request(
-        target.sha256, [self, alive](const ReputationResult& result) {
-            if (!alive || !*alive) return;
-            self->m_reputation = result;
-            self->refreshReputationLabel();
-        });
-
-    m_reputationSha = target.sha256;
-    switch (start) {
-        case ReputationService::Start::Started:
-        case ReputationService::Start::AlreadyRunning:
-            m_reputation = ReputationResult{};
-            m_reputation.state = ReputationState::Querying;
-            m_reputation.sha256 = target.sha256;
-            break;
-        case ReputationService::Start::Cached:
-            m_reputation = service.find(target.sha256);
-            break;
-        case ReputationService::Start::Rejected:
-            m_reputation = ReputationResult{};
-            m_reputation.state = ReputationState::Error;
-            m_reputation.sha256 = target.sha256;
-            m_reputation.message = "Too many reputation checks are running. "
-                                   "Try again in a moment.";
-            break;
-    }
-    refreshReputationLabel();
-}
-
-void AddTorrentDialog::refreshReputationLabel() {
-    if (!m_reputationLabel) return;
-
-    // Whichever explicit check ran last owns the line. Both say what they found
-    // and neither calls anything safe. The small print follows: which hash the
-    // metadata carries, so the user can check it themselves, or that there is
-    // none to check.
-    std::string line =
-        m_checkLine.empty() ? reputationLine(m_reputation) : m_checkLine;
-    const std::string hash =
-        m_reputation.sha256.empty() ? m_torrentSha256 : m_reputation.sha256;
-    line += "\n";
-    line +=
-        hashSmallPrint(hash, m_reputation.sha256.empty() ? m_torrentSha256Path
-                                                         : std::string());
-    m_reputationLabel->copy_label(line.c_str());
-    if (reputationHasDetections(m_reputation)) {
-        m_reputationLabel->labelcolor(
-            SecurityBadge::riskColor(RiskLevel::Critical));
-    } else if (m_reputation.state == ReputationState::Querying ||
-               m_archiveRunning) {
-        m_reputationLabel->labelcolor(
-            SecurityBadge::riskColor(RiskLevel::Medium));
-    } else {
-        m_reputationLabel->labelcolor(fl_rgb_color(110, 110, 110));
-    }
-    m_reputationLabel->redraw();
-}
-
 void AddTorrentDialog::onFileSelectionChanged(Fl_Widget*, void* data) {
     AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
     if (dlg) dlg->updateSecurityPanel();
@@ -795,4 +726,49 @@ void AddTorrentDialog::onSelectNonExecutables(Fl_Widget*, void* data) {
     }
     dlg->m_fileBrowser->redraw();
     dlg->updateSecurityPanel();
+}
+
+void AddTorrentDialog::checkReputation() {
+    const std::vector<TorrentFileEntry> selected = selectedFiles();
+    const ReputationTarget target =
+        m_reputationHelper->prepareReputation(selected);
+
+    if (!target.found()) {
+        m_reputationSha.clear();
+        m_reputation = ReputationService::noHashResult();
+        m_reputationHelper->refreshReputationLabel();
+        return;
+    }
+
+    m_reputationSha = target.sha256;
+    ReputationService& service = sharedReputationService();
+    std::shared_ptr<bool> alive = m_alive;
+    AddTorrentDialog* self = this;
+    const ReputationService::Start start = service.request(
+        target.sha256, [self, alive](const ReputationResult& result) {
+            if (!alive || !*alive) return;
+            self->m_reputation = result;
+            self->m_reputationHelper->refreshReputationLabel();
+        });
+
+    switch (start) {
+        case ReputationService::Start::Started:
+        case ReputationService::Start::AlreadyRunning:
+            m_reputation = ReputationResult{};
+            m_reputation.state = ReputationState::Querying;
+            m_reputation.sha256 = target.sha256;
+            break;
+        case ReputationService::Start::Cached:
+            m_reputation = service.find(target.sha256);
+            break;
+        case ReputationService::Start::Rejected:
+            m_reputation = ReputationResult{};
+            m_reputation.state = ReputationState::Error;
+            m_reputation.sha256 = target.sha256;
+            m_reputation.message =
+                "Too many reputation checks are running. "
+                "Try again in a moment.";
+            break;
+    }
+    m_reputationHelper->refreshReputationLabel();
 }

@@ -12,11 +12,15 @@
 #include "TorrentFileList.h" // TorrentFileEntry, for pre-filling magnets
 #include "SecurityBadge.h"
 #include "SecurityReputation.h"
+#include <libtorrent/add_torrent_params.hpp>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 class ArchiveCheckTask;
+class AddTorrentDialogReputation;
+class TorrentFileHashTask;
 
 /**
  * @brief Diálogo avanzado para añadir torrents
@@ -61,6 +65,8 @@ public:
     void setTorrentBody(const std::string& body) { m_torrentBody = body; }
 
 private:
+    friend class AddTorrentDialogReputation;
+
     // Common widgets
     Fl_Input* m_savePathInput;
     Fl_Button* m_browseSavePath;
@@ -135,6 +141,17 @@ private:
     // The archive check currently running, so the destructor can stop it.
     // Null when nothing is being read.
     std::shared_ptr<ArchiveCheckTask> m_archiveTask;
+    // The on-demand file hash currently running, so the destructor can stop it.
+    // Null when nothing is being hashed.
+    std::shared_ptr<TorrentFileHashTask> m_fileHashTask;
+    // SHA-256 computed on demand from a selected file's pieces, and the file
+    // it belongs to. Shown in the small print once available.
+    std::string m_fileHashSha256;
+    std::string m_fileHashPath;
+    bool m_fileHashRunning = false;
+    // Reputation logic (hash lookup, provider queries) kept in a separate file
+    // so AddTorrentDialog.cpp stays under the source-size limit.
+    std::unique_ptr<AddTorrentDialogReputation> m_reputationHelper;
 
     // UI Creation
     void createUI();
@@ -163,7 +180,7 @@ private:
     std::vector<TorrentFileEntry> selectedFiles() const;
     void updateSecurityPanel();
     void checkReputation();
-    void refreshReputationLabel();
+    std::optional<lt::add_torrent_params> buildAddTorrentParams();
     void checkArchive();
     static void onCheckArchive(Fl_Widget* w, void* data);
     bool confirmRiskySelection();
