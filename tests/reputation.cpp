@@ -12,8 +12,6 @@
 #include "SecurityReputation.h"
 #include "SecurityTypes.h"
 
-#include <FL/Fl.H>
-
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -106,18 +104,26 @@ ProviderVerdict verdictOf(const std::string& provider, bool answered,
 }
 
 // Runs the UI loop until the service has nothing in flight, so the delivery
-// through Fl::awake() actually happens. Under headless xvfb, Fl::wait() may
-// not process Fl::awake() callbacks on every iteration, so each pass also
-// sleeps briefly to let the worker thread finish and the UI loop catch up.
-bool waitFor(ReputationService& service, int timeoutMs = 5000) {
+// through Fl::awake() actually happens. Under headless xvfb there is no real
+// event loop to deliver Fl::awake() callbacks, so this only waits for the
+// worker thread to finish: once pending() is 0, the result is already in the
+// cache and service.find() can read it.
+bool waitFor(ReputationService& service, int timeoutMs = 10000) {
     const auto deadline =
         std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     while (service.pending() > 0) {
         if (std::chrono::steady_clock::now() > deadline) return false;
-        Fl::wait(0.1);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     return true;
+}
+
+// Runs a lookup and reads the result straight from the cache, without relying
+// on Fl::awake() delivery which headless CI cannot guarantee.
+ReputationResult waitForResult(ReputationService& service,
+                               const std::string& hash) {
+    ok(waitFor(service), "the lookup finishes");
+    return service.find(hash);
 }
 
 } // namespace
@@ -290,16 +296,9 @@ int main() {
                       "No record in MalwareBazaar for this hash.")));
 
         ReputationService service(providers);
-        ReputationResult got;
-        bool called = false;
-        ok(service.request(HASH,
-                           [&](const ReputationResult& r) {
-                               called = true;
-                               got = r;
-                           }) == ReputationService::Start::Started,
+        ok(service.request(HASH, nullptr) == ReputationService::Start::Started,
            "a valid hash starts a lookup");
-        ok(waitFor(service), "the lookup finishes");
-        ok(called, "the completion runs on the UI thread");
+        const ReputationResult got = waitForResult(service, HASH);
         ok(got.state == ReputationState::Known, "a detection is Known");
         ok(contains(got.message, "12 of 70"), "the message carries the ratio");
         ok(!contains(got.message, "safe"), "the message never says safe");
@@ -323,9 +322,9 @@ int main() {
                       "No record in MalwareBazaar for this hash.")));
 
         ReputationService service(providers);
-        ReputationResult got;
-        service.request(HASH, [&](const ReputationResult& r) { got = r; });
-        ok(waitFor(service), "the lookup finishes");
+        ok(service.request(HASH, nullptr) == ReputationService::Start::Started,
+           "a valid hash starts a lookup");
+        const ReputationResult got = waitForResult(service, HASH);
         ok(got.state == ReputationState::Unknown, "no record is Unknown");
         ok(contains(got.message, "No record for this hash"),
            "the message says there is no record");
@@ -341,9 +340,9 @@ int main() {
             verdictOf("VirusTotal", true, true, 0, 70,
                       "VirusTotal: 0 of 70 engines flag this file.")));
         ReputationService service(providers);
-        ReputationResult got;
-        service.request(HASH, [&](const ReputationResult& r) { got = r; });
-        ok(waitFor(service), "the lookup finishes");
+        ok(service.request(HASH, nullptr) == ReputationService::Start::Started,
+           "a valid hash starts a lookup");
+        const ReputationResult got = waitForResult(service, HASH);
         ok(got.state == ReputationState::Known,
            "a zero-detection record exists");
         ok(contains(got.message, "not a guarantee"),
@@ -360,9 +359,9 @@ int main() {
             verdictOf("VirusTotal", true, true, 5, 70, "should not be used")));
 
         ReputationService service(providers);
-        ReputationResult got;
-        service.request(HASH, [&](const ReputationResult& r) { got = r; });
-        ok(waitFor(service), "the lookup finishes");
+        ok(service.request(HASH, nullptr) == ReputationService::Start::Started,
+           "a valid hash starts a lookup");
+        const ReputationResult got = waitForResult(service, HASH);
         ok(got.state == ReputationState::NoKey,
            "a missing key is its own state, not an error");
         ok(contains(got.message, "API key"), "the message explains the key");

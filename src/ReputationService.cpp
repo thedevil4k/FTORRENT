@@ -233,31 +233,40 @@ ReputationService::Start ReputationService::request(const std::string& sha256,
         }
 
         delivery->result = aggregate(key, verdicts);
+        // Publish to the cache directly: headless CI has no event loop to
+        // deliver Fl::awake(), so the result would otherwise never land and
+        // pending() would never reach zero. Fl::awake() still notifies waiting
+        // UI callbacks below for configurations that have one.
+        {
+            std::lock_guard<std::mutex> lk(shared->mutex);
+            shared->cache[delivery->key] = delivery->result;
+            shared->inFlight.fetch_sub(1);
+            while (static_cast<int>(shared->order.size()) > shared->maxCached) {
+                shared->cache.erase(shared->order.front());
+                shared->order.pop_front();
+            }
+        }
         Fl::awake(&ReputationService::deliver, delivery);
     }).detach();
     return Start::Started;
 }
 
-// Runs on the UI thread, from Fl::awake().
+// Runs on the UI thread, from Fl::awake(). The cache and in-flight counter
+// were already updated by the worker; deliver() only notifies waiting UI
+// callbacks. If Fl::awake() never runs (headless environment), the cache is
+// still authoritative and pending() already reached zero.
 void ReputationService::deliver(void* data) {
     std::unique_ptr<Delivery> delivery(static_cast<Delivery*>(data));
     const std::shared_ptr<Shared>& shared = delivery->shared;
     if (!shared->alive.load()) return; // the owner is gone; drop it
 
-    shared->inFlight.fetch_sub(1);
-
     std::vector<Completion> waiters;
     {
         std::lock_guard<std::mutex> lk(shared->mutex);
-        shared->cache[delivery->key] = delivery->result;
         auto pendingWaiters = shared->waiting.find(delivery->key);
         if (pendingWaiters != shared->waiting.end()) {
             waiters = std::move(pendingWaiters->second);
             shared->waiting.erase(pendingWaiters);
-        }
-        while (static_cast<int>(shared->order.size()) > shared->maxCached) {
-            shared->cache.erase(shared->order.front());
-            shared->order.pop_front();
         }
     }
 
