@@ -6,6 +6,7 @@
 // the round trip, the removal path, the per-file separation and -- the part
 // that actually matters -- that the stored bytes do not contain the key.
 #include "SecurityKeys.h"
+#include "SystemUtils.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -50,8 +51,12 @@ void useScratchConfig() {
     fs::create_directories(dir, ec);
 #ifdef _WIN32
     _putenv_s("APPDATA", dir.string().c_str());
+    // SHGetFolderPath() does not follow a changed APPDATA; the explicit
+    // override is what keeps this test out of the real profile.
+    _putenv_s("FTORRENT_CONFIG_DIR", dir.string().c_str());
 #else
     setenv("XDG_CONFIG_HOME", dir.string().c_str(), 1);
+    setenv("FTORRENT_CONFIG_DIR", dir.string().c_str(), 1);
 #endif
 }
 
@@ -65,6 +70,16 @@ std::string readAllBytes(const std::string& path) {
 
 int main() {
     useScratchConfig();
+
+    // The store must resolve under the scratch directory. Without this, a
+    // Windows test wrote to the real profile (SHGetFolderPath ignored the
+    // redirected APPDATA) and removed the key that was already there.
+    ok(std::filesystem::path(
+           SecurityKeys::storagePath(SecurityKeys::Provider::VirusTotal))
+               .parent_path()
+               .parent_path()
+               .lexically_normal() == scratchDir().lexically_normal(),
+       "the key store resolves inside the scratch directory");
 
     const std::string key =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

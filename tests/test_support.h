@@ -72,10 +72,15 @@ inline void section(const char* title) {
 // whole point is to create the directory the app will actually open, and the
 // three platforms do not read the same variable.
 //
-//   Windows  SHGetFolderPathA(CSIDL_APPDATA), which follows %APPDATA%
+//   Windows  %APPDATA%, resolved once by SHGetFolderPathA(CSIDL_APPDATA).
+//            That call does NOT follow a later change to %APPDATA%, which is
+//            why useScratchConfig() also sets FTORRENT_CONFIG_DIR.
 //   macOS    $HOME/Library/Application Support/FTorrent -- and NOTHING else, so
 //            XDG_CONFIG_HOME is ignored there
 //   Linux    $XDG_CONFIG_HOME, falling back to $HOME/.config
+//
+// An explicit FTORRENT_CONFIG_DIR wins on every platform and is what the test
+// helper actually relies on.
 inline std::filesystem::path configDir() {
 #if defined(_WIN32)
     const char* appdata = getenv("APPDATA");
@@ -125,8 +130,19 @@ inline void useScratchConfig(const char* name) {
     // the environment variable: SystemUtils appends a suffix to it, and
     // SettingsManager::save() opens the file without creating a directory, so a
     // missing one turns every save into a silent no-op.
+    //
+    // The explicit override is also set: SHGetFolderPath() on Windows does not
+    // follow a runtime change to APPDATA, so the suffix alone was not enough
+    // and a test key could land in -- and later be removed from -- the real
+    // profile.
+    const std::string finalDir = configDir().string();
+#if defined(_WIN32) || defined(__APPLE__)
+    _putenv_s("FTORRENT_CONFIG_DIR", finalDir.c_str());
+#else
+    setenv("FTORRENT_CONFIG_DIR", finalDir.c_str(), 1);
+#endif
     std::error_code ec2;
-    std::filesystem::create_directories(configDir(), ec2);
+    std::filesystem::create_directories(finalDir, ec2);
 }
 
 // Remove the scratch directory, so a test run leaves nothing behind.

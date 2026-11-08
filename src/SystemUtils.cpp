@@ -1,6 +1,7 @@
 #include "SystemUtils.h"
 #include <sstream>
 #include <iomanip>
+#include <cstdlib>
 #include <thread>
 
 #ifdef _WIN32
@@ -80,6 +81,13 @@ void SystemUtils::releaseMemory() {
 }
 
 std::string SystemUtils::getConfigDir() {
+    // An explicit directory wins on every platform. Tests use it so their key
+    // store and settings can never touch the real profile; SHGetFolderPath()
+    // does not follow a runtime change to APPDATA, which is how a test once
+    // wrote into -- and then removed -- a developer's real key.
+    const char* overrideDir = getenv("FTORRENT_CONFIG_DIR");
+    if (overrideDir && *overrideDir) return overrideDir;
+
     std::string path;
 #ifdef _WIN32
     char buffer[MAX_PATH];
