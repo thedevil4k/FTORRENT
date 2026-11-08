@@ -70,6 +70,17 @@ A lightweight, ad-free BitTorrent client for Windows and Linux, written in **C++
 
 The extension only says `.rar`; the version comes from the file's signature (`RAR!` plus `0x01 0x00` is RAR5), which is why the variant is named after the index has been read. An archive whose headers are encrypted cannot be listed at all and is reported as password-protected, not as broken.
 
+#### How the pre-download check works (implementation attempt; needs real-world testing)
+
+This flow is implemented on `experimental` and covered by offline/loopback tests, but it still needs testing against real torrents/swarms before it can be considered reliable.
+
+1. **Target selection.** In Add Torrent the check uses the highlighted `.zip`/`.rar` row (falling back to a checked or first archive). In search rows and Details it uses the archive chosen there. Only `.rar`/`.zip` paths are accepted for pre-download listing.
+2. **No full download.** A throwaway probe session asks peers for only the data needed to read the archive index: ZIP reads the central directory at the end (two pieces), RAR5 reads headers at both ends (two pieces), and RAR 1.5–4.x walks headers sequentially with a bounded piece budget and deadline.
+3. **Read-only inspection.** The fetched bytes are written to a temporary folder under the config directory, read with the archive inspector (libarchive, when built in), and deleted afterwards. No file inside the archive is opened or decompressed, and nothing is written to the download folder.
+4. **What is reported.** The result lists entries (path, size, tags such as `[EXE]` or `[ENCRYPTED]`) and summarizes runnable indicators by name/metadata. A partial RAR 1.5–4.x walk is always labelled **partial** and never presented as complete.
+5. **Password protection.** If headers/entries report encryption, the UI marks it password-protected and states that the protected content cannot be inspected before downloading. It does not claim the archive contents were inspected.
+6. **Limits/failure modes.** The check depends on peers delivering the required pieces before the deadline; a slow or unavailable swarm can make it fail or time out. Unsupported formats, unreadable indexes, or missing build-time archive support are reported as not listable/unsupported rather than guessed.
+
 
 **Interface**
 - Dark and light themes; dark is the default and theme choice is per session
