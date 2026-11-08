@@ -37,11 +37,13 @@ struct Delivery {
 TorrentFileHashTask::TorrentFileHashTask(
     lt::add_torrent_params params, int fileIndex,
     const std::string& filePath, std::string savePath,
-    TorrentFileHashTask::Deliver deliver)
+    TorrentFileHashTask::Deliver deliver,
+    const std::string& quarantineDir)
     : m_params(std::move(params))
     , m_fileIndex(fileIndex)
     , m_filePath(filePath)
     , m_savePath(std::move(savePath))
+    , m_quarantineDir(quarantineDir)
     , m_deliver(std::move(deliver)) {}
 
 TorrentFileHashTask::~TorrentFileHashTask() {
@@ -56,7 +58,7 @@ TorrentFileHashTask::~TorrentFileHashTask() {
         }
         m_session.reset();
     }
-    if (!m_tempDir.empty()) {
+    if (m_quarantineDir.empty() && !m_tempDir.empty()) {
         std::error_code ec;
         std::filesystem::remove_all(m_tempDir, ec);
     }
@@ -69,10 +71,12 @@ void TorrentFileHashTask::cancel() {
 std::shared_ptr<TorrentFileHashTask>
 TorrentFileHashTask::start(lt::add_torrent_params params, int fileIndex,
                            const std::string& filePath, std::string savePath,
-                           TorrentFileHashTask::Deliver deliver) {
+                           TorrentFileHashTask::Deliver deliver,
+                           const std::string& quarantineDir) {
     std::shared_ptr<TorrentFileHashTask> task(
         new TorrentFileHashTask(std::move(params), fileIndex, filePath,
-                                std::move(savePath), std::move(deliver)));
+                                std::move(savePath), std::move(deliver),
+                                quarantineDir));
     std::thread([task]() { task->run(); }).detach();
     return task;
 }
@@ -98,12 +102,18 @@ void TorrentFileHashTask::run() {
     sessionParams.disk_io_constructor = lt::posix_disk_io_constructor;
 
     // Use a throwaway directory so nothing is written to the user's download
-    // folder. The session removes it when it shuts down.
+    // folder. When a quarantine dir was provided it is used instead: it was
+    // created with restrictive permissions by the caller, and the caller
+    // removes it after the answer arrives.
     std::error_code ec;
-    m_tempDir =
-        (std::filesystem::temp_directory_path() / "ftorrent-file-hash").string();
-    std::filesystem::remove_all(m_tempDir, ec);
-    std::filesystem::create_directories(m_tempDir, ec);
+    if (!m_quarantineDir.empty()) {
+        m_tempDir = m_quarantineDir;
+    } else {
+        m_tempDir =
+            (std::filesystem::temp_directory_path() / "ftorrent-file-hash").string();
+        std::filesystem::remove_all(m_tempDir, ec);
+        std::filesystem::create_directories(m_tempDir, ec);
+    }
     m_params.save_path = m_tempDir;
 
     m_session = std::make_shared<lt::session>(sessionParams);
@@ -207,13 +217,16 @@ void TorrentFileHashTask::run() {
     }
 
     // Tear down the session: remove the torrent, wait for the removal to
-    // complete, then destroy the session and delete its files.
+    // complete, then destroy the session. The temp dir is deleted unless a
+    // quarantine dir was provided: the caller owns that one and removes it.
     m_session->remove_torrent(m_handle);
     while (m_handle.is_valid()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     m_session.reset();
-    std::filesystem::remove_all(m_tempDir, ec);
+    if (m_quarantineDir.empty()) {
+        std::filesystem::remove_all(m_tempDir, ec);
+    }
 
     Fl::awake(&TorrentFileHashTask::deliverOnUiThread, delivery);
 }

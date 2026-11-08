@@ -136,6 +136,9 @@ set(SOURCES
     src/ArchiveCheckTask.cpp
     src/TorrentFileHashTask.cpp
     src/AddTorrentDialogReputation.cpp
+    src/AddTorrentDialogReputation.cpp
+    src/AddTorrentDialogHash.cpp
+    src/AddTorrentDialogArchive.cpp
     src/SecurityEvents.cpp
     src/NetworkMonitorDialog.cpp
     src/SearchScope.cpp
@@ -188,6 +191,9 @@ set(HEADERS
     src/ArchiveCheckTask.h
     src/TorrentFileHashTask.h
     src/AddTorrentDialogReputation.h
+    src/AddTorrentDialogReputation.h
+    src/AddTorrentDialogHash.h
+    src/AddTorrentDialogArchive.h
     src/SecurityEvents.h
     src/NetworkMonitorDialog.h
     src/SearchScope.h

@@ -1,4 +1,6 @@
 #include "AddTorrentDialog.h"
+#include "AddTorrentDialogArchive.h"
+#include "AddTorrentDialogHash.h"
 #include "SettingsManager.h"
 #include "SecurityAnalyzer.h"
 #include "SecurityBadge.h"
@@ -23,6 +25,7 @@
 #include <iomanip>
 #include <filesystem>
 #include <FL/fl_draw.H>
+#include <cstdlib>
 
 namespace {
 
@@ -56,6 +59,8 @@ AddTorrentDialog::AddTorrentDialog()
 
     loadDefaults();
     m_reputationHelper = std::make_unique<AddTorrentDialogReputation>(this);
+    m_fileHashHelper = std::make_unique<AddTorrentDialogFileHash>(this);
+    m_archiveHelper = std::make_unique<AddTorrentDialogArchive>(this);
 }
 
 AddTorrentDialog::~AddTorrentDialog() {
@@ -183,6 +188,21 @@ void AddTorrentDialog::createUI() {
         "checked for download. Saved to a temporary folder and deleted "
         "afterwards.");
     m_checkArchive->deactivate();
+
+    // Third explicit check: hash one selected file's pieces. Only one file at
+    // a time, only when the user clicks. The file's pieces are read into a
+    // throwaway dir (quarantine when the user asks), hashed, then deleted.
+    // Nothing is executed and nothing is uploaded.
+    m_calculateHashButton =
+        new Fl_Button(20, y + 78, 230, 26, "Calculate hash");
+    m_calculateHashButton->callback(onCalculateHash, this);
+    m_calculateHashButton->tooltip(
+        "Hashes only the pieces that cover the highlighted file. Not the whole "
+        "torrent: just that file. If the metadata already carries the whole-"
+        "file SHA-256 it is shown without downloading anything. Otherwise the "
+        "file's pieces are fetched to a throwaway folder and deleted after "
+        "hashing. Optional quarantine isolates the temp folder. Experimental.");
+    m_calculateHashButton->deactivate();
 
     // What the last check listed, under the panel. Hidden until there is
     // something to show: the dialog keeps its size while nothing is known.
@@ -511,33 +531,6 @@ std::vector<TorrentFileEntry> AddTorrentDialog::selectedFiles() const {
     return selected;
 }
 
-const TorrentFileEntry* AddTorrentDialog::archiveTarget() const {
-    if (!m_fileBrowser) return nullptr;
-
-    // Fl_Check_Browser::item_select() toggles the check box when a row is
-    // selected, so a click on a checked archive unchecks it. The highlight is
-    // the user saying "this one"; it must win over the checkbox state.
-    const int highlighted = m_fileBrowser->value();
-    if (highlighted >= 1 && highlighted <= static_cast<int>(m_files.size())) {
-        const TorrentFileEntry& file =
-            m_files[static_cast<std::size_t>(highlighted - 1)];
-        if (ArchiveInspector::canListBeforeDownload(file.path)) return &file;
-    }
-
-    for (int row = 0; row < static_cast<int>(m_files.size()); ++row) {
-        if (!m_fileBrowser->checked(row + 1)) continue;
-        const TorrentFileEntry& file = m_files[static_cast<std::size_t>(row)];
-        if (ArchiveInspector::canListBeforeDownload(file.path)) return &file;
-    }
-
-    // Nothing checked: the button still has a well-defined target, and the
-    // answer names the file so the user can see which one was read.
-    for (const TorrentFileEntry& file : m_files) {
-        if (ArchiveInspector::canListBeforeDownload(file.path)) return &file;
-    }
-    return nullptr;
-}
-
 void AddTorrentDialog::updateSecurityPanel() {
     if (!m_securityShield) return;
 
@@ -622,9 +615,19 @@ void AddTorrentDialog::updateSecurityPanel() {
     }
 
     if (m_checkArchive) {
-        const bool hasArchive = archiveTarget() != nullptr;
+        const bool hasArchive = m_archiveHelper->target() != nullptr;
         if (hasArchive && !m_archiveRunning) m_checkArchive->activate();
         else m_checkArchive->deactivate();
+    }
+
+    // Hash-by-file targets any selectable file, archive or not. Disabled while
+    // a hash is already running; enabled when there is at least one file row.
+    if (m_calculateHashButton) {
+        const bool hasFile = !m_files.empty();
+        if (hasFile && !m_fileHashRunning && !m_archiveRunning)
+            m_calculateHashButton->activate();
+        else
+            m_calculateHashButton->deactivate();
     }
 
     m_reputationHelper->refreshReputationLabel();
@@ -636,96 +639,16 @@ void AddTorrentDialog::onCheckArchive(Fl_Widget*, void* data) {
 }
 
 void AddTorrentDialog::checkArchive() {
-    if (m_archiveRunning) return;
-
-    // The same target the button was enabled for: highlighted row first, then
-    // a checked archive, then any archive in the list.
-    const TorrentFileEntry* archive = archiveTarget();
-    if (!archive) {
-        m_checkLine = "Archive: this torrent has no .zip or .rar to list.";
-        m_reputationHelper->refreshReputationLabel();
-        return;
-    }
-
-    const std::string torrentPath = m_filePathInput && m_filePathInput->value()
-                                        ? m_filePathInput->value()
-                                        : "";
-    const std::string magnet =
-        m_magnetInput && m_magnetInput->value() ? m_magnetInput->value() : "";
-    // The bytes the search row already resolved come first: reading two pieces
-    // of a torrent whose metadata is in hand needs no exchange with the swarm.
-    // Then the .torrent link, then the magnet.
-    std::string body = m_torrentBody;
-    // A body that describes a different torrent than the magnet on screen must
-    // never be used: the answer would be about someone else's files.
-    if (!body.empty() && !magnet.empty()) {
-        const std::string expected = TorrentFileList::magnetHash(magnet);
-        const std::string actual = TorrentFileList::infoHashOfTorrentFile(body);
-        if (!expected.empty() && !actual.empty() && expected != actual) {
-            body.clear();
-        }
-    }
-    const std::string torrentUrl = m_torrentUrl;
-    if (torrentPath.empty() && body.empty() && torrentUrl.empty() &&
-        magnet.empty()) {
-        m_checkLine = "Archive: open a .torrent file or a magnet first.";
-        m_reputationHelper->refreshReputationLabel();
-        return;
-    }
-
-    m_archiveRunning = true;
-    m_checkArchive->deactivate();
-    m_checkLine = "Archive: reading the archive index...";
-    m_reputationHelper->refreshReputationLabel();
-    // The previous answer described a check that is no longer the last word.
-    m_archiveEntries.clear();
-    if (m_archiveBrowser) {
-        m_archiveBrowser->clear();
-        m_archiveBrowser->hide();
-    }
-
-    const int index = archive->fileIndex;
-    const std::string path = archive->path;
-    std::shared_ptr<bool> alive = m_alive;
-    AddTorrentDialog* self = this;
-
-    // One task owns the worker thread, the cancellation and the hop back to the
-    // UI thread; this dialog only says what to check and what to do with the
-    // answer. The same task serves the search row and Details.
-    auto deliver = [self, alive](ArchiveCheckTask::Result result) {
-        if (!alive || !*alive) return;
-        self->m_archiveRunning = false;
-        self->m_checkLine = result.message;
-        self->m_archiveEntries = std::move(result.entries);
-        self->m_reputationHelper->refreshReputationLabel();
-        self->updateSecurityPanel();
-        self->showArchiveEntries();
-    };
-
-    if (!body.empty()) {
-        m_archiveTask =
-            ArchiveCheckTask::startFromTorrentBody(body, index, path, deliver);
-    } else {
-        m_archiveTask = ArchiveCheckTask::startFromMagnet(
-            magnet, torrentPath.empty() ? torrentUrl : torrentPath, index, path,
-            deliver);
-    }
+    if (m_archiveHelper) m_archiveHelper->checkArchive();
 }
 
-void AddTorrentDialog::showArchiveEntries() {
-    if (!m_archiveBrowser) return;
-    m_archiveBrowser->clear();
-    if (m_archiveEntries.empty()) {
-        m_archiveBrowser->hide();
-        return;
-    }
-    // Every entry, in archive order. The browser scrolls, so the list is not
-    // cut here the way the search row cuts it at eight.
-    for (const SecurityFile& entry : m_archiveEntries) {
-        m_archiveBrowser->add(SecurityBadge::archiveEntryLine(entry).c_str());
-    }
-    m_archiveBrowser->show();
-    redraw();
+void AddTorrentDialog::calculateHash() {
+    if (m_fileHashHelper) m_fileHashHelper->calculateHash();
+}
+
+void AddTorrentDialog::onCalculateHash(Fl_Widget*, void* data) {
+    AddTorrentDialog* dlg = static_cast<AddTorrentDialog*>(data);
+    if (dlg) dlg->calculateHash();
 }
 
 void AddTorrentDialog::onFileSelectionChanged(Fl_Widget*, void* data) {
@@ -791,4 +714,52 @@ void AddTorrentDialog::checkReputation() {
             break;
     }
     m_reputationHelper->refreshReputationLabel();
+}
+
+std::optional<lt::add_torrent_params>
+AddTorrentDialog::buildAddTorrentParams() {
+    const std::string torrentPath = m_filePathInput &&
+                                            m_filePathInput->value()
+                                        ? m_filePathInput->value()
+                                        : "";
+    const std::string magnet =
+        m_magnetInput && m_magnetInput->value() ? m_magnetInput->value()
+                                               : "";
+    std::string body = m_torrentBody;
+    // A body that describes a different torrent than the magnet on screen must
+    // never be used: the answer would be about someone else's files.
+    if (!body.empty() && !magnet.empty()) {
+        const std::string expected = TorrentFileList::magnetHash(magnet);
+        const std::string actual = TorrentFileList::infoHashOfTorrentFile(body);
+        if (!expected.empty() && !actual.empty() && expected != actual) {
+            body.clear();
+        }
+    }
+    const std::string torrentUrl = m_torrentUrl;
+    if (torrentPath.empty() && body.empty() && torrentUrl.empty() &&
+        magnet.empty()) {
+        return std::nullopt;
+    }
+
+    lt::add_torrent_params atp;
+    if (!body.empty()) {
+        try {
+            atp = lt::load_torrent_buffer(
+                lt::span<char const>(body.data(), body.size()));
+        } catch (const std::exception&) {
+            return std::nullopt;
+        }
+    } else if (!torrentPath.empty()) {
+        try {
+            atp = lt::load_torrent_file(torrentPath);
+        } catch (const std::exception&) {
+            return std::nullopt;
+        }
+    } else {
+        lt::error_code mec;
+        atp = lt::parse_magnet_uri(magnet, mec);
+        if (mec) return std::nullopt;
+        TorrentFileList::addDefaultTrackers(atp.trackers);
+    }
+    return atp;
 }

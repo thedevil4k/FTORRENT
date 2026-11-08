@@ -34,9 +34,15 @@ public:
 
     // Starts a detached worker thread. The caller owns the returned handle only
     // long enough to cancel() if the dialog closes before the answer arrives.
+    //
+    // `quarantineDir`, when non-empty, is used as the throwaway download dir
+    // instead of a fresh temp dir. It is created with restrictive permissions
+    // before the session starts and cleaned (contents removed) after the hash
+    // is computed; the directory itself is left for the caller to remove.
     static std::shared_ptr<TorrentFileHashTask>
     start(lt::add_torrent_params params, int fileIndex,
-          const std::string& filePath, std::string savePath, Deliver deliver);
+          const std::string& filePath, std::string savePath, Deliver deliver,
+          const std::string& quarantineDir = std::string());
 
     void cancel();
     ~TorrentFileHashTask();
@@ -47,7 +53,8 @@ public:
 private:
     TorrentFileHashTask(lt::add_torrent_params params, int fileIndex,
                         const std::string& filePath, std::string savePath,
-                        Deliver deliver);
+                        Deliver deliver,
+                        const std::string& quarantineDir = std::string());
     void run();
     static void deliverOnUiThread(void* data);
 
@@ -56,6 +63,7 @@ private:
     std::string m_filePath;
     std::string m_savePath;   // caller's save path (not used for storage)
     std::string m_tempDir;    // throwaway directory the session writes into
+    std::string m_quarantineDir; // caller-provided isolated dir, if any
     Deliver m_deliver;
     std::atomic<bool> m_cancel{false};
     std::shared_ptr<lt::session> m_session;

@@ -46,7 +46,7 @@ ReputationTarget AddTorrentDialogReputation::prepareReputation(
     dlg->m_checkLine = "Hash: reading the file's pieces...";
     refreshReputationLabel();
 
-    auto params = buildAddTorrentParams();
+    auto params = dlg->buildAddTorrentParams();
     if (!params) {
         dlg->m_fileHashRunning = false;
         dlg->m_reputation = ReputationService::noHashResult();
@@ -56,7 +56,8 @@ ReputationTarget AddTorrentDialogReputation::prepareReputation(
 
     std::shared_ptr<bool> alive = dlg->m_alive;
     dlg->m_fileHashTask = TorrentFileHashTask::start(
-        *params, hashTarget->fileIndex, hashTarget->path, dlg->m_savePath,
+        *params, hashTarget->fileIndex, hashTarget->path,
+        dlg->m_savePath,
         [this, alive](TorrentFileHashTask::Result result) {
             if (!alive || !*alive) return;
             dlg->m_fileHashRunning = false;
@@ -107,53 +108,4 @@ void AddTorrentDialogReputation::refreshReputationLabel() {
         dlg->m_reputationLabel->labelcolor(fl_rgb_color(110, 110, 110));
     }
     dlg->m_reputationLabel->redraw();
-}
-
-std::optional<lt::add_torrent_params>
-AddTorrentDialogReputation::buildAddTorrentParams() {
-    const std::string torrentPath = dlg->m_filePathInput &&
-                                            dlg->m_filePathInput->value()
-                                        ? dlg->m_filePathInput->value()
-                                        : "";
-    const std::string magnet =
-        dlg->m_magnetInput && dlg->m_magnetInput->value()
-            ? dlg->m_magnetInput->value()
-            : "";
-    std::string body = dlg->m_torrentBody;
-    // A body that describes a different torrent than the magnet on screen must
-    // never be used: the answer would be about someone else's files.
-    if (!body.empty() && !magnet.empty()) {
-        const std::string expected = TorrentFileList::magnetHash(magnet);
-        const std::string actual = TorrentFileList::infoHashOfTorrentFile(body);
-        if (!expected.empty() && !actual.empty() && expected != actual) {
-            body.clear();
-        }
-    }
-    const std::string torrentUrl = dlg->m_torrentUrl;
-    if (torrentPath.empty() && body.empty() && torrentUrl.empty() &&
-        magnet.empty()) {
-        return std::nullopt;
-    }
-
-    lt::add_torrent_params atp;
-    if (!body.empty()) {
-        try {
-            atp = lt::load_torrent_buffer(
-                lt::span<char const>(body.data(), body.size()));
-        } catch (const std::exception&) {
-            return std::nullopt;
-        }
-    } else if (!torrentPath.empty()) {
-        try {
-            atp = lt::load_torrent_file(torrentPath);
-        } catch (const std::exception&) {
-            return std::nullopt;
-        }
-    } else {
-        lt::error_code mec;
-        atp = lt::parse_magnet_uri(magnet, mec);
-        if (mec) return std::nullopt;
-        TorrentFileList::addDefaultTrackers(atp.trackers);
-    }
-    return atp;
 }

@@ -17,9 +17,12 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 class ArchiveCheckTask;
 class AddTorrentDialogReputation;
+class AddTorrentDialogFileHash;
+class AddTorrentDialogArchive;
 class TorrentFileHashTask;
 
 /**
@@ -66,6 +69,8 @@ public:
 
 private:
     friend class AddTorrentDialogReputation;
+    friend class AddTorrentDialogFileHash;
+    friend class AddTorrentDialogArchive;
 
     // Common widgets
     Fl_Input* m_savePathInput;
@@ -110,11 +115,16 @@ private:
     std::string m_torrentSha256;
     std::string m_torrentSha256Path;
     std::vector<SecurityFile> m_archiveEntries;
-    void showArchiveEntries();
 
     // Buttons
     Fl_Button* m_okButton;
     Fl_Button* m_cancelButton;
+
+    // Hash-by-file: an explicit, per-file, opt-in check. Only one runs at a
+    // time; clicking a row first, then this button, hashes that file's pieces.
+    Fl_Button* m_calculateHashButton;
+    std::unique_ptr<AddTorrentDialogFileHash> m_fileHashHelper;
+    std::unique_ptr<AddTorrentDialogArchive> m_archiveHelper;
 
     // Results
     std::string m_torrentPath;
@@ -178,11 +188,6 @@ private:
     void showFiles(const std::vector<TorrentFileEntry>& files,
                    int totalFileCount);
     std::vector<TorrentFileEntry> selectedFiles() const;
-    // The archive the check button would read. The highlighted row wins when
-    // it is a RAR/ZIP: clicking a row in an Fl_Check_Browser also toggles its
-    // checkbox, so the user's click must not disable the button. Falls back to
-    // a checked archive, then to the first archive in the list.
-    const TorrentFileEntry* archiveTarget() const;
     void updateSecurityPanel();
     void checkReputation();
     std::optional<lt::add_torrent_params> buildAddTorrentParams();
@@ -190,6 +195,10 @@ private:
     static void onCheckArchive(Fl_Widget* w, void* data);
     bool confirmRiskySelection();
     std::string fileRowLabel(const TorrentFileEntry& file) const;
+    // Hash the highlighted (or first checked) file's pieces, without touching
+    // the rest of the torrent. Opt-in: the user must click this button.
+    void calculateHash();
+    static void onCalculateHash(Fl_Widget* w, void* data);
     // Shows or hides the green dot, following the same precedence validate()
     // uses: a .torrent file wins over a magnet, so the dot only shows while
     // the magnet is what would actually be imported.
