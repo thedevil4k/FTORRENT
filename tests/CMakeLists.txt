@@ -75,6 +75,7 @@ endfunction()
 
 ftorrent_add_test(toolbar_layout toolbar_layout.cpp)
 ftorrent_add_test(toolbar_clicks toolbar_clicks.cpp)
+ftorrent_add_test(add_torrent_dialog add_torrent_dialog.cpp)
 ftorrent_add_test(flows flows.cpp)
 ftorrent_add_test(icons icons.cpp icons_geometry.cpp)
 ftorrent_add_test(file_hash file_hash.cpp)
@@ -119,12 +120,13 @@ add_custom_target(ftorrent_test_assets ALL
             ${CMAKE_SOURCE_DIR}/src/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
     COMMENT "Staging src/assets beside the test binaries for AssetLoader"
 )
-foreach(stage icons toolbar_layout toolbar_clicks flows)
+foreach(stage icons toolbar_layout toolbar_clicks add_torrent_dialog flows)
     add_dependencies(${stage} ftorrent_test_assets)
 endforeach()
 
 add_test(NAME toolbar_layout COMMAND toolbar_layout)
 add_test(NAME toolbar_clicks COMMAND toolbar_clicks)
+add_test(NAME add_torrent_dialog COMMAND add_torrent_dialog)
 add_test(NAME icons_full COMMAND icons full)
 add_test(NAME flows COMMAND flows)
 add_test(NAME file_hash COMMAND file_hash)
@@ -172,7 +174,8 @@ else()
         "Run scripts/quality/check_invariants.py by hand instead.")
 endif()
 
-set(FTORRENT_TESTS toolbar_layout toolbar_clicks icons_full flows file_hash
+set(FTORRENT_TESTS toolbar_layout toolbar_clicks add_torrent_dialog
+    icons_full flows file_hash
     security_analyzer security_badge security_keys reputation archive_preflight
     archive_preflight_network security_events search_results search_scope
     search_parse filelist filelist_network format)
@@ -197,8 +200,9 @@ set_tests_properties(toolbar_layout PROPERTIES TIMEOUT 300)
 # Labels let CI choose a subset without naming tests one by one: `unit` is
 # headless and offline, `ui` needs FLTK but not the network, and `network`
 # covers the end-to-end journeys that talk to search engines and trackers.
-set_tests_properties(toolbar_layout toolbar_clicks icons_full security_badge
-    search_results PROPERTIES LABELS "ui")
+set_tests_properties(toolbar_layout toolbar_clicks add_torrent_dialog
+    icons_full security_badge search_results
+    PROPERTIES LABELS "ui")
 set_tests_properties(file_hash security_analyzer security_keys
     PROPERTIES LABELS "unit")
 set_tests_properties(search_parse filelist format PROPERTIES LABELS "unit")

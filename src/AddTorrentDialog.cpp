@@ -179,7 +179,9 @@ void AddTorrentDialog::createUI() {
     m_checkArchive->tooltip(
         "Reads only the archive index (first and last piece for ZIP/RAR5, a "
         "bounded header walk for older RAR) to list what "
-        "is inside. Saved to a temporary folder and deleted afterwards.");
+        "is inside. The highlighted .zip/.rar is used; it does not need to be "
+        "checked for download. Saved to a temporary folder and deleted "
+        "afterwards.");
     m_checkArchive->deactivate();
 
     // What the last check listed, under the panel. Hidden until there is
@@ -509,6 +511,33 @@ std::vector<TorrentFileEntry> AddTorrentDialog::selectedFiles() const {
     return selected;
 }
 
+const TorrentFileEntry* AddTorrentDialog::archiveTarget() const {
+    if (!m_fileBrowser) return nullptr;
+
+    // Fl_Check_Browser::item_select() toggles the check box when a row is
+    // selected, so a click on a checked archive unchecks it. The highlight is
+    // the user saying "this one"; it must win over the checkbox state.
+    const int highlighted = m_fileBrowser->value();
+    if (highlighted >= 1 && highlighted <= static_cast<int>(m_files.size())) {
+        const TorrentFileEntry& file =
+            m_files[static_cast<std::size_t>(highlighted - 1)];
+        if (ArchiveInspector::canListBeforeDownload(file.path)) return &file;
+    }
+
+    for (int row = 0; row < static_cast<int>(m_files.size()); ++row) {
+        if (!m_fileBrowser->checked(row + 1)) continue;
+        const TorrentFileEntry& file = m_files[static_cast<std::size_t>(row)];
+        if (ArchiveInspector::canListBeforeDownload(file.path)) return &file;
+    }
+
+    // Nothing checked: the button still has a well-defined target, and the
+    // answer names the file so the user can see which one was read.
+    for (const TorrentFileEntry& file : m_files) {
+        if (ArchiveInspector::canListBeforeDownload(file.path)) return &file;
+    }
+    return nullptr;
+}
+
 void AddTorrentDialog::updateSecurityPanel() {
     if (!m_securityShield) return;
 
@@ -593,10 +622,7 @@ void AddTorrentDialog::updateSecurityPanel() {
     }
 
     if (m_checkArchive) {
-        const bool hasArchive = std::any_of(
-            selected.begin(), selected.end(), [](const TorrentFileEntry& file) {
-                return ArchiveInspector::canListBeforeDownload(file.path);
-            });
+        const bool hasArchive = archiveTarget() != nullptr;
         if (hasArchive && !m_archiveRunning) m_checkArchive->activate();
         else m_checkArchive->deactivate();
     }
@@ -612,17 +638,11 @@ void AddTorrentDialog::onCheckArchive(Fl_Widget*, void* data) {
 void AddTorrentDialog::checkArchive() {
     if (m_archiveRunning) return;
 
-    // The first archive in the selection, so the answer names one file.
-    const std::vector<TorrentFileEntry> selected = selectedFiles();
-    const TorrentFileEntry* archive = nullptr;
-    for (const TorrentFileEntry& file : selected) {
-        if (ArchiveInspector::canListBeforeDownload(file.path)) {
-            archive = &file;
-            break;
-        }
-    }
+    // The same target the button was enabled for: highlighted row first, then
+    // a checked archive, then any archive in the list.
+    const TorrentFileEntry* archive = archiveTarget();
     if (!archive) {
-        m_checkLine = "Archive: select a RAR or ZIP first.";
+        m_checkLine = "Archive: this torrent has no .zip or .rar to list.";
         m_reputationHelper->refreshReputationLabel();
         return;
     }

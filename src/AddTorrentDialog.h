@@ -178,6 +178,11 @@ private:
     void showFiles(const std::vector<TorrentFileEntry>& files,
                    int totalFileCount);
     std::vector<TorrentFileEntry> selectedFiles() const;
+    // The archive the check button would read. The highlighted row wins when
+    // it is a RAR/ZIP: clicking a row in an Fl_Check_Browser also toggles its
+    // checkbox, so the user's click must not disable the button. Falls back to
+    // a checked archive, then to the first archive in the list.
+    const TorrentFileEntry* archiveTarget() const;
     void updateSecurityPanel();
     void checkReputation();
     std::optional<lt::add_torrent_params> buildAddTorrentParams();
