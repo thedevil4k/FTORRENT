@@ -97,7 +97,14 @@ private:
     // Security tab
     void loadKeyIntoField();
     void refreshKeyStatus();
+    // Writes one field when it holds a non-empty key. Returns false only when
+    // the write failed; an empty field is a no-op.
+    bool storeKey(SecurityKeys::Provider provider, Fl_Input* field);
     void saveKeyFromField(SecurityKeys::Provider provider, Fl_Input* field);
+    // Stores every non-empty key field. Used by OK/Apply so pasting a key and
+    // accepting the dialog is enough; an empty field never removes a key,
+    // because "Remove key" is the explicit way to do that.
+    bool persistKeyFields();
     void clearKeyFor(SecurityKeys::Provider provider, Fl_Input* field);
     static void onSaveKey(Fl_Widget* w, void* data);
     static void onClearKey(Fl_Widget* w, void* data);

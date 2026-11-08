@@ -307,14 +307,37 @@ void PreferencesDialog::saveKeyFromField(SecurityKeys::Provider provider,
         return;
     }
 
+    if (storeKey(provider, field)) refreshKeyStatus();
+}
+
+bool PreferencesDialog::storeKey(SecurityKeys::Provider provider,
+                                 Fl_Input* field) {
+    if (!field) return true;
+
+    const std::string key =
+        SecurityKeys::normalize(field->value() ? field->value() : "");
+    if (key.empty()) return true;
+
     std::string error;
     if (!SecurityKeys::save(provider, key, error)) {
         fl_alert("The key could not be saved: %s", error.c_str());
-        return;
+        return false;
     }
     // Show what was actually stored, without the paste noise.
     field->value(key.c_str());
+    return true;
+}
+
+bool PreferencesDialog::persistKeyFields() {
+    // Both fields are attempted, so a failure on one does not silently skip
+    // the other. An empty field is a no-op: "Remove key" is the only action
+    // that deletes one.
+    const bool virusTotal =
+        storeKey(SecurityKeys::Provider::VirusTotal, m_virusTotalKey);
+    const bool malwareBazaar =
+        storeKey(SecurityKeys::Provider::MalwareBazaar, m_malwareBazaarKey);
     refreshKeyStatus();
+    return virusTotal && malwareBazaar;
 }
 
 void PreferencesDialog::clearKeyFor(SecurityKeys::Provider provider,
@@ -439,7 +462,7 @@ void PreferencesDialog::saveSettings() {
 }
 
 void PreferencesDialog::applySettings() {
-    if (validateSettings()) {
+    if (validateSettings() && persistKeyFields()) {
         saveSettings();
         fl_message("Settings applied successfully.\nRestart may be required "
                    "for some changes.");
@@ -518,7 +541,7 @@ void PreferencesDialog::onRandomPort(Fl_Widget*, void* data) {
 void PreferencesDialog::onOK(Fl_Widget*, void* data) {
     PreferencesDialog* dlg = (PreferencesDialog*)data;
 
-    if (dlg->validateSettings()) {
+    if (dlg->validateSettings() && dlg->persistKeyFields()) {
         dlg->saveSettings();
         dlg->m_okClicked = true;
         dlg->hide();

@@ -96,7 +96,7 @@ Both providers need a key, so open **Preferences ▸ Security** and paste two:
 - **VirusTotal API key** — from your VirusTotal account, 64 characters.
 - **MalwareBazaar Auth-Key** — from abuse.ch. MalwareBazaar answers HTTP 401 without it, so it cannot be asked anonymously.
 
-Each is stored with Windows DPAPI, or in a file only your user can read on Linux; neither is ever written to `settings.ini`. If one is missing, that provider is skipped and the other is still asked; the dialog says which.
+Each is stored with Windows DPAPI, or in a file only your user can read on Linux; neither is ever written to `settings.ini`. Pasting a key and pressing **OK** or **Apply** stores it, just like **Save key**; **Remove key** is the only button that deletes one. If one is missing, that provider is skipped and the other is still asked; the dialog says which.
 
 ### Looking inside a RAR or ZIP
 
